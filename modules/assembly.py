@@ -48,20 +48,36 @@ class Segmentation:
 
 class VesselTree:
 
-    def __init__(self, case, image_file, init_step):
+    def __init__(self, case, image_file, init_step, pot_branches):
         self.name = case
         self.image = image_file
-        self.bifurcations = []
-        self.branches = []
+        self.bifurcations = [0]
+        self.branches = [[0]]
         self.steps = [init_step]
+        self.potential_branches = pot_branches
 
     def add_step(self, i, step, branch):
         self.steps.append(step)
         self.branches[branch].append(i)
 
-    def add_branch(self, i, step):
-        self.branches.append([i])
-        self.bifurcations.append(i)
+    def remove_step(self, i, step, branch):
+        self.steps.remove(step)
+        self.branches[branch].remove(i)
+
+    def add_branch(self, connector, i):
+        self.branches.append([connector, i])
+        self.bifurcations.append(connector)
+
+    def remove_branch(self, branch):
+        start = self.branches[branch][1]
+        end = self.branches[branch][-1]
+        del self.steps[start:end]
+        self.branches[branch] = []
+        del self.bifurcations[branch]
+
+    def sort_potential(self):
+        import operator
+        self.potential_branches.sort(key=operator.itemgetter('radius'))
 
     def get_previous_n(self, i, branch, n):
         branch0 = self.branches[branch]
@@ -74,3 +90,36 @@ class VesselTree:
             for i in range(1,res):
                 previous_n.append(conn+i)
                 previous_n.append(conn-i)
+
+class VesselTreeParallel:
+
+    def __init__(self, case, image_file, pot_branches):
+        self.name = case
+        self.image = image_file
+        self.potential_branches = pot_branches
+        self.branches = []
+
+    def add_branch(self, branch):
+        self.branches.append(branch)
+        self.potential_branches.extend(branch.children)
+
+    def remove_potential(self, pot_branch):
+        self.potential_branches = [i for i in self.potential_branches if not (i['radius'] == pot_branch['radius'])]
+
+    def sort_potential(self):
+        import operator
+        self.potential_branches.sort(key=operator.itemgetter('radius'))
+
+
+class Branch:
+
+    def __init__(self, init_step):
+        self.steps = [init_step]
+        self.parent = init_step['connection']
+        self.children = []
+
+    def add_step(self, step):
+        self.steps.append(step)
+
+    def add_child(self, step):
+        self.children.append(step)

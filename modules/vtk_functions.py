@@ -687,7 +687,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, assem
         angle = 360/(2*np.pi)*np.arccos(np.dot(old_vector, vector))
         print("The angle is: " + str(angle))
 
-        if angle < 70:
+        if angle < 90:
             point_to_check = locs[-1] + 3*rads[id_along_cent_save] * vector
             pfn = '/Users/numisveinsson/Downloads/point.vtp'
             polydata_point = points2polydata([point_to_check.tolist()])
@@ -719,21 +719,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, assem
                 print("ERROR: Point is inside surface")
                 import pdb; pdb.set_trace()
         else:
-            print("Angle less than desired, returning None for ip=" + str(ip))
-
-
-        # if np.linalg.norm(locs[0]-old_point) > np.linalg.norm(locs[0]-current_point):# and np.linalg.norm(locs[-1]-old_point) < np.linalg.norm(locs[-1]-current_point): ## Make sure you start at closest
-        #     print("Flipping for ip: " +str(ip))
-        #     locs = np.flip(points_in_cells[0][point_ids], 0)
-        #     rads = np.flip(rads)
-        #     points.append(locs[-1])
-        #     vessel_r.append(rads[-1])
-        # elif np.linalg.norm(locs[-1]-old_point) > np.linalg.norm(locs[-1]-current_point):
-        #     points.append(locs[-1])
-        #     vessel_r.append(rads[-1])
-        # else:
-        #     import pdb; pdb.set_trace()
-        #     print("Error orienting centerline, returing None for ip=" + str(ip))
+            print("Angle weird, returning None for ip=" + str(ip))
 
     arr_rad = np.array(vessel_r)
     arr_pt = np.array(points)

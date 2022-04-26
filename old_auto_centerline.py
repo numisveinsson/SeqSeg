@@ -166,7 +166,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality, im
             # assembly = sf.remove_other_vessels(assembly, initial_seed)
             # #assembly_surface = vf.evaluate_surface(assembly, 1)
 
-            point_tree, radius_tree, angle_change = vf.get_next_point_end(centerline_poly, point, old_point, old_radius, assembly_segs.assembly)
+            point_tree, radius_tree, angle_change = vf.get_next_points(centerline_poly, point, old_point, old_radius, assembly_segs.assembly)
             if take_time:
                 print("\n Calc next point: " + str(time.time() - start_time_loc) + " s\n")
 
@@ -281,12 +281,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality, im
 if __name__=='__main__':
 
     ## Directories
-    dir_output = '/Users/numisveinsson/Documents/Berkeley/Research/Automatic_Centerline_ML/output_test3/'
+    dir_output = '/Users/numisveinsson/Documents/Berkeley/Research/Automatic_Centerline_ML/output2_test3/'
     directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
-    dir_model_weights = '/Users/numisveinsson/Documents/Berkeley/Research/BloodVessel_UNet3D/output/test14/'
+    dir_model_weights = '/Users/numisveinsson/Documents/Berkeley/Research/BloodVessel_UNet3D/output/test18/'
 
     ## Information
-    case = '0176_0000'
+    case = '0146_1001'
     modality = 'ct'
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold = 0.5 # Threshold for binarization of prediction
