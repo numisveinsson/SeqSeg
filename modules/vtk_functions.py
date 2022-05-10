@@ -640,8 +640,9 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
 
     return locs[count], rads[count]
 
-def get_next_points(centerline_poly, current_point, old_point, old_radius, assembly_image):
+def get_next_points(centerline_poly, current_point, old_point, old_radius):
 
+    #print('Calculating next steps')
     cent = centerline_poly
     num_points = cent.GetNumberOfPoints()               # number of points in centerline
     cent_data = collect_arrays(cent.GetPointData())           # point locations as numpy array
@@ -685,7 +686,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, assem
             vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
 
         angle = 360/(2*np.pi)*np.arccos(np.dot(old_vector, vector))
-        print("The angle is: " + str(angle))
+        #print("The angle is: " + str(angle))
 
         if angle < 90:
             point_to_check = locs[-1] + 3*rads[id_along_cent_save] * vector
@@ -697,7 +698,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, assem
             if not is_inside:
                 #print("Point Outside Surface!")
                 #if not next((True for elem in points if np.array_equal(elem, locs[id_along_cent])), False):
-                print("Saving for ip: " +str(ip))
+                #print("Saving for ip: " +str(ip))
 
                 radius_to_save = max(rads[id_along_cent_save], 0.05) ##  have mininum size radius
                 if radius_to_save < 0.1 and old_radius > radius_to_save:
@@ -718,8 +719,8 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, assem
             else:
                 print("ERROR: Point is inside surface")
                 import pdb; pdb.set_trace()
-        else:
-            print("Angle weird, returning None for ip=" + str(ip))
+        #else:
+            #print("Angle weird, returning None for ip=" + str(ip))
 
     arr_rad = np.array(vessel_r)
     arr_pt = np.array(points)

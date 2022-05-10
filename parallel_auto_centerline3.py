@@ -2,7 +2,7 @@ import faulthandler
 faulthandler.enable()
 
 import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor, wait, ALL_COMPLETED
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait, ALL_COMPLETED
 from functools import partial
 from itertools import product
 
@@ -31,6 +31,9 @@ from model import UNet3DIsensee
         # cl.extract_center_lines(params)
         # cl.extract_branches(params)
         # cl.write_outlet_face_names(params)
+
+#import cProfile
+#cProfile.run('main()')
 
 def create_directories(output_folder):
     try:
@@ -90,6 +93,13 @@ def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
             if step_seg['surf_file']:
                 vf.write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
 
+def chunks(l, n):
+    """Yield n number of sequential chunks from l."""
+    d, r = divmod(len(l), n)
+    for i in range(n):
+        si = (d+1)*(i if i < r else r) + d*(0 if i < r else i - r)
+        yield l[si:si+(d+1 if i < r else d)]
+
 def trace_branch(input_queue, init_step, branch_number, image_file, output_folder, modality, threshold, initial_seed, seg_file = None):
 
     prevent_retracing = False
@@ -99,6 +109,7 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
     inside_branch = 0
     magnify_radius = 1.1
     number_chances = 1
+
     run_time = True
 
     if seg_file:
@@ -110,6 +121,49 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
     i = 0
     next_step_worked = True
     print("\n** branch is: " + str(branch_number) + "**")
+
+    # lock = mp.Lock()
+    workers = 1
+
+    def write_to_global(fl_ids_chunks, lock, init_id):
+        sub_array = np.array([index_extract[0], index_extract[1], index_extract[2]])
+        len_in_z = len(fl_ids_chunks[0])
+        # print('length of z is ', len_in_z)
+        for i, fl_list in enumerate(fl_ids_chunks):
+            lock.acquire()
+            # print('initid is ', init_id)
+            # print(idx_arr[:, init_id + i*len_in_z])
+            local_index = idx_arr[:, init_id + i*len_in_z] - sub_array
+            # print('local index is ', local_index)
+            values = np.array(assembly_array[fl_list[0]:fl_list[-1]+1]) + np_prob_array[local_index[0], local_index[1], :]
+            # print([fl_list[0], fl_list[-1]+1])
+            # print(np_prob_array.shape)
+            assembly_array[fl_list[0]:fl_list[-1]+1] = values
+
+            values = np.array(number_updates_array[fl_list[0]:fl_list[-1]+1]) + 1
+            number_updates_array[fl_list[0]:fl_list[-1]+1] = values
+
+            lock.release()
+        return
+    #
+    # def write_to_global(ids_slices, lock, worker_id):
+    #     sub_array = np.array([index_extract[0], index_extract[1], index_extract[2]])
+    #     for i, ids_slice in enumerate(ids_slices):
+    #         lock.acquire()
+    #         #local_assembly = assembly_array[ids]
+    #         #print(assembly_array[0:5])
+    #         # values = assembly(ids_slice[0]:ids_slice[-1])
+    #         # values += np_prob_array[tuple(idx_arr[:,index] - sub_array) ]
+    #         slice_index_extract = idx_arr[:, (cumu[worker_id]+i)*size_slice] #what is the index though?
+    #         values_in_local = np_prob_array[slice_index_extract[0], slice_index_extract[1], slice_index_extract[2]:slice_index_extract[2]+size_slice]
+    #         values_in_global = np.array(assembly_array[ids_slice[0]:ids_slice[-1]])
+    #         assembly_array[ids_slice[0]:ids_slice[-1]] = [val for val in (values_in_local+values_in_global)]
+    #         # assembly_array[fl_ids[index]] += np_prob_array[tuple(idx_arr[:,index] - sub_array) ]
+    #         # number_updates_array[fl_ids[index]] += 1
+    #         number_updates_array[ids_slice[0]:ids_slice[-1]] = [val+1 for val in number_updates_array[ids_slice[0]:ids_slice[-1]]]
+    #         lock.release()
+    #     return
+
     while next_step_worked:
         #print("\n** branch is: " + str(branch_number) + "**")
         #print("\n** i is: " + str(i) + "**")
@@ -161,13 +215,12 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
                     sitk.WriteImage(seg_volume, seg_fn)
             if take_time:
                 print("\n Extracting and writing volumes: " + str(time.time() - start_time_loc) + " s\n")
+
             if run_time:
                 step_seg['time']=[]
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
 
-            #print(hex(id(model)))
-            #print(model)
             # Prediction
             predict = Prediction(model, model_name, modality, cropped_volume, img_shape, output_folder+'predictions', threshold, seg_volume)
             predict.volume_prediction(1)
@@ -188,6 +241,7 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
             pd_fn = output_folder +'predictions/seg_'+case+'_branch'+str(branch_number)+'_'+str(i)+'.vtk'
             if take_time:
                 print("\n Prediction, forward pass: " + str(time.time() - start_time_loc) + " s\n")
+
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
@@ -205,6 +259,7 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
             surface_smooth = vf.bound_polydata_by_image(vtkimage[0], surface_smooth, length*1/20)
             if take_time:
                 print("\n Calc and smooth surface: " + str(time.time() - start_time_loc) + " s\n")
+
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
@@ -217,26 +272,6 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
                 vf.write_vtk_polydata(surface_smooth, sfn)
                 step_seg['surf_file'] = sfn
                 #step_seg['surface'] = surface_smooth
-
-
-            # Assembly
-
-            # N = 5
-            # buffer = 5
-            # if len(branch.steps) % N == 0 and len(branch.steps) >= (N+buffer):
-            #     for j in range(N):
-            #         if branch.steps[-(j+buffer)]['prob_predicted_vessel']:
-            #             assembly_segs.add_segmentation(branch.steps[-(j+buffer)]['prob_predicted_vessel'], branch.steps[-(j+buffer)]['img_index'], branch.steps[-(j+buffer)]['img_size'])
-            #             branch.steps[-(j+buffer)]['prob_predicted_vessel'] = None
-            #
-            #     sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_branch'+str(branch_number)+'_'+str(i)+'.vtk')
-            #     assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=0.5, upperThreshold=1)
-            #     assembly = sf.remove_other_vessels(assembly, initial_seed)
-            #     surface_assembly = vf.evaluate_surface(assembly, 1)
-            #     vf.write_vtk_polydata(surface_assembly, output_folder +'assembly/assembly_surface_'+case+'_branch'+str(branch_number)+'_'+str(i)+'.vtk')
-            #
-            #     if take_time:
-            #         print("\n Adding to seg volume: " + str(time.time() - start_time_loc) + " s\n")
 
             # Centerline
 
@@ -255,7 +290,6 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
                     centerline_poly = centerline_poly1
             if take_time:
                 print("\n Calc centerline: " + str(time.time() - start_time_loc) + " s\n")
-
             if write_samples:
                 vmtkfs.write_centerline(centerline_poly, cfn)
 
@@ -268,7 +302,6 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
-
 
             # Assembly
             cut = 1
@@ -283,11 +316,34 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
             listx, listy, listz = zip(*vals)
             idx_arr = np.array([listx, listy, listz])
             fl_ids = np.ravel_multi_index(idx_arr, size_im)
+            # getting chunks to be assigned to each thread
+            size_slice = edges[2]-index_extract[2]
+            number_mini_chunk = (edges[0]-index_extract[0])*(edges[1]-index_extract[1])
+            mini_ids = list(chunks(fl_ids, number_mini_chunk))
 
             start_time_global = time.time()
-            for index in range(len(fl_ids)):
-                assembly_array[fl_ids[index]] += np_prob_array[tuple(idx_arr[:,index] - np.array([index_extract[0], index_extract[1], index_extract[2]])) ]
-                number_updates_array[fl_ids[index]] += 1
+            list_ids_slices = list(chunks(mini_ids, workers))
+            size_workers = np.array([len(c) for c in list_ids_slices])
+            cumu = np.cumsum(size_workers)
+            init_ids = np.zeros(workers).astype(int)
+
+            init_ids[1:] += cumu[0:-1]*size_slice
+
+            # print('about to enter thread')
+            with ThreadPoolExecutor(max_workers=workers) as executor_thread:
+                fut = [executor_thread.submit(write_to_global, list_ids_slices[i_thread], mp.Lock(), init_id) for i_thread,init_id in enumerate(init_ids)]
+            done, _ = wait(fut, timeout=None, return_when=ALL_COMPLETED)
+            for future in done:
+                try:
+                    data = future.result()
+                except Exception as e: print(e)
+            # for index in range(len(fl_ids)):
+            #     lock.acquire()
+            #     #local_assembly = assembly_array[ids]
+            #     #print(assembly_array[0:5])
+            #     assembly_array[fl_ids[index]] += np_prob_array[tuple(idx_arr[:,index] - np.array([index_extract[0], index_extract[1], index_extract[2]])) ]
+            #     number_updates_array[fl_ids[index]] += 1
+            #     lock.release()
             if take_time:
                 print('writing to global done: ', time.time()-start_time_global)
             if run_time:
@@ -301,7 +357,7 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
-
+            #step_seg['time_total'] = time.time() - start_time_loc
             branch.steps[i] = step_seg
 
             if point_tree.size != 0:
@@ -325,9 +381,8 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
                 print(this)
             #print("\n This location done: " + str(time.time() - start_time_loc) + " s\n")
 
-
         except Exception as e:
-            #print(e)
+            print(e)
 
             print('Failed step')
             if step_seg['seg_file']:
@@ -362,14 +417,14 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
                 print("\n Moving onto another branch")
                 next_step_worked = False
 
-                list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
-                for id in branch.steps:
-                    list_surf_branch.append(id['surface'])
-                    list_cent_branch.append(id['centerline'])
-                    list_pts_branch.append(id['point_pd'])
-                    del id['surface']
-                    del id['centerline']
-                    del id['point_pd']
+                # list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
+                # for id in branch.steps:
+                #     list_surf_branch.append(id['surface'])
+                #     list_cent_branch.append(id['centerline'])
+                #     list_pts_branch.append(id['point_pd'])
+                #     del id['surface']
+                #     del id['centerline']
+                #     del id['point_pd']
                 # list_centerlines.extend(list_cent_branch)
                 # list_surfaces.extend(list_surf_branch)
                 # list_points.extend(list_pts_branch)
@@ -386,7 +441,7 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
     print('had steps: ', i)
     return branch
 
-WAIT_SLEEP = 0.1 # second to adjust based on our application
+WAIT_SLEEP = 1 # second to adjust based on our application
 
 class BufferedIter(object):
     def __init__(self):
@@ -524,11 +579,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality, im
             if counter > max_number_steps:
                 break
 
+    start_time_assembly = time.time()
     output_array = np.array(assembly_array[:])/(np.array(number_updates_array[:])+1e-6)
     reader_img, _, size_im, spacing_im = sf.import_image(image_file)
     assembly_segs.assembly = sitk.GetImageFromArray(output_array.reshape(size_im).transpose(2,1,0))
     assembly_segs.assembly = sf.copy_settings(assembly_segs.assembly, reader_img)
-
+    print('Creating final 3D volume :', time.time() - start_time_assembly)
     return list_centerlines, list_surfaces, list_points, assembly_segs.assembly, vessel_tree
 
 
@@ -547,6 +603,7 @@ if __name__=='__main__':
     stepsize = 1 # Step size along centerline (proportional to radius at the point)
     dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case)
     dir_seg = None
+
     ## Create directories for results
     create_directories(dir_output)
 
@@ -558,14 +615,18 @@ if __name__=='__main__':
     init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, [0,0], 0)
     potential_branches = [init_step]
 
-    ## Trace centerline
+    ## Create Global Shared Arrays
     img = sf.read_image(dir_image)
     sizes = img.GetSize()
     start_time = time.time()
     total_size = sizes[0]*sizes[1]*sizes[2]
-    assembly_array = mp.Array("f", total_size, lock=True)
-    number_updates_array = mp.Array("i", total_size, lock=True)
+    assembly_array = mp.Array("f", total_size, lock=False)
+    number_updates_array = mp.Array("i", total_size, lock=False)
     print('done created array: ', (time.time() - start_time))
+
+    np_array_img = sitk.GetArrayFromImage(sitk.ReadImage(dir_image))
+    image_array = mp.Array("f", total_size, lock=False)
+    image_array[:] = np_array_img.flatten()
 
     ## Call function
     centerlines, surfaces, points, assembly, vessel_tree = trace_centerline(dir_output, dir_image, case, dir_model_weights, modality, nn_input_shape, threshold, stepsize, potential_branches, dir_seg, write_samples=True)
@@ -590,35 +651,34 @@ if __name__=='__main__':
                     time_arr[i] = step['time'][i]
                 time_sum += time_arr
                 counter += 1
+
     for i in range(len(names)):
         print('Average time for ' + names[i]+ ' : ', time_sum[i]/counter)
 
-
-    import pdb; pdb.set_trace()
-    total_time = 0
-    count = 0
-    for i in range(1,len(vessel_tree.steps)):
-        if vessel_tree.steps[i]['time']:
-            count += 1
-            total_time += vessel_tree.steps[i]['time']
-    print('Average time was :' + str(total_time/count))
-
-    final_surface = vf.appendPolyData(surfaces)
-    vf.write_vtk_polydata(final_surface, dir_output+'/final_'+case+'_'+str(i)+'_surfaces.vtp')
-
-    final_centerline = vf.appendPolyData(centerlines)
-    vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'+str(i)+'_centerlines.vtp')
-
-    final_points = vf.appendPolyData(points)
-    vf.write_vtk_polydata(final_points, dir_output+'/final_'+case+'_'+str(i)+'_points.vtp')
-
-    ## Assembly work
-    assembly = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
-    seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
-    assembly = sf.remove_other_vessels(assembly, seed)
-    assembly_surface = vf.evaluate_surface(assembly, 1)
-    vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly'+case+'_'+str(i)+'_surface.vtp')
-    surface_smooth = vf.smooth_surface(assembly_surface, 10)
-    vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly'+case+'_'+str(i)+'_surface_smooth.vtp')
-
-    import pdb; pdb.set_trace()
+    # total_time = 0
+    # count = 0
+    # for i in range(1,len(vessel_tree.steps)):
+    #     if vessel_tree.steps[i]['time']:
+    #         count += 1
+    #         total_time += vessel_tree.steps[i]['time']
+    # print('Average time was :' + str(total_time/count))
+    #
+    # final_surface = vf.appendPolyData(surfaces)
+    # vf.write_vtk_polydata(final_surface, dir_output+'/final_'+case+'_'+str(i)+'_surfaces.vtp')
+    #
+    # final_centerline = vf.appendPolyData(centerlines)
+    # vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'+str(i)+'_centerlines.vtp')
+    #
+    # final_points = vf.appendPolyData(points)
+    # vf.write_vtk_polydata(final_points, dir_output+'/final_'+case+'_'+str(i)+'_points.vtp')
+    #
+    # ## Assembly work
+    # assembly = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
+    # seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
+    # assembly = sf.remove_other_vessels(assembly, seed)
+    # assembly_surface = vf.evaluate_surface(assembly, 1)
+    # vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly'+case+'_'+str(i)+'_surface.vtp')
+    # surface_smooth = vf.smooth_surface(assembly_surface, 10)
+    # vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly'+case+'_'+str(i)+'_surface_smooth.vtp')
+    #
+    # import pdb; pdb.set_trace()

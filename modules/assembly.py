@@ -1,5 +1,7 @@
 import modules.sitk_functions as sf
+from modules import vtk_functions as vf
 import numpy as np
+import SimpleITK as sitk
 
 class Segmentation:
 
@@ -113,13 +115,54 @@ class VesselTreeParallel:
 
 class Branch:
 
-    def __init__(self, init_step):
+    def __init__(self, init_step, branch_number):
         self.steps = [init_step]
         self.parent = init_step['connection']
         self.children = []
+        self.branch_number = branch_number
 
     def add_step(self, step):
         self.steps.append(step)
 
     def add_child(self, step):
         self.children.append(step)
+
+
+def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
+
+    directory = output_folder + str(i) + '_error_'
+
+    if step_seg['img_file']:
+        sitk.WriteImage(image, directory + 'img.vtk')
+
+        if step_seg['seg_file']:
+            sitk.WriteImage(predicted_vessel, directory + 'seg.vtk')
+
+            if step_seg['surf_file']:
+                vf.write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
+
+
+def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=None):
+
+    step_dict = {}
+    step_dict['old point'] = old_point
+    step_dict['point'] = new_point
+    step_dict['old radius'] = old_radius
+    step_dict['tangent'] = (new_point - old_point)/np.linalg.norm(new_point - old_point)
+    step_dict['radius'] = new_radius
+    step_dict['chances'] = 0
+    step_dict['seg_file'] = None
+    step_dict['img_file'] = None
+    step_dict['surf_file'] = None
+    step_dict['cent_file'] = None
+    step_dict['prob_predicted_vessel'] = None
+    step_dict['point_pd'] = None
+    step_dict['surface'] = None
+    step_dict['centerline'] = None
+    step_dict['is_inside'] = False
+    step_dict['time'] = None
+    step_dict['dice'] = None
+    if angle_change:
+        step_dict['angle change'] = angle_change
+
+    return step_dict

@@ -31,6 +31,14 @@ def create_new(file_reader):
     result_img.SetDirection(file_reader.GetDirection())
     return result_img
 
+def copy_settings(img, ref_img):
+
+    img.SetSpacing(ref_img.GetSpacing())
+    img.SetOrigin(ref_img.GetOrigin())
+    img.SetDirection(ref_img.GetDirection())
+
+    return img
+    
 def write_image(image, outputImageFileName):
     """
     Write image to file

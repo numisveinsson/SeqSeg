@@ -6,15 +6,15 @@ import SimpleITK as sitk
 
 class Prediction:
     #This is a class to get 3D volumetric prediction from the UNet model
-    def __init__(self, unet, model, modality, image, size, out_fn, threshold, seg = None):
+    def __init__(self, unet, model, modality, image, size, out_fn, threshold, seg_volume = None):
         self.unet=unet
         self.model_name = model
         self.modality = modality
         self.image_vol = image
         self.image_resampled = resample_spacing(self.image_vol, template_size=size, order=1)[0]
         self.threshold = threshold
-        if seg:
-            label_vol = sitk.GetArrayFromImage(seg)
+        if seg_volume:
+            label_vol = sitk.GetArrayFromImage(seg_volume)
             label_vol = (label_vol/np.max(label_vol))
             label_vol[label_vol >= self.threshold] = 1
             label_vol[label_vol < self.threshold] = 0
@@ -23,6 +23,8 @@ class Prediction:
             label_vol.SetSpacing(image.GetSpacing())
             label_vol.SetDirection(image.GetDirection())
             self.seg_vol = label_vol
+        else:
+            self.seg_vol = None
         self.prob_prediction = None
         self.prediction = None
         self.dice_score = None
@@ -59,9 +61,12 @@ class Prediction:
 
     def dice(self):
         #assuming groud truth label has the same origin, spacing and orientation as input image
-        self.dice_score = dice_score(sitk.GetArrayFromImage(self.prediction), sitk.GetArrayFromImage(self.seg_vol).astype('int'))[0]
+        if self.seg_vol:
+            self.dice_score = dice_score(sitk.GetArrayFromImage(self.prediction), sitk.GetArrayFromImage(self.seg_vol).astype('int'))[0]
 
-        return self.dice_score
+            return self.dice_score
+        else:
+            return None
 
     def resample_prediction(self, upsample=False):
         #resample prediction so it matches the original image
