@@ -13,6 +13,32 @@ from vtk.util.numpy_support import numpy_to_vtk as n2v
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 from vtk.util.numpy_support import get_vtk_array_type
 
+def calc_caps(polyData):
+
+    # Now extract feature edges
+    boundaryEdges = vtk.vtkFeatureEdges()
+    boundaryEdges.SetInputData(polyData)
+    boundaryEdges.BoundaryEdgesOn()
+    boundaryEdges.FeatureEdgesOff()
+    boundaryEdges.NonManifoldEdgesOff()
+    boundaryEdges.ManifoldEdgesOff()
+    boundaryEdges.Update()
+    output = boundaryEdges.GetOutput()
+
+    conn = connectivity_all(output)
+    data = get_points_cells(conn.GetOutput())
+    connects = v2n(conn.GetOutput().GetPointData().GetArray(0))
+
+    caps_locs = []
+    for i in range(connects.max()+1):
+
+        locs = data[0][connects == i]
+        center = np.mean(locs, axis=0)
+        caps_locs.append(center)
+
+    return caps_locs
+
+
 class ClosestPoints:
     """
     Find closest points within a geometry
@@ -690,9 +716,9 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
 
         if angle < 90:
             point_to_check = locs[-1] + 3*rads[id_along_cent_save] * vector
-            pfn = '/Users/numisveinsson/Downloads/point.vtp'
-            polydata_point = points2polydata([point_to_check.tolist()])
-            write_geo(pfn, polydata_point)
+            #pfn = '/Users/numisveinsson/Downloads/point.vtp'
+            #polydata_point = points2polydata([point_to_check.tolist()])
+            #write_geo(pfn, polydata_point)
             is_inside = False # is_point_in_image(assembly_image, point_to_check)
 
             if not is_inside:
@@ -768,7 +794,7 @@ def is_point_in_image(assembly_image, location):
     index = assembly_image.TransformPhysicalPointToIndex(location.tolist())
     vessel_value = assembly_image[index]
     is_inside = vessel_value > 0.5
-    print("Vessel value to check is: " + str(vessel_value))
+    #print("Vessel value to check is: " + str(vessel_value))
     return is_inside
 
 def is_point_in_surface(surface, point):

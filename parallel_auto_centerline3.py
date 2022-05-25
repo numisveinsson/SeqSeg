@@ -603,6 +603,7 @@ if __name__=='__main__':
     stepsize = 1 # Step size along centerline (proportional to radius at the point)
     dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case)
     dir_seg = None
+    write_samples = False
 
     ## Create directories for results
     create_directories(dir_output)
@@ -629,7 +630,7 @@ if __name__=='__main__':
     image_array[:] = np_array_img.flatten()
 
     ## Call function
-    centerlines, surfaces, points, assembly, vessel_tree = trace_centerline(dir_output, dir_image, case, dir_model_weights, modality, nn_input_shape, threshold, stepsize, potential_branches, dir_seg, write_samples=True)
+    centerlines, surfaces, points, assembly, vessel_tree = trace_centerline(dir_output, dir_image, case, dir_model_weights, modality, nn_input_shape, threshold, stepsize, potential_branches, dir_seg, write_samples)
 
     print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
 
@@ -655,6 +656,8 @@ if __name__=='__main__':
     for i in range(len(names)):
         print('Average time for ' + names[i]+ ' : ', time_sum[i]/counter)
 
+    print(np.array(time_sum/counter).tolist())
+    import pdb; pdb.set_trace()
     # total_time = 0
     # count = 0
     # for i in range(1,len(vessel_tree.steps)):
