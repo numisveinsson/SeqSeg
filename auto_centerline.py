@@ -366,7 +366,7 @@ if __name__=='__main__':
     print('\n test is: \n', test)
     ## Directories
     dir_output = '/Users/numisveinsson/Documents/Berkeley/Research/Automatic_Centerline_ML/'
-    directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
+    directory_data = directory_data = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
     dir_model_weights = '/Users/numisveinsson/Documents/Berkeley/Research/BloodVessel_UNet3D/output/' + test + '/'
     write_samples=False
 
@@ -380,7 +380,7 @@ if __name__=='__main__':
     dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case)
     dir_seg=None
     #dir_output = dir_output + 'output_'+test+'_'+case+'/'
-    dir_output = '/Users/numisveinsson/Documents/Berkeley/Research/Automatic_Centerline_ML/scratch_output/'
+    dir_output = '/Users/numisveins/Documents/Automatic_Tracing_ML/output/scratch'
     ## Create directories for results
     create_directories(dir_output)
 
