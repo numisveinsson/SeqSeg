@@ -260,7 +260,6 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
 
-            print(model)
             # Prediction
             predict = Prediction(model, model_name, modality, cropped_volume, img_shape, output_folder+'predictions', threshold, seg_volume=None)
             predict.volume_prediction(1)
@@ -283,7 +282,7 @@ def trace_branch(input_queue, init_step, branch_number, image_file, output_folde
 
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
-                print('Prediction took: ', time.time()-start_time_loc)
+                #print('Prediction took: ', time.time()-start_time_loc)
                 start_time_loc = time.time()
             # Surface
             # if seg_file:
@@ -531,7 +530,7 @@ def initmap(executor, do_init, initargs, it):
 
 def trace_centerline(output_folder, image_file, case, model_folder, modality, img_shape, threshold, stepsize, potential_branches, seg_file=None, write_samples=True):
 
-    max_number_steps = 1
+    max_number_steps = 300
 
     init_step = potential_branches[0]
     vessel_tree = VesselTreeParallel(case, image_file, potential_branches)
@@ -643,6 +642,7 @@ if __name__=='__main__':
     stepsize = 1 # Step size along centerline (proportional to radius at the point)
     dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case)
     dir_seg = None
+    write_samples = False
     ## Create directories for results
     create_directories(dir_output)
 
@@ -670,7 +670,7 @@ if __name__=='__main__':
     print('done created array: ', (time.time() - start_time))
 
     ## Call function
-    centerlines, surfaces, points, assembly, vessel_tree = trace_centerline(dir_output, dir_image, case, dir_model_weights, modality, nn_input_shape, threshold, stepsize, potential_branches, dir_seg, write_samples=True)
+    centerlines, surfaces, points, assembly, vessel_tree = trace_centerline(dir_output, dir_image, case, dir_model_weights, modality, nn_input_shape, threshold, stepsize, potential_branches, dir_seg, write_samples)
 
     print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
 
@@ -697,6 +697,8 @@ if __name__=='__main__':
         print('Average time for ' + names[i]+ ' : ', time_sum[i]/counter)
         print('Total time for '+ names[i]+ ' : ', time_sum[i])
 
+    print(np.array(time_sum/counter).tolist())
+    import pdb; pdb.set_trace()
     # total_time = 0
     # count = 0
     # for i in range(1,len(vessel_tree.steps)):

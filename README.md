@@ -1,2 +1,2 @@
 # Automatic_Tracing_ML
-Added readme
+Repository for Automatic Vascular Model Creation using localized 3D segmentation for tracing.

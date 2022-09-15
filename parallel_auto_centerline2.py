@@ -601,7 +601,7 @@ if __name__=='__main__':
     for i in range(len(names)):
         print('Average time for ' + names[i]+ ' : ', time_sum[i]/counter)
 
-
+    print(np.array(time_sum/counter).tolist())
     import pdb; pdb.set_trace()
     total_time = 0
     count = 0

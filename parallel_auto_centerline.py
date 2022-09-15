@@ -436,7 +436,7 @@ def initmap(executor, do_init, initargs, it):
 
 def trace_centerline(output_folder, image_file, case, model_folder, modality, img_shape, threshold, stepsize, potential_branches, seg_file=None, write_samples=True):
 
-    max_number_steps = 5
+    max_number_steps = 300
 
     init_step = potential_branches[0]
     vessel_tree = VesselTreeParallel(case, image_file, potential_branches)
@@ -540,7 +540,9 @@ if __name__=='__main__':
     dir_model_weights = '/Users/numisveinsson/Documents/Berkeley/Research/BloodVessel_UNet3D/output/test14/'
 
     ## Information
-    case = '0176_0000'
+    case = '0002_0001'
+    start1 = 140
+    start2 = 160
     modality = 'ct'
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold = 0.5 # Threshold for binarization of prediction
@@ -552,8 +554,8 @@ if __name__=='__main__':
 
     ## Get inital seed point + radius
     i = 0
-    old_seed, old_radius = vf.get_seed(dir_cent, i, 20)
-    initial_seed, initial_radius = vf.get_seed(dir_cent, i, 40)
+    old_seed, old_radius = vf.get_seed(dir_cent, i, start1)
+    initial_seed, initial_radius = vf.get_seed(dir_cent, i, start2)
     vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
     init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, [0,0], 0)
     potential_branches = [init_step]
@@ -592,7 +594,7 @@ if __name__=='__main__':
                 counter += 1
     for i in range(len(names)):
         print('Average time for ' + names[i]+ ' : ', time_sum[i]/counter)
-
+    print(np.array(time_sum/counter).tolist())
 
     import pdb; pdb.set_trace()
     total_time = 0
