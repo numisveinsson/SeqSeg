@@ -792,8 +792,12 @@ def get_largest_connected_polydata(poly):
 def is_point_in_image(assembly_image, location):
 
     index = assembly_image.TransformPhysicalPointToIndex(location.tolist())
-    vessel_value = assembly_image[index]
-    is_inside = vessel_value > 0.5
+
+    try:
+        vessel_value = assembly_image[index]
+        is_inside = vessel_value > 0.5
+    except:
+        is_inside = False
     #print("Vessel value to check is: " + str(vessel_value))
     return is_inside
 
@@ -823,3 +827,27 @@ def is_point_in_surface(surface, point):
     else:
         print("Error, output from VTK enclosed surface")
         return 0
+
+def orient_caps(caps, step_seg):
+
+    source_dist = 100
+    target = []
+    poly = []
+    for i in range(len(caps)):
+        target = target + caps[i].tolist()
+        poly.append(caps[i].tolist())
+
+    for i in range(len(caps)):
+        cap_dist = np.linalg.norm(caps[i] - np.array(step_seg['old point']))
+        #print(cap_dist)
+        if  cap_dist < source_dist:
+            source_id = i
+            source_dist = cap_dist
+            sourcee = caps[i].tolist()
+    target[source_id*3:source_id*3+3] = []
+
+    polydata_point = points2polydata(poly)
+    pfn = '/Users/numisveinsson/Downloads/points.vtp'
+    write_geo(pfn, polydata_point)
+
+    return [sourcee, target]

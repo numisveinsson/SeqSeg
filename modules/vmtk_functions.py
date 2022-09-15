@@ -59,7 +59,7 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
     centerline_calc = vmtkscripts.vmtkCenterlines()
     centerline_calc.Surface = Surface
     centerline_calc.SeedSelectorName = method
-    #centerline_calc.AppendEndPoints = 1
+    centerline_calc.AppendEndPoints = 1
 
     if method == "profileidlist":
 
@@ -68,7 +68,7 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
         centerline_calc.SourceIds = var_source
         centerline_calc.TargetIds = var_target
 
-    elif method == "pickpoint":
+    elif method == "pointlist":
 
         centerline_calc.SourcePoints = var_source
         centerline_calc.TargetPoints = var_target
