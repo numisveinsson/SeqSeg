@@ -57,6 +57,7 @@ class VesselTree:
         self.branches = [[0]]
         self.steps = [init_step]
         self.potential_branches = pot_branches
+        self.caps = []
 
     def add_step(self, i, step, branch):
         self.steps.append(step)
@@ -130,7 +131,7 @@ class Branch:
 
 def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
 
-    directory = output_folder + str(i) + '_error_'
+    directory = output_folder + 'errors/'+str(i) + '_error_'
 
     if step_seg['img_file']:
         sitk.WriteImage(image, directory + 'img.vtk')
