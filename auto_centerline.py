@@ -7,6 +7,8 @@ start_time = time.time()
 
 import os
 
+import import pdb; pdb.set_trace()
+
 import numpy as np
 import SimpleITK as sitk
 
