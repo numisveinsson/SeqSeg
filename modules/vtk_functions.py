@@ -739,7 +739,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
 
                     print("\nERROR: Point is too close to old point so adding vector\n")
                     points.append(  current_point + 1/2*rads[id_along_cent_save] * vector)
-                    polydata_point = points2polydata([current_poin.tolist(), locs[id_along_cent].tolist()])
+                    polydata_point = points2polydata([current_point.tolist(), locs[id_along_cent].tolist()])
                     pfn = '/Users/numisveinsson/Downloads/vector.vtp'
                     write_geo(pfn, polydata_point)
             else:
@@ -795,10 +795,11 @@ def is_point_in_image(assembly_image, location):
 
     try:
         vessel_value = assembly_image[index]
+        #print("Vessel value is: " + str(vessel_value))
         is_inside = vessel_value > 0.5
     except:
         is_inside = False
-    #print("Vessel value to check is: " + str(vessel_value))
+
     return is_inside
 
 def is_point_in_surface(surface, point):

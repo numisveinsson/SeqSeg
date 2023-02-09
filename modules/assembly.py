@@ -2,6 +2,7 @@ import modules.sitk_functions as sf
 from modules import vtk_functions as vf
 import numpy as np
 import SimpleITK as sitk
+import time 
 
 class Segmentation:
 
@@ -144,7 +145,7 @@ class Branch:
 
 def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
 
-    directory = output_folder + 'errors/'+str(i) + '_error_'
+    directory = output_folder + 'errors/'+str(i) + '_error_'+str(time.time())
 
     if step_seg['img_file']:
         sitk.WriteImage(image, directory + 'img.vtk')

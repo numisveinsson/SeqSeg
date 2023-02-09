@@ -1,13 +1,98 @@
+from modules import vtk_functions as vf
+from prediction import dice_score
+from vtk.util.numpy_support import vtk_to_numpy as v2n
+import numpy as np
+import SimpleITK as sitk
 
-class EvaluateTracing
+class EvaluateTracing:
 
-    def __init__(self, case, cent_vtp_truth, cent_vtp_prediction, surf_vtp_truth, surf_vtp_prediction):
+    def __init__(self, case, seed, dir_seg_truth, dir_surf_vtp_truth, dir_cent_vtp_truth, seg_pred, surf_vtp_prediction):
         self.name = case
-        self.truth = vtp_truth
-        self.prediction = vtp_prediction
+        self.seed = seed
+        self.seg_truth = sitk.ReadImage(dir_seg_truth)
+        self.seg_pred = seg_pred
+        self.surf_truth = dir_surf_vtp_truth
+        self.surf_pred = surf_vtp_prediction
+        self.cent_truth = dir_cent_vtp_truth
 
-    def count_branches:
+    def count_branches(self):
+        """
+        Function to count how many branches in grountruth were captured in tracing
+        """
+        move_distance_radius = 1.5
 
-    def ave_distance:
+        ## Centerline
+        cent = vf.read_geo(self.cent_truth).GetOutput()  # read in geometry
+        num_points = cent.GetNumberOfPoints()   # number of points in centerline
+        cent_data = vf.collect_arrays(cent.GetPointData())
+        c_loc = v2n(cent.GetPoints().GetData())             # point locations as numpy array
+        radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
+        cent_id = cent_data['CenterlineId']
+        bifurc_id = cent_data['BifurcationIdTmp']
 
-    def
+        try:
+            num_cent = len(cent_id[0]) # number of centerlines (one is assembled of multiple)
+        except:
+            num_cent = 1 # in the case of only one centerline
+
+        missed_branches = 0
+        percent_caught = []
+        ids_total = []
+        for ip in range(num_cent):
+            try:
+                ids = [i for i in range(num_points) if cent_id[i,ip]==1]    # ids of points belonging to centerline ip
+            except:
+                ids = [i for i in range(num_points)]
+            locs = c_loc[ids] # locations of those points
+            rads = radii[ids] # radii at those locations
+            bifurc = bifurc_id[ids]
+
+            on_cent = True
+            total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs, axis=0), axis=1), 0, 0))[-1]
+
+            count = 0 # the point along centerline
+            lengths = [0]
+            lengths_prev = [0]
+            print("\n ** Ip is " + str(ip)+"\n")
+            while on_cent:
+                if not (ids[count] in ids_total):
+
+                    # Do something at this location
+                    location = locs[count] # Current location in xyz
+                    if not vf.is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
+                        if not count == 0:
+                            on_cent = False
+                            missed_branches += 1
+                            percent_caught.append(round(lengths_prev[-1]/total_length,3))
+
+                lengths_prev = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[:count], axis=0), axis=1), 0, 0))
+                lengths = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[count:], axis=0), axis=1), 0, 0))
+                move = 1
+                count = count+1
+                if count == len(locs):
+                    on_cent = False
+                    percent_caught.append(1)
+                    break
+                move_distance = move_distance_radius*rads[count]
+                while lengths[move] < move_distance :
+                    count = count+1
+                    move = move+1
+                    if count == len(locs):
+                        on_cent = False
+                        percent_caught.append(1)
+                        break
+            ids_total.extend(ids)
+
+        print(str(missed_branches)+'/'+str(num_cent)+' branches missed\n')
+        print(percent_caught)
+
+        return missed_branches, percent_caught
+
+    def calc_dice_score:
+        seg_truth = sitk.GetArrayFromImage(self.seg_truth).astype('int')
+        if seg_truth.max() > 1:
+            seg_truth = seg_truth/(seg_truth.max())
+        dice = dice_score(sitk.GetArrayFromImage(self.seg_pred), seg_truth)[0]
+
+        print('Global dice score: ', dice)
+        return dice
