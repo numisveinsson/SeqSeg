@@ -53,7 +53,7 @@ class EvaluateTracing:
             count = 0 # the point along centerline
             lengths = [0]
             lengths_prev = [0]
-            print("\n ** Ip is " + str(ip)+"\n")
+            #print("\n ** Ip is " + str(ip)+"\n")
             while on_cent:
                 if not (ids[count] in ids_total):
 
@@ -86,9 +86,9 @@ class EvaluateTracing:
         print(str(missed_branches)+'/'+str(num_cent)+' branches missed\n')
         print(percent_caught)
 
-        return missed_branches, percent_caught
+        return [missed_branches, num_cent], percent_caught
 
-    def calc_dice_score:
+    def calc_dice_score(self):
         seg_truth = sitk.GetArrayFromImage(self.seg_truth).astype('int')
         if seg_truth.max() > 1:
             seg_truth = seg_truth/(seg_truth.max())
