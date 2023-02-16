@@ -2,8 +2,12 @@ import faulthandler
 
 faulthandler.enable()
 
+import warnings
+warnings.filterwarnings('ignore')
+
 import time
 start_time = time.time()
+from datetime import datetime
 
 import os
 
@@ -56,13 +60,13 @@ def create_directories(output_folder):
     except Exception as e: print(e)
 
 
-def trace_centerline(output_folder, image_file, case, model_folder, modality, img_shape, threshold, stepsize, potential_branches, max_step_size, seg_file=None, write_samples=True, take_time=False):
+def trace_centerline(output_folder, image_file, case, model_folder, modality, img_shape, threshold, potential_branches, max_step_size, seg_file=None, write_samples=True, take_time=False):
 
     allowed_steps = 10
     prevent_retracing = True
     volume_size_ratio = 5
     magnify_radius = 1
-    number_chances = 1
+    number_chances = 2
     run_time = False
     use_buffer = True
     forceful_sidebranch = True
@@ -388,7 +392,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality, im
                     vf.write_vtk_polydata(final_points, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
 
                 vessel_tree.caps = vessel_tree.caps + [step_seg['point'] + volume_size_ratio*step_seg['radius']*step_seg['tangent']]
-                #vessel_tree.sort_potential()
+                vessel_tree.sort_potential()
                 if len(vessel_tree.potential_branches) == 1:
                     break
                 next_step = vessel_tree.potential_branches.pop(1)
@@ -425,14 +429,17 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality, im
 
 if __name__=='__main__':
 
-    tests = ['test27', 'test48']
+    tests = ['test48', 'test49', 'test27']
 
     for test in tests:
 
         print('\n test is: \n', test)
 
+        if not test == 'test27':    modality = 'all'
+        else:                       modality = 'ct'
+
         ## Directories
-        dir_output0 = '//Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs_version4/'
+        dir_output0 = '//Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs_version4/sorted_2_ch_'
         directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
         dir_model_weights = '/Users/numisveinsson/Documents/Berkeley/Research/BloodVessel_UNet3D/output/' + test + '/'
         dir_model_weights = './weights/'+test+'/'
@@ -443,16 +450,14 @@ if __name__=='__main__':
                            #['0002_0001',1,150, 170] ,
                            #['0005_1001',0,300,320]  ,
                            #['0005_1001',1,200,220]  ,
-                           #['0006_0001',0,10,20],
-                           #['0063_1001',0,10,20],
-                           #['0176_0000',0,10,20]    ,
-                           ['0146_1001',0,10,20] ]
+                           ['0146_1001',0,10,20],
+                           ['0006_0001',0,10,20],
+                           ['0063_1001',0,10,20],
+                           ['0176_0000',0,10,20]]
 
-        max_step_size = 1002
-        modality = 'ct'
+        max_step_size = 500
         nn_input_shape = [64, 64, 64] # Input shape for NN
         threshold = 0.5 # Threshold for binarization of prediction
-        stepsize = 1 # Step size along centerline (proportional to radius at the point)
 
         final_dice_scores, final_perc_caught, final_missed_branches, final_n_steps_taken = [], [], [], []
         for test_case in testing_samples:
@@ -480,7 +485,7 @@ if __name__=='__main__':
             init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
             potential_branches = [init_step]
             ## Trace centerline
-            centerlines, surfaces, points, assembly, vessel_tree, n_steps_taken = trace_centerline(dir_output, dir_image, case, dir_model_weights, modality, nn_input_shape, threshold, stepsize, potential_branches, max_step_size, dir_seg, write_samples, take_time)
+            centerlines, surfaces, points, assembly, vessel_tree, n_steps_taken = trace_centerline(dir_output, dir_image, case, dir_model_weights, modality, nn_input_shape, threshold, potential_branches, max_step_size, dir_seg, write_samples, take_time)
 
             # if len(vessel_tree.steps) < max_step_size/2:
             #     print(error)
@@ -554,7 +559,7 @@ if __name__=='__main__':
 
             #print('Number of outlets: ' + str(len(final_caps[1])))
 
-            evaluate_tracing = EvaluateTracing(case, seed, dir_seg, dir_surf, dir_cent, assembly, surface_smooth)
+            evaluate_tracing = EvaluateTracing(case, initial_seed, dir_seg, dir_surf, dir_cent, assembly_binary, surface_smooth)
             missed_branches, perc_caught = evaluate_tracing.count_branches()
             final_dice = evaluate_tracing.calc_dice_score()
 
@@ -573,6 +578,19 @@ if __name__=='__main__':
             print('Dice: ', final_dice_scores[i])
             print('Percent caught: ', final_perc_caught[i])
             print(str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
+
+        now = datetime.now()
+        dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
+        info_file_name = "info_"+test+'_'+dt_string+".txt"
+        f = open(dir_output0 +info_file_name,'a')
+        for i in range(len(testing_samples)):
+            f.write(testing_samples[i][0])
+            f.write('\nSteps taken: ' + str(final_n_steps_taken[i]))
+            f.write('\nDice: ' +str(final_dice_scores[i]))
+            f.write('\nPercent caught: ' +str(final_perc_caught[i]))
+            f.write('\n'+str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
+        f.close()
+
     import pdb; pdb.set_trace()
 
     path = vmtkfs.calc_centerline(surface_smooth, "pickpoint", number = 0)

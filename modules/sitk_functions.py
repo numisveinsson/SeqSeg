@@ -38,7 +38,7 @@ def copy_settings(img, ref_img):
     img.SetDirection(ref_img.GetDirection())
 
     return img
-    
+
 def write_image(image, outputImageFileName):
     """
     Write image to file

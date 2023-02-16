@@ -712,7 +712,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
         #     vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
 
         angle = 360/(2*np.pi)*np.arccos(np.dot(old_vector, vector))
-        print("The angle is: " + str(angle))
+        #print("The angle is: " + str(angle))
 
         if angle < 135:
             point_to_check = locs[-1] + 3*rads[id_along_cent_save] * vector

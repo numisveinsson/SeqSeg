@@ -46,7 +46,7 @@ class Prediction:
         prediction = np.squeeze(prediction, axis=-1).squeeze()
 
         def sigmoid(z):
-            return 1/(1 + np.exp(-z))
+            return (np.exp(z))/(1 + np.exp(z))
 
         pred = sigmoid(prediction)
 
@@ -67,6 +67,9 @@ class Prediction:
             return self.dice_score
         else:
             return None
+
+    def write_prediction(self, pd_fn):
+        sitk.WriteImage(self.prediction, pd_fn)
 
     def resample_prediction(self, upsample=False):
         #resample prediction so it matches the original image
@@ -238,8 +241,10 @@ def centering(img, ref_img, order=1):
     img_center = np.array(img.TransformContinuousIndexToPhysicalPoint(np.array(img.GetSize())/2.0))
     reference_center = np.array(ref_img.TransformContinuousIndexToPhysicalPoint(np.array(ref_img.GetSize())/2.0))
     centering_transform.SetOffset(np.array(transform.GetInverse().TransformPoint(img_center) - reference_center))
+
     centered_transform = sitk.Transform(transform)
     centered_transform.AddTransform(centering_transform)
+    #centered_transform = sitk.CompositeTransform([transform, centering_transform])
 
     return transform_func(img, ref_img, centered_transform, order)
 

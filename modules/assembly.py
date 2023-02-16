@@ -2,11 +2,12 @@ import modules.sitk_functions as sf
 from modules import vtk_functions as vf
 import numpy as np
 import SimpleITK as sitk
-import time 
+import operator
+import time
 
 class Segmentation:
 
-    def __init__(self, case, image_file):
+    def __init__(self, case, image_file, weighted = False):
         self.name = case
         self.image_reader = sf.read_image(image_file)
 
@@ -15,7 +16,14 @@ class Segmentation:
 
         self.number_updates = np.zeros(sf.sitk_to_numpy(self.assembly).shape)
 
-    def add_segmentation(self, volume_seg, index_extract, size_extract):
+        self.weighted = weighted
+
+        if weighted:
+            # also keep track of how many updates to pixels
+            self.n_updates = np.zeros(sf.sitk_to_numpy(self.assembly).shape)
+            #print("Creating weighted segmentation")
+
+    def add_segmentation(self, volume_seg, index_extract, size_extract, weight=None):
 
         # Load the volumes
         np_arr = sf.sitk_to_numpy(self.assembly).astype(float)
@@ -36,8 +44,17 @@ class Segmentation:
         # Find indexes where we need to average predictions
         ind = curr_n > 0
 
-        # Update those values, calculating an average
-        curr_sub_section[ind] = 1/(curr_n[ind])*( np_arr_add[ind] + (curr_n[ind] - 1)*curr_sub_section[ind] )
+        if not self.weighted: # Then we do plain average
+            # Update those values, calculating an average
+            curr_sub_section[ind] = 1/(curr_n[ind]+1)*( np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+            # Add to update counter for these voxels
+            self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
+
+        else:
+            curr_sub_section[ind] = 1/(curr_n[ind]+weight)*( weight*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+            # Add to update weight sum for these voxels
+            self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight
+            self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
 
         # Where this is the first update, copy directly
         curr_sub_section[curr_n == 0] = np_arr_add[curr_n == 0]
@@ -45,9 +62,6 @@ class Segmentation:
         # Update the global volume
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
         self.assembly = sf.numpy_to_sitk(np_arr, self.image_reader)
-
-        # Add to update counter for these voxels
-        self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
 
 class VesselTree:
 
@@ -80,8 +94,7 @@ class VesselTree:
         del self.bifurcations[branch]
 
     def sort_potential(self):
-        import operator
-        self.potential_branches.sort(key=operator.itemgetter('radius'))
+        self.potential_branches.sort(key=operator.itemgetter('radius'), reverse = True)
 
     def get_previous_n(self, i, branch, n):
         branch0 = self.branches[branch]
@@ -111,8 +124,8 @@ class VesselTreeParallel:
         self.potential_branches = [i for i in self.potential_branches if not (i['radius'] == pot_branch['radius'])]
 
     def sort_potential(self):
-        import operator
-        self.potential_branches.sort(key=operator.itemgetter('radius'))
+        self.potential_branches.sort(key=operator.itemgetter('old radius'))
+
 
 
 class Branch:
