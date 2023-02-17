@@ -47,23 +47,27 @@ class EvaluateTracing:
             rads = radii[ids] # radii at those locations
             bifurc = bifurc_id[ids]
 
+            if self.seed in locs:
+                print(f"Initial seed on centerline: {ip}")
+                ind = np.where(locs==self.seed)[0][0]
+                locs = np.delete(locs, np.s_[0:ind], 0)
+                rads = np.delete(rads, np.s_[0:ind], 0)
+                bifurc = np.delete(bifurc, np.s_[0:ind], 0)
+
             on_cent = True
             total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs, axis=0), axis=1), 0, 0))[-1]
 
             count = 0 # the point along centerline
             lengths = [0]
             lengths_prev = [0]
-            print("\n ** Ip is " + str(ip)+"\n")
+            #print("\n ** Ip is " + str(ip)+"\n")
             while on_cent:
                 if not (ids[count] in ids_total):
-
                     # Do something at this location
-                    location = locs[count] # Current location in xyz
                     if not vf.is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
-                        if not count == 0:
-                            on_cent = False
-                            missed_branches += 1
-                            percent_caught.append(round(lengths_prev[-1]/total_length,3))
+                        on_cent = False
+                        missed_branches += 1
+                        percent_caught.append(round(lengths_prev[-1]/total_length,3))
 
                 lengths_prev = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[:count], axis=0), axis=1), 0, 0))
                 lengths = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[count:], axis=0), axis=1), 0, 0))
@@ -86,9 +90,9 @@ class EvaluateTracing:
         print(str(missed_branches)+'/'+str(num_cent)+' branches missed\n')
         print(percent_caught)
 
-        return missed_branches, percent_caught
+        return [missed_branches, num_cent], percent_caught
 
-    def calc_dice_score:
+    def calc_dice_score(self):
         seg_truth = sitk.GetArrayFromImage(self.seg_truth).astype('int')
         if seg_truth.max() > 1:
             seg_truth = seg_truth/(seg_truth.max())

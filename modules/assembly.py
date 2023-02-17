@@ -2,7 +2,8 @@ import modules.sitk_functions as sf
 from modules import vtk_functions as vf
 import numpy as np
 import SimpleITK as sitk
-import time 
+import operator
+import time
 
 class Segmentation:
 
@@ -93,8 +94,7 @@ class VesselTree:
         del self.bifurcations[branch]
 
     def sort_potential(self):
-        import operator
-        self.potential_branches.sort(key=operator.itemgetter('radius'))
+        self.potential_branches.sort(key=operator.itemgetter('radius'), reverse = True)
 
     def get_previous_n(self, i, branch, n):
         branch0 = self.branches[branch]
@@ -124,8 +124,8 @@ class VesselTreeParallel:
         self.potential_branches = [i for i in self.potential_branches if not (i['radius'] == pot_branch['radius'])]
 
     def sort_potential(self):
-        import operator
-        self.potential_branches.sort(key=operator.itemgetter('radius'))
+        self.potential_branches.sort(key=operator.itemgetter('old radius'))
+
 
 
 class Branch:

@@ -696,7 +696,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
             point_ids = point_ids + points_in_cells[1][i]
         locs = points_in_cells[0][point_ids] ## Locations of the points on line
         rads = radii[point_ids]
-        if len(locs) < 5:
+        if len(locs) < 4:
             print("ERROR: too few points for ip: " +str(ip))
             continue
 
@@ -705,48 +705,43 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
 
         vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
 
-        if np.dot(old_vector, vector) < 0:
-            #print("Flipping for ip: " +str(ip))
-            locs = np.flip(locs, 0)
-            rads = np.flip(rads)
-            vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
+        # if np.dot(old_vector, vector) < 0:
+        #     print("Flipping for ip: " +str(ip))
+        #     locs = np.flip(locs, 0)
+        #     rads = np.flip(rads)
+        #     vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
 
         angle = 360/(2*np.pi)*np.arccos(np.dot(old_vector, vector))
         #print("The angle is: " + str(angle))
 
-        if angle < 90:
+        if angle < 135:
             point_to_check = locs[-1] + 3*rads[id_along_cent_save] * vector
             #pfn = '/Users/numisveinsson/Downloads/point.vtp'
             #polydata_point = points2polydata([point_to_check.tolist()])
             #write_geo(pfn, polydata_point)
-            is_inside = False # is_point_in_image(assembly_image, point_to_check)
 
-            if not is_inside:
-                #print("Point Outside Surface!")
-                #if not next((True for elem in points if np.array_equal(elem, locs[id_along_cent])), False):
-                #print("Saving for ip: " +str(ip))
+            #if not next((True for elem in points if np.array_equal(elem, locs[id_along_cent])), False):
+            #print("Saving for ip: " +str(ip))
 
-                radius_to_save = max(rads[id_along_cent_save], 0.05) ##  have mininum size radius
-                if radius_to_save < 0.1 and old_radius > radius_to_save:
-                    radius_to_save = (1/2*radius_to_save + 1/2*old_radius)*1.1 ## Have old radius carry into new
+            radius_to_save = max(rads[id_along_cent_save], 0.05) ##  have mininum size radius
+            if radius_to_save < 0.1 and old_radius > radius_to_save:
+                radius_to_save = (1/2*radius_to_save + 1/2*old_radius)*1.1 ## Have old radius carry into new
 
-                vessel_r.append( radius_to_save)
-                angles.append(angle)
+            vessel_r.append( radius_to_save)
+            angles.append(angle)
 
-                if np.linalg.norm(current_point - locs[id_along_cent_save]) > 1/4*rads[id_along_cent_save] :
-                    points.append(  locs[id_along_cent_save]) # current_point + rads[id_along_cent_save] * vector) #
-                else:
-
-                    print("\nERROR: Point is too close to old point so adding vector\n")
-                    points.append(  current_point + 1/2*rads[id_along_cent_save] * vector)
-                    polydata_point = points2polydata([current_point.tolist(), locs[id_along_cent].tolist()])
-                    pfn = '/Users/numisveinsson/Downloads/vector.vtp'
-                    write_geo(pfn, polydata_point)
+            if np.linalg.norm(current_point - locs[id_along_cent_save]) > 1/4*rads[id_along_cent_save] :
+                points.append(  locs[id_along_cent_save]) # current_point + rads[id_along_cent_save] * vector) #
             else:
-                print("ERROR: Point is inside surface")
-                import pdb; pdb.set_trace()
-        #else:
-            #print("Angle weird, returning None for ip=" + str(ip))
+
+                print("\nERROR: Point is too close to old point so adding vector\n")
+                points.append(  current_point + 1/2*rads[id_along_cent_save] * vector)
+                polydata_point = points2polydata([current_point.tolist(), locs[id_along_cent].tolist()])
+                pfn = '/Users/numisveinsson/Downloads/vector.vtp'
+                write_geo(pfn, polydata_point)
+
+        else:
+            print("Angle not within limit, returning None for ip=" + str(ip))
 
     arr_rad = np.array(vessel_r)
     arr_pt = np.array(points)
@@ -851,4 +846,4 @@ def orient_caps(caps, step_seg):
     pfn = '/Users/numisveinsson/Downloads/points.vtp'
     write_geo(pfn, polydata_point)
 
-    return [sourcee, target]
+    return [sourcee, target], source_id
