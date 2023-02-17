@@ -60,8 +60,8 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
     take_time = True
     exponent = 3
 
-    csv_file = "_test_Sample_stats.csv"
-    csv_list = pandas.read_csv(data_folder+modality+csv_file)
+    csv_file = "all_test_Sample_stats.csv"
+    csv_list = pandas.read_csv(data_folder+csv_file)
     keep_values = ['NAME','INDEX', 'SIZE_EXTRACT', 'BIFURCATION', 'RADIUS']
 
     data_folder = data_folder+modality+'_test/'
@@ -174,7 +174,7 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
 
 if __name__=='__main__':
 
-    test = 'test27'
+    test = 'test49'
     print('\nTest is: ', test)
 
     data_folder = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_4_aortas/'
