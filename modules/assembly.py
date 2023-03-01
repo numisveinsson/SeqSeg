@@ -1,3 +1,4 @@
+import pdb
 import modules.sitk_functions as sf
 from modules import vtk_functions as vf
 import numpy as np
@@ -30,7 +31,7 @@ class Segmentation:
         np_arr_add = sf.sitk_to_numpy(volume_seg).astype(float)
 
         # Calculate boundaries
-        cut = 1
+        cut = 0
         edges = np.array(index_extract) + np.array(size_extract) - cut
         index_extract = np.array(index_extract) + cut
 
@@ -43,6 +44,8 @@ class Segmentation:
 
         # Find indexes where we need to average predictions
         ind = curr_n > 0
+        # Where this is the first update, copy directly
+        curr_sub_section[curr_n == 0] = np_arr_add[curr_n == 0]
 
         if not self.weighted: # Then we do plain average
             # Update those values, calculating an average
@@ -55,14 +58,11 @@ class Segmentation:
             # Add to update weight sum for these voxels
             self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight
             self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
-
-        # Where this is the first update, copy directly
-        curr_sub_section[curr_n == 0] = np_arr_add[curr_n == 0]
-
+        
         # Update the global volume
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
         self.assembly = sf.numpy_to_sitk(np_arr, self.image_reader)
-
+        
 class VesselTree:
 
     def __init__(self, case, image_file, init_step, pot_branches):

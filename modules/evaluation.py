@@ -9,7 +9,11 @@ class EvaluateTracing:
     def __init__(self, case, seed, dir_seg_truth, dir_surf_vtp_truth, dir_cent_vtp_truth, seg_pred, surf_vtp_prediction):
         self.name = case
         self.seed = seed
-        self.seg_truth = sitk.ReadImage(dir_seg_truth)
+        seg_truth = sitk.ReadImage(dir_seg_truth)
+        seg_truth = sitk.GetArrayFromImage(seg_truth).astype('int')
+        if seg_truth.max() > 1:
+            seg_truth = seg_truth/(seg_truth.max())
+        self.seg_truth = seg_truth
         self.seg_pred = seg_pred
         self.surf_truth = dir_surf_vtp_truth
         self.surf_pred = surf_vtp_prediction
@@ -93,10 +97,17 @@ class EvaluateTracing:
         return [missed_branches, num_cent], percent_caught
 
     def calc_dice_score(self):
-        seg_truth = sitk.GetArrayFromImage(self.seg_truth).astype('int')
-        if seg_truth.max() > 1:
-            seg_truth = seg_truth/(seg_truth.max())
+        
         dice = dice_score(sitk.GetArrayFromImage(self.seg_pred), seg_truth)[0]
 
         print('Global dice score: ', dice)
         return dice
+    def calc_sens_spec(self):
+
+        return sensitivity_specificity(self.seg_pred, self.seg_truth)
+
+def sensitivity_specificity(pred, truth):
+        C = (((pred==1)*2 + (truth==1)).reshape(-1,1) == range(4)).sum(0)
+        sensitivity, specificity = C[3]/C[1::2].sum(), C[0]/C[::2].sum()
+
+        return sensitivity, specificity
