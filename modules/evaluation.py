@@ -67,7 +67,9 @@ class EvaluateTracing:
                     if not vf.is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
                         on_cent = False
                         missed_branches += 1
-                        percent_caught.append(round(lengths_prev[-1]/total_length,3))
+                        perc = round(lengths_prev[-1]/total_length,3)
+                        percent_caught.append(perc)
+                        #if perc == 0: import pdb; pdb.set_trace()
 
                 lengths_prev = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[:count], axis=0), axis=1), 0, 0))
                 lengths = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[count:], axis=0), axis=1), 0, 0))
@@ -89,8 +91,9 @@ class EvaluateTracing:
 
         print(str(missed_branches)+'/'+str(num_cent)+' branches missed\n')
         print(percent_caught)
+        total_perc = np.array(percent_caught).sum()/len(percent_caught)
 
-        return [missed_branches, num_cent], percent_caught
+        return [missed_branches, num_cent], percent_caught, total_perc
 
     def calc_dice_score(self):
         seg_truth = sitk.GetArrayFromImage(self.seg_truth).astype('int')

@@ -4,6 +4,7 @@ import numpy as np
 import SimpleITK as sitk
 import operator
 import time
+from datetime import datetime
 
 class Segmentation:
 
@@ -108,6 +109,41 @@ class VesselTree:
                 previous_n.append(conn+i)
                 previous_n.append(conn-i)
 
+    def write_csv(self):
+        """
+        Function to write tree graph as a csv file
+        Each line will have: Node 1, Node 2 that are connected
+        and any attributes associated with the edge: Radius, Angle, etc
+        """
+        import csv
+
+
+    def plot_graph(self):
+        import networkx
+        import matplotlib.pyplot as plt
+
+        G = nx.DiGraph()
+        G.add_edges_from(
+            [('A', 'B'), ('A', 'C'), ('D', 'B'), ('E', 'C'), ('E', 'F'),
+             ('B', 'H'), ('B', 'G'), ('B', 'F'), ('C', 'G')])
+
+        nx.draw(G)
+
+        G = nx.Graph()
+        G.add_edge(1, 2, color='r' ,weight=3)
+        G.add_edge(2, 3, color='b', weight=5)
+        G.add_edge(3, 4, color='g', weight=7)
+
+        pos = nx.circular_layout(G)
+
+        colors = nx.get_edge_attributes(G,'color').values()
+        weights = nx.get_edge_attributes(G,'weight').values()
+
+        nx.draw(G, pos, edge_color=colors, width=list(weights))
+
+        plt.show()
+
+
 class VesselTreeParallel:
 
     def __init__(self, case, image_file, pot_branches):
@@ -145,7 +181,9 @@ class Branch:
 
 def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
 
-    directory = output_folder + 'errors/'+str(i) + '_error_'+str(time.time())
+    now = datetime.now()
+    dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
+    directory = output_folder + 'errors/'+str(i) + '_error_'+dt_string
 
     if step_seg['img_file']:
         sitk.WriteImage(image, directory + 'img.vtk')
