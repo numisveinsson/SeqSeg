@@ -842,8 +842,8 @@ def orient_caps(caps, step_seg):
             sourcee = caps[i].tolist()
     target[source_id*3:source_id*3+3] = []
 
-    polydata_point = points2polydata(poly)
-    pfn = '/Users/numisveinsson/Downloads/points.vtp'
-    write_geo(pfn, polydata_point)
+    #polydata_point = points2polydata(poly)
+    #pfn = '/Users/numisveinsson/Downloads/points.vtp'
+    #write_geo(pfn, polydata_point)
 
     return [sourcee, target], source_id

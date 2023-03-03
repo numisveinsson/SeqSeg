@@ -59,11 +59,11 @@ class Segmentation:
             # Add to update weight sum for these voxels
             self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight
             self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
-        
+
         # Update the global volume
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
         self.assembly = sf.numpy_to_sitk(np_arr, self.image_reader)
-        
+
 class VesselTree:
 
     def __init__(self, case, image_file, init_step, pot_branches):
@@ -108,6 +108,63 @@ class VesselTree:
             for i in range(1,res):
                 previous_n.append(conn+i)
                 previous_n.append(conn-i)
+
+    def calc_ave_dice(self):
+        total_dice, count = 0,0
+        for step in self.steps[1:]:
+            if step['dice']:
+                if not step['dice'] == 0:
+                    count += 1
+                    total_dice += step['dice']
+        ave_dice = total_dice/count
+        if count > 1:
+            print(f"Average dice per step was : {ave_dice}")
+        return ave_dice
+
+    def calc_ave_time(self):
+        total_time, count = 0,0
+        for step in self.steps[1:]:
+            if step['time']:
+                count += 1
+                total_time += step['time']
+        ave_time = total_time/count
+        if count > 1:
+            print(f"Average time was : {ave_time}")
+        return ave_time
+
+    def time_analysis(self):
+        names = ['extraction     ',
+                 'prediction     ',
+                 'surface        ',
+                 'centerline     ',
+                 'global assembly',
+                 'next point     ']
+        time_sum = np.zeros(len(names))
+        counter = 0
+        for step in self.steps:
+            if step['time']:
+                time_arr = np.zeros(len(names))
+                for j in range(len(step['time'])):
+                    time_arr[j] = step['time'][j]
+                time_sum += time_arr
+                counter += 1
+
+        for j in range(len(names)):
+            print('Average time for ' + names[j]+ ' : ', time_sum[j]/counter)
+        print(np.array(time_sum/counter).tolist())
+
+    def calc_caps(self):
+        'Temp try at calculating global caps'
+        final_caps = []
+        for point in vessel_tree.caps:
+            if not vf.is_point_in_image(assembly, point):
+                final_caps.append(point)
+            #else:
+                #print('Inside \n')
+
+        print('Number of outlets: ' + str(len(final_caps)))
+        #final_caps = vf.orient_caps(final_caps, init_step)
+        return final_caps
 
     def write_csv(self):
         """
