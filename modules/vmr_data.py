@@ -1,4 +1,4 @@
-def vmr_directories(directory, model):
+def vmr_directories(directory, model, global_scale):
     """
     Function to return the directories of
         Image Volume
@@ -8,7 +8,11 @@ def vmr_directories(directory, model):
     for a specific model in the
     Vascular Model Repository
     """
-    dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
+    if global_scale:
+        dir_image = directory +'scaled_images/'+model+'.vtk'
+    else:
+        dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
+
     dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
 
     dir_cent = directory + 'centerlines/'+model+'.vtp'

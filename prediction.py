@@ -6,13 +6,14 @@ import SimpleITK as sitk
 
 class Prediction:
     #This is a class to get 3D volumetric prediction from the UNet model
-    def __init__(self, unet, model, modality, image, size, out_fn, threshold, seg_volume = None):
+    def __init__(self, unet, model, modality, image, size, out_fn, threshold, seg_volume = None, global_scale = False):
         self.unet=unet
         self.model_name = model
         self.modality = modality
         self.image_vol = image
         self.image_resampled = resample_spacing(self.image_vol, template_size=size, order=1)[0]
         self.threshold = threshold
+        self.global_scale = global_scale
         if seg_volume:
             label_vol = sitk.GetArrayFromImage(seg_volume)
             label_vol = (label_vol/np.max(label_vol))
@@ -33,7 +34,9 @@ class Prediction:
     def volume_prediction(self, num_class):
 
         img_vol = sitk.GetArrayFromImage(self.image_resampled).transpose(2,1,0)
-        img_vol = rescale_intensity(img_vol, self.modality, [750, -750])
+        if not self.global_scale:
+            img_vol = rescale_intensity(img_vol, self.modality, [750, -750])
+        #print(f"Vol Max: {img_vol.max()}, Vol Min: {img_vol.min()}")
         self.original_shape = img_vol.shape
         print(f"Min: {img_vol.min():.2f}, Max: {img_vol.max():.2f}")
             

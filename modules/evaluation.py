@@ -23,7 +23,7 @@ class EvaluateTracing:
         """
         Function to count how many branches in grountruth were captured in tracing
         """
-        move_distance_radius = 1.5
+        move_distance_radius = 0.1
 
         ## Centerline
         cent = vf.read_geo(self.cent_truth).GetOutput()  # read in geometry
@@ -52,28 +52,36 @@ class EvaluateTracing:
             bifurc = bifurc_id[ids]
 
             if self.seed in locs:
-                print(f"Initial seed on centerline: {ip}")
+                #print(f"Initial seed on centerline: {ip}")
                 ind = np.where(locs==self.seed)[0][0]
                 locs = np.delete(locs, np.s_[0:ind], 0)
                 rads = np.delete(rads, np.s_[0:ind], 0)
                 bifurc = np.delete(bifurc, np.s_[0:ind], 0)
 
             on_cent = True
-            total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs, axis=0), axis=1), 0, 0))[-1]
-
             count = 0 # the point along centerline
+            first_count = True
             lengths = [0]
             lengths_prev = [0]
             #print("\n ** Ip is " + str(ip)+"\n")
             while on_cent:
                 if not (ids[count] in ids_total):
+                    if first_count:
+                        min_count = count
+                        first_count = False
+                        print(f"Min count is: {min_count}")
                     # Do something at this location
                     if not vf.is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
                         on_cent = False
                         missed_branches += 1
-                        percent_caught.append(round(lengths_prev[-1]/total_length,3))
-
-                lengths_prev = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[:count], axis=0), axis=1), 0, 0))
+                        total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[min_count:], axis=0), axis=1), 0, 0))[-1]
+                        print(f"Total length: {total_length}")
+                        print(f"Prev lengths: {lengths_prev}")
+                        perc = round(lengths_prev[-1]/total_length,3)
+                        percent_caught.append(perc)
+                        #if perc == 0: import pdb; pdb.set_trace()
+                if not first_count:
+                    lengths_prev = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[min_count:count], axis=0), axis=1), 0, 0))
                 lengths = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[count:], axis=0), axis=1), 0, 0))
                 move = 1
                 count = count+1
@@ -93,15 +101,17 @@ class EvaluateTracing:
 
         print(str(missed_branches)+'/'+str(num_cent)+' branches missed\n')
         print(percent_caught)
+        total_perc = np.array(percent_caught).sum()/len(percent_caught)
 
-        return [missed_branches, num_cent], percent_caught
+        return [missed_branches, num_cent], percent_caught, total_perc
 
     def calc_dice_score(self):
-        
-        dice = dice_score(sitk.GetArrayFromImage(self.seg_pred), seg_truth)[0]
+
+        dice = dice_score(sitk.GetArrayFromImage(self.seg_pred), self.seg_truth)[0]
 
         print('Global dice score: ', dice)
         return dice
+
     def calc_sens_spec(self):
 
         return sensitivity_specificity(self.seg_pred, self.seg_truth)
