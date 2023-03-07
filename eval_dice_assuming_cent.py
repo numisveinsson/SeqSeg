@@ -59,7 +59,6 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
     #reader_im, origin_im, size_im, spacing_im = sf.import_image(image_file)
     #assembly_segs = Segmentation(case, image_file)
 
-    take_time = True
     exponent = 3
 
     csv_file = modality+"_test_Sample_stats.csv"
@@ -97,6 +96,8 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
                 if sample in samples[1:N_tot:N_tot//10]: print('*', end=" ", flush=True)
             # Read in
             volume = sitk.ReadImage(data_folder+sample)
+            vol_np = sitk.GetArrayFromImage(volume)
+            print(f"Min: {vol_np.min():.2f}, Max: {vol_np.max():.2f}")
             seg_volume = sitk.ReadImage(data_folder.replace('_test', '_test_masks') +sample)
 
             sample = sample.replace('.nii.gz','.vtk')
@@ -183,10 +184,10 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
 
 if __name__=='__main__':
 
-    test = 'test53'
+    test = 'test100'
     print('\nTest is: ', test)
 
-    data_folder = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_vers5_aortas/'
+    data_folder = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_global_aortas/'
     dir_model_weights = '/Users/numisveins/Documents/Automatic_Tracing_ML/weights/' + test + '/'
     write_samples = True
     dir_seg = True
@@ -197,7 +198,7 @@ if __name__=='__main__':
     ## Create directories for results
     create_directories(dir_output)
 
-    modality = 'mr'
+    modality = 'both'
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold = 0.5
 

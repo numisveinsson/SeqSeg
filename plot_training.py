@@ -71,7 +71,7 @@ import numpy
 #
 # plt.show()
 
-for i in [47]:#range(1,9):
+for i in [48,49]:#range(1,9):
 
     test = 'test'+str(i) #'cent_test_' + str(i) + '_scaled'
     history_dir = './weights/'+test+'_history'

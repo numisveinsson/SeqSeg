@@ -35,7 +35,8 @@ class Prediction:
         img_vol = sitk.GetArrayFromImage(self.image_resampled).transpose(2,1,0)
         img_vol = rescale_intensity(img_vol, self.modality, [750, -750])
         self.original_shape = img_vol.shape
-
+        print(f"Min: {img_vol.min():.2f}, Max: {img_vol.max():.2f}")
+            
         prob = np.zeros((*self.original_shape,num_class))
 
         start = time.time()
@@ -242,9 +243,9 @@ def centering(img, ref_img, order=1):
     reference_center = np.array(ref_img.TransformContinuousIndexToPhysicalPoint(np.array(ref_img.GetSize())/2.0))
     centering_transform.SetOffset(np.array(transform.GetInverse().TransformPoint(img_center) - reference_center))
 
-    centered_transform = sitk.Transform(transform)
-    centered_transform.AddTransform(centering_transform)
-    #centered_transform = sitk.CompositeTransform([transform, centering_transform])
+    #centered_transform = sitk.Transform(transform)
+    #centered_transform.AddTransform(centering_transform)
+    centered_transform = sitk.CompositeTransform([transform, centering_transform])
 
     return transform_func(img, ref_img, centered_transform, order)
 
