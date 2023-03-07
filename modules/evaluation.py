@@ -69,14 +69,14 @@ class EvaluateTracing:
                     if first_count:
                         min_count = count
                         first_count = False
-                        print(f"Min count is: {min_count}")
+                        #print(f"Min count is: {min_count}")
                     # Do something at this location
                     if not vf.is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
                         on_cent = False
                         missed_branches += 1
                         total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[min_count:], axis=0), axis=1), 0, 0))[-1]
-                        print(f"Total length: {total_length}")
-                        print(f"Prev lengths: {lengths_prev}")
+                        #print(f"Total length: {total_length}")
+                        #print(f"Prev lengths: {lengths_prev}")
                         perc = round(lengths_prev[-1]/total_length,3)
                         percent_caught.append(perc)
                         #if perc == 0: import pdb; pdb.set_trace()
