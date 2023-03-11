@@ -64,6 +64,14 @@ class Segmentation:
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
         self.assembly = sf.numpy_to_sitk(np_arr, self.image_reader)
 
+    def create_mask(self):
+        "Function to create a global image mask of areas that were segmented"
+        mask = (self.number_updates > 0).astype(int)
+        mask = sf.numpy_to_sitk(mask,self.image_reader)
+        # import pdb; pdb.set_trace()
+        self.mask = mask
+
+        return mask
 class VesselTree:
 
     def __init__(self, case, image_file, init_step, pot_branches):

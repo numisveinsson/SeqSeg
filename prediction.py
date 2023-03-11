@@ -38,7 +38,7 @@ class Prediction:
             img_vol = rescale_intensity(img_vol, self.modality, [750, -750])
         #print(f"Vol Max: {img_vol.max()}, Vol Min: {img_vol.min()}")
         self.original_shape = img_vol.shape
-        print(f"Min: {img_vol.min():.2f}, Max: {img_vol.max():.2f}")
+        #print(f"Min: {img_vol.min():.2f}, Max: {img_vol.max():.2f}")
             
         prob = np.zeros((*self.original_shape,num_class))
 

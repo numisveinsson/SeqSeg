@@ -2,13 +2,14 @@ import numpy as np
 import pdb
 import os
 import pandas
+import pickle
 from ast import literal_eval
 
 from modules import vtk_functions as vf
 from modules import sitk_functions as sf
 from modules.assembly import Segmentation
 from modules.vmr_data import vmr_directories
-from modules.evaluation import sensitivity_specificity
+from modules.evaluation import sensitivity_specificity, EvaluateTracing
 from prediction import Prediction, dice_score
 from model import UNet3DIsensee
 
@@ -52,7 +53,10 @@ def list_samples_cases(directory):
 
     return samples_cases, cases
 
-def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img_shape, threshold, weighted, seg_file=False, write_samples=True):
+def predict(output_folder, data_folder, model_folder, 
+            dir_data_3d, modality, img_shape, threshold, 
+            weighted, seg_file=False, write_samples=True, 
+            global_scale=False, eval_threshold=False):
 
     #if seg_file:
     #    reader_seg, origin_im, size_im, spacing_im = sf.import_image(seg_file)
@@ -74,7 +78,8 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
     unet.load_weights(model_name)
 
     predictions = []
-    final_dice_scores = {}
+    final_dice_scores = []
+    final_cent_scores = []
 
     for case in cases:
         print('\nNext case: ', case)
@@ -87,7 +92,8 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
         csv_array = csv_list.loc[csv_list['NAME'].isin(samples_names)]
         csv_list_small = csv_array[keep_values]
 
-        dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(dir_data_3d, case)
+        dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(dir_data_3d, 
+                                                                 case, global_scale)
         assembly_segs = Segmentation(case, dir_image, weighted)
 
         for sample in samples:#[0:N_tot:20]:
@@ -97,7 +103,7 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
             # Read in
             volume = sitk.ReadImage(data_folder+sample)
             vol_np = sitk.GetArrayFromImage(volume)
-            print(f"Min: {vol_np.min():.2f}, Max: {vol_np.max():.2f}")
+            #print(f"Min: {vol_np.min():.2f}, Max: {vol_np.max():.2f}")
             seg_volume = sitk.ReadImage(data_folder.replace('_test', '_test_masks') +sample)
 
             sample = sample.replace('.nii.gz','.vtk')
@@ -108,7 +114,9 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
             sitk.WriteImage(volume, img_fn)
 
             # Prediction
-            predict = Prediction(unet, model_name, modality, volume, img_shape, output_folder+'predictions', threshold, seg_volume)
+            predict = Prediction(unet, model_name, modality, volume, 
+                                 img_shape, output_folder+'predictions', 
+                                 threshold, seg_volume, global_scale)
             predict.volume_prediction(1)
             #pred64 = predict.volume_prediction(1)
             predict.resample_prediction()
@@ -127,7 +135,6 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
             #print('weight :', weight_size)
 
             assembly_segs.add_segmentation(predict.prob_prediction, index, size_extract, weight_size)
-
 
             # pd_fn64 = output_folder +'predictions/64_'+sample
             # pred_raw = sitk.GetImageFromArray(pred64.transpose(2,1,0))
@@ -166,47 +173,89 @@ def predict(output_folder, data_folder, model_folder, dir_data_3d, modality, img
         global_seg_truth_np = sitk.GetArrayFromImage(global_seg_truth)
         global_seg_truth_np = global_seg_truth_np/global_seg_truth_np.max()
 
-        for i in range(1,20):
-            threshold = i*0.05
+        assembly_segs.create_mask()
+        sitk.WriteImage(assembly_segs.mask, output_folder +'mask_'+case+'.vtk')
+
+        if eval_threshold:
+            for i in range(1,20):
+                threshold = i*0.05
+                assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=threshold, upperThreshold=1)
+                assembly_np = sitk.GetArrayFromImage(assembly)
+                final_dice = dice_score(assembly_np, global_seg_truth_np)[0]
+                #print('\nDice for threshold '+str(threshold)[:4]+': ', final_dice)
+                sens, spec = sensitivity_specificity(assembly_np, global_seg_truth_np)
+                print(f"Sensitivity, Specificity, DICE for threshold {threshold:.2f}: {sens:.3f}, {spec:.3f}, {final_dice:.3f}")
+                #print(f"Specificity for threshold {threshold}: {spec}")
+        else:
             assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=threshold, upperThreshold=1)
-            assembly_np = sitk.GetArrayFromImage(assembly)
-            final_dice = dice_score(assembly_np, global_seg_truth_np)[0]
-            final_dice_scores[case] = final_dice
-            #print('\nDice for threshold '+str(threshold)[:4]+': ', final_dice)
-            sens, spec = sensitivity_specificity(assembly_np, global_seg_truth_np)
-            print(f"Sensitivity, Specificity, DICE for threshold {threshold:.2f}: {sens:.3f}, {spec:.3f}, {final_dice:.3f}")
-            #print(f"Specificity for threshold {threshold}: {spec}")
+        
         surface_assembly = vf.evaluate_surface(assembly, 1)
         vf.write_vtk_polydata(surface_assembly, output_folder +'assembly_surface_'+case+'.vtp')
 
+        seed = np.zeros(3)
 
-    return final_dice_scores
+        eval_tracing = EvaluateTracing(case, seed, dir_seg, dir_surf, dir_cent, assembly, surface_assembly)
+        missed_branches, perc_caught, total_perc = eval_tracing.count_branches()
+        final_dice = eval_tracing.calc_dice_score()
+        final_dice_scores.append(final_dice)
+        final_cent_scores.append(total_perc)
+
+
+    return cases, final_dice_scores, final_cent_scores
 
 if __name__=='__main__':
-
-    test = 'test100'
-    print('\nTest is: ', test)
-
-    data_folder = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_global_aortas/'
-    dir_model_weights = '/Users/numisveins/Documents/Automatic_Tracing_ML/weights/' + test + '/'
+    # [test, global_scale]
+    tests = [['test55', True],
+             #['test101', True]
+             ]
+    
+    data_folder = '/Users/numisveins/Documents/Automatic_Tracing_Data/patches_for_masks/'
+    dir_data_3d = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
+    dir_output0 = '/Users/numisveins/Documents/Automatic_Tracing_Data/output_masks/'    
     write_samples = True
     dir_seg = True
     weighted_assembly = False
-
-    dir_data_3d = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
-    dir_output = '/Users/numisveins/Documents/Automatic_Tracing_Data/output_global/'+test+'/'
-    ## Create directories for results
-    create_directories(dir_output)
-
-    modality = 'both'
+    eval_threshold = False
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold = 0.5
 
-    dice_list = predict(dir_output, data_folder, dir_model_weights, dir_data_3d, modality, nn_input_shape, threshold, weighted_assembly, dir_seg, write_samples)
+    global_dict = {}
+    global_dict['test'] = []
+    global_dict['ct dice'] = []
+    global_dict['mr dice'] = []
+    global_dict['ct cent'] = []
+    global_dict['mr cent'] = []
 
-    info_file_name = "info"+'_'+modality+dt_string+".txt"
-    
-    f = open(dir_output +info_file_name,'a')
-    for key in dice_list:
-        f.write(f"\nCase: {key} , Dice: {dice_list[key]:.4f}")
-    f.close()
+    for test in tests:
+        
+        if test == 'test101': nn_input_shape = [128,128,128]
+        global_scale = test[1]
+        test = test[0]
+        print('\nTest is: ', test)
+        dir_model_weights = '/Users/numisveins/Documents/Automatic_Tracing_ML/weights/' + test + '/'
+        dir_output = dir_output0+test+'/'
+        ## Create directories for results
+        create_directories(dir_output)
+
+        global_dict['test'].append(test)
+
+        for modality in ['ct','mr']:
+
+            cases, dice_scores, cent_scores = predict(dir_output, data_folder, dir_model_weights, 
+                                dir_data_3d, modality, nn_input_shape, threshold, 
+                                weighted_assembly, dir_seg, write_samples, 
+                                global_scale, eval_threshold)
+
+            info_file_name = "info"+'_'+modality+".txt"
+            
+            f = open(dir_output +info_file_name,'a')
+            for i, case in enumerate(cases):
+                f.write(f"\nCase: {case} , Dice: {dice_scores[i]:.4f}, Cent: {cent_scores[i]:.4f}")
+            f.close()
+
+            global_dict[modality+' dice'].append(np.array(dice_scores).mean())
+            global_dict[modality+' cent'].append(np.array(cent_scores).mean())
+
+    #import pdb; pdb.set_trace()
+    with open(dir_output0+'results.pickle', 'wb') as handle:
+        pickle.dump(global_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
