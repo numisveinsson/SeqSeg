@@ -736,9 +736,9 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
 
                 print("\nERROR: Point is too close to old point so adding vector\n")
                 points.append(  current_point + 1/2*rads[id_along_cent_save] * vector)
-                polydata_point = points2polydata([current_point.tolist(), locs[id_along_cent].tolist()])
-                pfn = '/Users/numisveinsson/Downloads/vector.vtp'
-                write_geo(pfn, polydata_point)
+                # polydata_point = points2polydata([current_point.tolist(), locs[id_along_cent].tolist()])
+                # pfn = '/Users/numisveinsson/Downloads/vector.vtp'
+                # write_geo(pfn, polydata_point)
 
         else:
             print("Angle not within limit, returning None for ip=" + str(ip))
@@ -824,7 +824,7 @@ def is_point_in_surface(surface, point):
         print("Error, output from VTK enclosed surface")
         return 0
 
-def orient_caps(caps, step_seg):
+def orient_caps(caps, old_point):
 
     source_dist = 100
     target = []
@@ -834,7 +834,7 @@ def orient_caps(caps, step_seg):
         poly.append(caps[i].tolist())
 
     for i in range(len(caps)):
-        cap_dist = np.linalg.norm(caps[i] - np.array(step_seg['old point']))
+        cap_dist = np.linalg.norm(caps[i] - old_point)
         #print(cap_dist)
         if  cap_dist < source_dist:
             source_id = i

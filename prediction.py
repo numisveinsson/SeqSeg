@@ -185,10 +185,12 @@ def resample_spacing(sitkIm, resolution=0.5, dim=3, template_size=(256, 256, 256
     orig_direction = image.GetDirection()
     orig_size = np.array(image.GetSize(), dtype=np.int)
     orig_spacing = np.array(image.GetSpacing())
+
     new_size = orig_size*(orig_spacing/np.array(resolution))
     new_size = np.ceil(new_size).astype(np.int) #  Image dimensions are in integers
     new_size = [int(s) for s in new_size]
     new_size = np.abs(np.matmul(np.reshape(orig_direction, (3,3)), np.array(new_size)))
+    #print(f"New size: {new_size}")
     ref_img = reference_image_build(resolution, new_size, template_size, dim)
     centered = centering(image, ref_img, order)
     transformed = isometric_transform(centered, ref_img, orig_direction, order)
