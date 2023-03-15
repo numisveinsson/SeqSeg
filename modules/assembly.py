@@ -161,11 +161,11 @@ class VesselTree:
             print('Average time for ' + names[j]+ ' : ', time_sum[j]/counter)
         print(np.array(time_sum/counter).tolist())
 
-    def calc_caps(self):
+    def calc_caps(self, global_assembly):
         'Temp try at calculating global caps'
         final_caps = []
-        for point in vessel_tree.caps:
-            if not vf.is_point_in_image(assembly, point):
+        for point in self.caps:
+            if not vf.is_point_in_image(global_assembly, point):
                 final_caps.append(point)
             #else:
                 #print('Inside \n')
@@ -184,7 +184,7 @@ class VesselTree:
 
 
     def plot_graph(self):
-        import networkx
+        import networkx as nx
         import matplotlib.pyplot as plt
 
         G = nx.DiGraph()

@@ -56,7 +56,7 @@ def list_samples_cases(directory):
 def predict(output_folder, data_folder, model_folder, 
             dir_data_3d, modality, img_shape, threshold, 
             weighted, seg_file=False, write_samples=True, 
-            global_scale=False, eval_threshold=False):
+            global_scale=False, cropped=False, eval_threshold=False):
 
     #if seg_file:
     #    reader_seg, origin_im, size_im, spacing_im = sf.import_image(seg_file)
@@ -93,7 +93,9 @@ def predict(output_folder, data_folder, model_folder,
         csv_list_small = csv_array[keep_values]
 
         dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(dir_data_3d, 
-                                                                 case, global_scale)
+                                                                 case, 
+                                                                 global_scale,
+                                                                 cropped)
         assembly_segs = Segmentation(case, dir_image, weighted)
 
         for sample in samples:#[0:N_tot:20]:
@@ -190,10 +192,10 @@ def predict(output_folder, data_folder, model_folder,
             assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=threshold, upperThreshold=1)
         
         surface_assembly = vf.evaluate_surface(assembly, 1)
+        surface_assembly = vf.smooth_surface(surface_assembly, 15)
         vf.write_vtk_polydata(surface_assembly, output_folder +'assembly_surface_'+case+'.vtp')
 
         seed = np.zeros(3)
-
         eval_tracing = EvaluateTracing(case, seed, dir_seg, dir_surf, dir_cent, assembly, surface_assembly)
         missed_branches, perc_caught, total_perc = eval_tracing.count_branches()
         final_dice = eval_tracing.calc_dice_score()
@@ -205,18 +207,24 @@ def predict(output_folder, data_folder, model_folder,
 
 if __name__=='__main__':
     # [test, global_scale]
-    tests = [['test55', True],
-             #['test101', True]
+    tests = [['test122', False],
+             ['test123', False],
+            #  ['test115', False],
+            #  ['test113', False],
+            #  ['test118', False],
+            #  ['test119', False],
              ]
     
-    data_folder = '/Users/numisveins/Documents/Automatic_Tracing_Data/patches_for_masks/'
+    data_folder = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_global_aortas/'
     dir_data_3d = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
-    dir_output0 = '/Users/numisveins/Documents/Automatic_Tracing_Data/output_masks/'    
+    dir_output0 = '/Users/numisveins/Documents/Automatic_Tracing_Data/output_global/'    
+    cropped=True
+    
     write_samples = True
     dir_seg = True
     weighted_assembly = False
     eval_threshold = False
-    nn_input_shape = [64, 64, 64] # Input shape for NN
+    nn_input_shape = [128, 128, 128] # Input shape for NN
     threshold = 0.5
 
     global_dict = {}
@@ -244,7 +252,7 @@ if __name__=='__main__':
             cases, dice_scores, cent_scores = predict(dir_output, data_folder, dir_model_weights, 
                                 dir_data_3d, modality, nn_input_shape, threshold, 
                                 weighted_assembly, dir_seg, write_samples, 
-                                global_scale, eval_threshold)
+                                global_scale, cropped, eval_threshold)
 
             info_file_name = "info"+'_'+modality+".txt"
             
@@ -259,3 +267,5 @@ if __name__=='__main__':
     #import pdb; pdb.set_trace()
     with open(dir_output0+'results.pickle', 'wb') as handle:
         pickle.dump(global_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    pdb.set_trace()
