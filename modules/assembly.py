@@ -72,6 +72,28 @@ class Segmentation:
         self.mask = mask
 
         return mask
+    def upsample(self, template_size=[1000,1000,1000]):
+        from prediction import centering
+        import pdb; pdb.set_trace()
+        or_im = sitk.GetImageFromArray(self.assembly)
+        or_im.SetSpacing(self.image_resampled.GetSpacing())
+        or_im.SetOrigin(self.image_resampled.GetOrigin())
+        or_im.SetDirection(self.image_resampled.GetDirection())
+        target_im = sf.create_new(or_im)
+        target_im.SetSize(template_size)
+        new_spacing = (np.array(or_im.GetSize())*np.array(or_im.GetSpacing()))/np.array(template_size)
+        target_im.SetSpacing(new_spacing)
+        import pdb; pdb.set_trace()
+
+        resampled = centering(or_im, target_im, order=0)
+        return resampled
+
+    def upsample_sitk(self, template_size=[1000,1000,1000]):
+
+        from prediction import resample_spacing
+        resampled, ref_im = resample_spacing(self.assembly, template_size=template_size)
+        return resampled
+
 class VesselTree:
 
     def __init__(self, case, image_file, init_step, pot_branches):
@@ -116,6 +138,16 @@ class VesselTree:
             for i in range(1,res):
                 previous_n.append(conn+i)
                 previous_n.append(conn-i)
+
+    def get_previous_step(self,step_number):
+
+        inds = [(i, colour.index(step_number)) for i, colour in enumerate(self.branches) if step_number in colour]
+
+        for ind in inds:
+            if ind[1] == 0: continue
+            else:
+                ind_prev = self.branches[ind[0]][ind[1]-1]
+        return self.steps[ind_prev]
 
     def calc_ave_dice(self):
         total_dice, count = 0,0
@@ -250,7 +282,7 @@ def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
     dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
     directory = output_folder + 'errors/'+str(i) + '_error_'+dt_string
 
-    if step_seg['img_file']:
+    if step_seg['img_file'] and not step_seg['is_inside']:
         sitk.WriteImage(image, directory + 'img.vtk')
 
         if step_seg['seg_file']:

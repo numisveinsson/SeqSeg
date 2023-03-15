@@ -10,7 +10,7 @@ start_time = time.time()
 from datetime import datetime
 
 import os
-
+import pickle
 import numpy as np
 import SimpleITK as sitk
 
@@ -65,8 +65,8 @@ def create_directories(output_folder, write_samples):
 
 def trace_centerline(output_folder, image_file, case, model_folder, modality,
                     img_shape, threshold, potential_branches, max_step_size,
-                    seg_file=None, global_scale=False, write_samples=True,
-                    take_time=False
+                    seg_file=None,      global_scale=False, write_samples=True,
+                    take_time=False,    retrace_cent=False, weighted=False
                     ):
 
     allowed_steps = 10
@@ -86,7 +86,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
 
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
-    assembly_segs = Segmentation(case, image_file)
+    assembly_segs = Segmentation(case, image_file, weighted)
     model         = UNet3DIsensee((img_shape[0], img_shape[1], img_shape[2], 1),
                                 num_class=1)
     unet = model.build()
@@ -107,7 +107,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     i = 0 # numbering chronological order
     while vessel_tree.potential_branches and i < max_step_size:
 
-        print(f"*** Step number {i} ***")
+        if i in range(0, max_step_size, max_step_size//10):
+            print(f"*** Step number {i} ***")
 
         try:
 
@@ -144,9 +145,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 pfn = output_folder + 'points/point_'+case+'_'+str(i)+'.vtp'
                 vf.write_geo(pfn, polydata_point)
 
+            perc, mag = 1,1
+            # while perc>0.33 and mag < 1.5:
             # Extract Volume
             size_extract, index_extract = sf.map_to_image(  step_seg['point'],
-                                                            step_seg['radius'],
+                                                            step_seg['radius']*mag,
                                                             volume_size_ratio,
                                                             origin_im,
                                                             spacing_im          )
@@ -187,14 +190,19 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             predict.resample_prediction()
             if seg_file:
                 d = predict.dice()
-                print(f"Local dice: {d:.4f}")
+                #print(f"Local dice: {d:.4f}")
                 step_seg['dice'] = d
                 dice_list.append(d)
 
             predicted_vessel = predict.prediction
+            # perc = sitk.GetArrayFromImage(predicted_vessel).mean()
+            # mag = mag+0.1
+            #print(f"Perc as 1: {perc:.3f}")
+
             step_seg['prob_predicted_vessel'] = predict.prob_prediction
             seed = np.rint(np.array(size_extract)/2).astype(int).tolist()
             predicted_vessel = sf.remove_other_vessels(predicted_vessel, seed)
+
             #print("Now the components are: ")
             #labels, means = sf.connected_comp_info(predicted_vessel, True)
             pd_fn = output_folder +'predictions/seg_'+case+'_'+str(i)+'.vtk'
@@ -235,9 +243,15 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
 
+
+            if i != 0:
+                prev_step = vessel_tree.get_previous_step(i)
+                old_point_ref = prev_step['old point']
+            elif i == 0:
+                old_point_ref = step_seg['old point']
             caps = vf.calc_caps(surface_smooth)
             step_seg['caps'] = caps
-            _ , source_id = vf.orient_caps(caps, step_seg)
+            _ , source_id = vf.orient_caps(caps, old_point_ref)
 
 
             #print('Number of caps: ', len(caps))
@@ -249,9 +263,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
 
             # Centerline
             centerline_poly = vmtkfs.calc_centerline(   surface_smooth,
-                                                        "profileidlist",
-                                                        var_source=[source_id],
-                                                        number = i)
+                                                            "profileidlist",
+                                                            var_source=[source_id],
+                                                            number = i)
             #centerline_poly = vmtkfs.calc_centerline(surface_smooth, "profileidlist", number = i)
             #centerline_poly = vf.get_largest_connected_polydata(centerline_poly)
             step_seg['cent_file'] = cfn
@@ -280,7 +294,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             step_seg['centerline'] = centerline_poly
 
             # Assembly
-
             N = 10
             buffer = 10
             if use_buffer:
@@ -290,7 +303,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                             #print(f"Adding step {-(j+buffer)} and number of steps are {len(vessel_tree.steps)}")
                             assembly_segs.add_segmentation( vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'],
                                                             vessel_tree.steps[-(j+buffer)]['img_index'],
-                                                            vessel_tree.steps[-(j+buffer)]['img_size'])
+                                                            vessel_tree.steps[-(j+buffer)]['img_size'], (1/vessel_tree.steps[-(j+buffer)]['radius'])**2)
                             vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'] = None
                             vessel_tree.caps = vessel_tree.caps + vessel_tree.steps[-(j+buffer)]['caps']
                     if len(vessel_tree.steps) % (N*5) == 0 and write_samples:
@@ -306,7 +319,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                     step_seg['time'].append(time.time()-start_time_loc)
                     start_time_loc = time.time()
             else:
-                assembly_segs.add_segmentation(step_seg['prob_predicted_vessel'], step_seg['img_index'], step_seg['img_size'])
+                assembly_segs.add_segmentation(step_seg['prob_predicted_vessel'], step_seg['img_index'], step_seg['img_size'], step_seg['radius'])
                 step_seg['prob_predicted_vessel'] = None
 
             # Print polydata surfaces,cents together for animation
@@ -428,6 +441,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                     vf.write_vtk_polydata(final_points, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
 
                 vessel_tree.caps = vessel_tree.caps + [step_seg['point'] + volume_size_ratio*step_seg['radius']*step_seg['tangent']]
+
+                if retrace_cent:
+                    ind = vessel_tree.branches[branch][1] # second step on this branch
+                    step_to_add = vessel_tree.steps[ind]
+                    step_to_add['connection'] = [-branch+1, ind] # add connection that says retrace
+                    vessel_tree.potential_branches.append(step_to_add)
                 # Sort the potentials by radius
                 vessel_tree.sort_potential()
 
@@ -462,51 +481,74 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     #                 assembly_segs.add_segmentation(vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'], vessel_tree.steps[-(j+buffer)]['img_index'], vessel_tree.steps[-(j+buffer)]['img_size'])
     #                 vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'] = None
     #
-    return list_centerlines, list_surfaces, list_points, assembly_segs.assembly, vessel_tree, i
+    return list_centerlines, list_surfaces, list_points, assembly_segs, vessel_tree, i
 
 if __name__=='__main__':
+    #       [name    , global_scale]
+    tests = [
+             ['test53',True, 'mr'],
+            #['test54',True],
+            ['test55',True, 'ct'],
+            #['test56',False],
+            # ['test57',False, 'ct'],
+            # ['test58',False, 'mr']
+            ]# 'test49', 'test27']
 
-    tests = ['test48']#,'test57','test58']#, 'test49', 'test27']
+    global_dict                  = {}
+    global_dict['test']          = []
+    global_dict['ct dice']       = []
+    global_dict['mr dice']       = []
+    global_dict['ct cent']       = []
+    global_dict['mr cent']       = []
+
+    dir_output0    = '//Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs/'
+    directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
+    max_step_size  = 700
+    nn_input_shape = [64, 64, 64] # Input shape for NN
+    threshold      = 0.5 # Threshold for binarization of prediction
+    write_samples  = False
+    retrace_cent = False
+    take_time      = False
+    weighted = True
 
     for test in tests:
 
+        global_scale = test[1]
+        modality_model = test[2]
+        test         = test[0]
         print('\n test is: \n', test)
-
-        ## Directories
-        dir_output0 = '//Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs_version4/'
-        directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
+        ## Weight directory
         dir_model_weights = '/Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/weights/' + test + '/'
-        write_samples=False
-        take_time = False
-        global_scale = False
 
-        testing_samples = [#['0002_0001',0,150,170]  ,
-                           #['0002_0001',1,150, 170] ,
-                           #['0005_1001',0,300,320]  ,
-                           #['0005_1001',1,200,220]  ,
+        testing_samples = [#['0002_0001',0,150,170,'ct']  ,
+                           # ['0002_0001',1,150, 170,'ct'] ,
+                           # ['0001_0001',0,30,50,'ct']
+                           # ['0005_1001',0,300,320,'ct']  ,
+                            #['0005_1001',1,200,220,'ct']  ,
                            ['0146_1001',0,10,20,'ct'],
                            ['0006_0001',0,10,20,'mr'],
                            ['0063_1001',0,10,20,'mr'],
                            ['0176_0000',0,10,20,'ct'],
                            ['0141_1001',0,10,20,'ct'],
-                           ['0090_0001',0,10,20,'mr'],
+                           ['0090_0001',0,10,20,'mr']
                            ]
 
-        max_step_size = 600
-        nn_input_shape = [64, 64, 64] # Input shape for NN
-        threshold = 0.5 # Threshold for binarization of prediction
+        ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
+        testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
         for test_case in testing_samples:
 
-
-            print(test_case)
             ## Information
             case = test_case[0]
             i = test_case[1]
             id_old = test_case[2]
             id_current = test_case[3]
             modality = test_case[4]
+
+            if modality != modality_model: continue
+            else: testing_samples_done.append(test_case)
+            print(test_case)
 
             dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, global_scale)
             dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
@@ -522,7 +564,7 @@ if __name__=='__main__':
             init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
             potential_branches = [init_step]
             ## Trace centerline
-            centerlines, surfaces, points, assembly, vessel_tree, n_steps_taken = trace_centerline( dir_output,
+            centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
                                                                                                     dir_image,
                                                                                                     case,
                                                                                                     dir_model_weights,
@@ -534,21 +576,31 @@ if __name__=='__main__':
                                                                                                     dir_seg,
                                                                                                     global_scale,
                                                                                                     write_samples,
-                                                                                                    take_time)
+                                                                                                    take_time,
+                                                                                                    retrace_cent,
+                                                                                                    weighted)
 
             print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
-            sitk.WriteImage(assembly, dir_output+'/final_assembly_'+case+'_'+test +'_'+str(i)+'.vtk')
+
             if take_time:
                 vessel_tree.time_analysis()
 
             ## Assembly work
-            assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
-            seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
-            assembly_binary = sf.remove_other_vessels(assembly_binary, seed)
-            assembly_surface = vf.evaluate_surface(assembly_binary, 1)
-            vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_surface.vtp')
-            surface_smooth = vf.smooth_surface(assembly_surface, 10)
-            vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_surface_smooth.vtp')
+            assembly_org = assembly_obj.assembly
+            assembly_ups = assembly_obj.upsample_sitk()
+            print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
+            sitk.WriteImage(assembly_org, dir_output+'/final_assembly_'+case+'_'+test +'_'+str(i)+'.vtk')
+
+            for assembly,name in zip([assembly_ups, assembly_org],['upsampled', 'original']):
+                assembly_binary     = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
+                if name == 'original':
+                    seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
+                    assembly_binary     = sf.remove_other_vessels(assembly_binary, seed)
+                assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
+                vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+'_surface.vtp')
+                for level in range(10,50,10):
+                    surface_smooth      = vf.smooth_surface(assembly_surface, level)
+                    vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+str(level)+'_surface_smooth.vtp')
 
             final_surface = vf.appendPolyData(surfaces)
             final_centerline = vf.appendPolyData(centerlines)
@@ -564,6 +616,11 @@ if __name__=='__main__':
             final_dice = evaluate_tracing.calc_dice_score()
             ave_dice = vessel_tree.calc_ave_dice()
 
+            masked_dir = '/Users/numisveinsson/Downloads/tests_masks/test_global_masks/mask_'+case+'.vtk'
+            masked_dice = evaluate_tracing.masked_dice(masked_dir)
+            print(f"******* Masked dice: {masked_dice} **************")
+            final_dice = masked_dice
+
             final_ave_step_dice.append(ave_dice)
             final_n_steps_taken.append(n_steps_taken)
             final_dice_scores.append(final_dice)
@@ -571,12 +628,23 @@ if __name__=='__main__':
             final_tot_perc.append(total_perc)
             final_missed_branches.append(missed_branches)
 
+            if modality == 'ct': ct_dice.append(final_dice)
+            elif modality == 'mr': mr_dice.append(final_dice)
+            if modality == 'ct': ct_cent.append(total_perc)
+            elif modality == 'mr': mr_cent.append(total_perc)
+
             # final_centerline_poly = vmtkfs.calc_centerline(assembly_surface, "pointlist", final_caps[0], final_caps[1], number = 0)
             # vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerline_from_caps.vtp')
 
+        global_dict['test'].append(test)
+        global_dict['ct dice'].append(np.array(ct_dice).mean())
+        global_dict['mr dice'].append(np.array(mr_dice).mean())
+        global_dict['ct cent'].append(np.array(ct_cent).mean())
+        global_dict['mr cent'].append(np.array(mr_cent).mean())
+
         print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
-        for i in range(len(testing_samples)):
-            print(testing_samples[i][0])
+        for i in range(len(testing_samples_done)):
+            print(testing_samples_done[i][0])
             print('Steps taken: ', final_n_steps_taken[i])
             print('Ave dice per step: ', final_ave_step_dice[i])
             print('Dice: ', final_dice_scores[i])
@@ -588,17 +656,24 @@ if __name__=='__main__':
         dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
         info_file_name = "info_"+test+".txt"
         f = open(dir_output0 +info_file_name,'a')
-        for i in range(len(testing_samples)):
-            f.write(testing_samples[i][0])
+        for i in range(len(testing_samples_done)):
+            f.write(testing_samples_done[i][0])
             f.write('\nSteps taken: ' + str(final_n_steps_taken[i]))
             f.write('\nAve dice per step: ' + str(final_ave_step_dice[i]))
             f.write('\nDice: ' +str(final_dice_scores[i]))
             f.write('\nPercent caught: ' +str(final_perc_caught[i]))
             f.write('\nTotal cent caught: ' +str(final_tot_perc[i]))
             f.write('\n'+str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
+        for key in global_dict.keys():
+            f.write(f"\n{key}: {global_dict[key]}")
         f.close()
 
+    with open(dir_output0+'results.pickle', 'wb') as handle:
+        pickle.dump(global_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
     import pdb; pdb.set_trace()
+    with open('filename.pickle', 'rb') as handle:
+        b = pickle.load(handle)
 
     path = vmtkfs.calc_centerline(surface_smooth, "pickpoint", number = 0)
     vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerline_smooth.vtp')

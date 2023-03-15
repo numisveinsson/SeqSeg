@@ -41,6 +41,7 @@ class EvaluateTracing:
 
         missed_branches = 0
         percent_caught = []
+        total_lengths = []
         ids_total = []
         for ip in range(num_cent):
             try:
@@ -69,16 +70,15 @@ class EvaluateTracing:
                     if first_count:
                         min_count = count
                         first_count = False
+                        total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[min_count:], axis=0), axis=1), 0, 0))[-1]
                         #print(f"Min count is: {min_count}")
                     # Do something at this location
                     if not vf.is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
                         on_cent = False
                         missed_branches += 1
-                        total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[min_count:], axis=0), axis=1), 0, 0))[-1]
                         #print(f"Total length: {total_length}")
                         #print(f"Prev lengths: {lengths_prev}")
                         perc = round(lengths_prev[-1]/total_length,3)
-                        percent_caught.append(perc)
                         #if perc == 0: import pdb; pdb.set_trace()
                 if not first_count:
                     lengths_prev = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[min_count:count], axis=0), axis=1), 0, 0))
@@ -87,7 +87,7 @@ class EvaluateTracing:
                 count = count+1
                 if count == len(locs):
                     on_cent = False
-                    percent_caught.append(1)
+                    perc=1
                     break
                 move_distance = move_distance_radius*rads[count]
                 while lengths[move] < move_distance :
@@ -95,13 +95,19 @@ class EvaluateTracing:
                     move = move+1
                     if count == len(locs):
                         on_cent = False
-                        percent_caught.append(1)
+                        perc=1
                         break
+            percent_caught.append(perc)
+            total_lengths.append(total_length)
             ids_total.extend(ids)
 
         print(str(missed_branches)+'/'+str(num_cent)+' branches missed\n')
         print(percent_caught)
-        total_perc = np.array(percent_caught).sum()/len(percent_caught)
+        print(total_lengths)
+        print(num_cent)
+        total_perc = (np.array(percent_caught)*np.array(total_lengths)/np.array(total_lengths).sum()).sum()
+        print(f"Total caught {total_perc}")
+        #total_perc = np.array(percent_caught).sum()/len(percent_caught)
 
         return [missed_branches, num_cent], percent_caught, total_perc
 
@@ -111,6 +117,18 @@ class EvaluateTracing:
 
         print('Global dice score: ', dice)
         return dice
+
+    def masked_dice(self, masked_dir):
+        mask = sitk.ReadImage(masked_dir)
+        filter = sitk.GetArrayFromImage(mask)
+        pred = sitk.GetArrayFromImage(self.seg_pred)
+        pred[filter == 0] = 0
+
+        dice = dice_score(pred, self.seg_truth)[0]
+
+        return dice
+
+
 
     def calc_sens_spec(self):
 
