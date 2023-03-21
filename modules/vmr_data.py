@@ -1,4 +1,4 @@
-def vmr_directories(directory, model, global_scale):
+def vmr_directories(directory, model, global_scale, dir_seg):
     """
     Function to return the directories of
         Image Volume
@@ -13,7 +13,10 @@ def vmr_directories(directory, model, global_scale):
     else:
         dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
 
-    dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
+    if 'KDR' in model: dir_image = directory +'images/'+model[0:5]+'.vtk'
+
+    if dir_seg:
+        dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
 
     dir_cent = directory + 'centerlines/'+model+'.vtp'
     dir_surf = directory + 'surfaces/'+model+'.vtp'

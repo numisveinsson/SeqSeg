@@ -68,6 +68,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                     seg_file=None,      global_scale=False, write_samples=True,
                     take_time=False,    retrace_cent=False, weighted=False
                     ):
+    animation = True
 
     allowed_steps = 10
     prevent_retracing = True
@@ -79,10 +80,15 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     forceful_sidebranch = False
     forceful_sidebranch_magnify = 1.1
 
+    #Assembly params
+    N = 10
+    buffer = 10
+
     if seg_file:
         reader_seg, origin_im, size_im, spacing_im = sf.import_image(seg_file)
 
     reader_im, origin_im, size_im, spacing_im = sf.import_image(image_file)
+    print(f"Image data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
 
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
@@ -105,7 +111,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     num_steps_direction = 0
     inside_branch = 0
     i = 0 # numbering chronological order
-    while vessel_tree.potential_branches and i < max_step_size:
+    while vessel_tree.potential_branches and i < (max_step_size +1):
 
         if i in range(0, max_step_size, max_step_size//10):
             print(f"*** Step number {i} ***")
@@ -190,7 +196,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             predict.resample_prediction()
             if seg_file:
                 d = predict.dice()
-                #print(f"Local dice: {d:.4f}")
+                print(f"Local dice: {d:.4f}")
                 step_seg['dice'] = d
                 dice_list.append(d)
 
@@ -294,8 +300,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             step_seg['centerline'] = centerline_poly
 
             # Assembly
-            N = 10
-            buffer = 10
             if use_buffer:
                 if len(vessel_tree.steps) % N == 0 and len(vessel_tree.steps) >= (N+buffer):
                     for j in range(1,N+1):
@@ -303,7 +307,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                             #print(f"Adding step {-(j+buffer)} and number of steps are {len(vessel_tree.steps)}")
                             assembly_segs.add_segmentation( vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'],
                                                             vessel_tree.steps[-(j+buffer)]['img_index'],
-                                                            vessel_tree.steps[-(j+buffer)]['img_size'], (1/vessel_tree.steps[-(j+buffer)]['radius'])**2)
+                                                            vessel_tree.steps[-(j+buffer)]['img_size'],
+                                                            (1/vessel_tree.steps[-(j+buffer)]['radius'])**2)
                             vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'] = None
                             vessel_tree.caps = vessel_tree.caps + vessel_tree.steps[-(j+buffer)]['caps']
                     if len(vessel_tree.steps) % (N*5) == 0 and write_samples:
@@ -323,14 +328,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 step_seg['prob_predicted_vessel'] = None
 
             # Print polydata surfaces,cents together for animation
-            if write_samples:
-                print('No animation')
-                #surfaces_animation.append(surface_smooth)
-                #surface_accum = vf.appendPolyData(surfaces_animation)
-                #vf.write_vtk_polydata(surface_accum, dir_output+'animation/animation_'+str(i).zfill(3)+'.vtp')
-                # cent_animation.append(centerline_poly)
-                # cent_accum = vf.appendPolyData(cent_animation)
-                # vf.write_vtk_polydata(cent_accum, dir_output+'animation/animation_'+str(2*i+1).zfill(3)+'.vtp')
+            if animation and write_samples:
+                # print('Animation step added')
+                surfaces_animation.append(surface_smooth)
+                surface_accum = vf.appendPolyData(surfaces_animation)
+                vf.write_vtk_polydata(surface_accum, dir_output+'animation/animation_'+str(i).zfill(3)+'.vtp')
+                cent_animation.append(centerline_poly)
+                cent_accum = vf.appendPolyData(cent_animation)
+                vf.write_vtk_polydata(cent_accum, dir_output+'animation/animation_'+str(2*i+1).zfill(3)+'.vtp')
 
             point_tree, radius_tree, angle_change = vf.get_next_points( centerline_poly,
                                                                         step_seg['point'],
@@ -474,40 +479,52 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
         final_pot = vf.appendPolyData(list_pot)
         vf.write_vtk_polydata(final_pot, output_folder+'/assembly/potentials_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
 
-    # if use_buffer:
-    #     if len(vessel_tree.steps) % N == 0 and len(vessel_tree.steps) >= (N+buffer):
-    #         for j in range(N):
-    #             if vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel']:
-    #                 assembly_segs.add_segmentation(vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'], vessel_tree.steps[-(j+buffer)]['img_index'], vessel_tree.steps[-(j+buffer)]['img_size'])
-    #                 vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'] = None
+    if use_buffer:
+        # Add rest of local segs to global before returning
+        check = 1
+        while check < len(vessel_tree.steps) and vessel_tree.steps[-check]['prob_predicted_vessel']:
+            assembly_segs.add_segmentation( vessel_tree.steps[-check]['prob_predicted_vessel'],
+                                            vessel_tree.steps[-check]['img_index'],
+                                            vessel_tree.steps[-check]['img_size'],
+                                            (1/vessel_tree.steps[-check]['radius'])**2)
+            vessel_tree.steps[-check]['prob_predicted_vessel'] = None
+            check += 1
     #
     return list_centerlines, list_surfaces, list_points, assembly_segs, vessel_tree, i
 
 if __name__=='__main__':
     #       [name    , global_scale]
     tests = [
+             ['test55',True, 'ct'],
              ['test53',True, 'mr'],
             #['test54',True],
-            ['test55',True, 'ct'],
+
             #['test56',False],
             # ['test57',False, 'ct'],
             # ['test58',False, 'mr']
             ]# 'test49', 'test27']
 
-    global_dict                  = {}
-    global_dict['test']          = []
-    global_dict['ct dice']       = []
-    global_dict['mr dice']       = []
-    global_dict['ct cent']       = []
-    global_dict['mr cent']       = []
+    calc_restults = False
 
-    dir_output0    = '//Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs/'
+    if calc_restults:
+        global_dict                  = {}
+        global_dict['test']          = []
+        global_dict['ct dice']       = []
+        global_dict['mr dice']       = []
+        global_dict['ct cent']       = []
+        global_dict['mr cent']       = []
+
+    dir_output0    = '//Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs_new/'
     directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
-    max_step_size  = 700
+    directory_data = '/Users/numisveinsson/Documents_numi/vmr_data_new/'
+    dir_seg = None#True
+    masked = False
+
+    max_step_size  = 200
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold      = 0.5 # Threshold for binarization of prediction
     write_samples  = False
-    retrace_cent = False
+    retrace_cent   = False
     take_time      = False
     weighted = True
 
@@ -522,15 +539,52 @@ if __name__=='__main__':
 
         testing_samples = [#['0002_0001',0,150,170,'ct']  ,
                            # ['0002_0001',1,150, 170,'ct'] ,
-                           # ['0001_0001',0,30,50,'ct']
+                           #['0001_0001',0,30,50,'ct'],
+                           #['0001_0001',7,30,50,'ct'],
+                           #['0001_0001',8,110,130,'ct'],
                            # ['0005_1001',0,300,320,'ct']  ,
-                            #['0005_1001',1,200,220,'ct']  ,
-                           ['0146_1001',0,10,20,'ct'],
-                           ['0006_0001',0,10,20,'mr'],
-                           ['0063_1001',0,10,20,'mr'],
-                           ['0176_0000',0,10,20,'ct'],
-                           ['0141_1001',0,10,20,'ct'],
-                           ['0090_0001',0,10,20,'mr']
+                           #  ['0005_1001',1,200,220,'ct']  ,
+                           # ['0146_1001',0,10,20,'ct'],
+                           # ['0006_0001',0,10,20,'mr'],
+                           # ['0063_1001',0,10,20,'mr'],
+                           # ['0176_0000',0,10,20,'ct'],
+                           # ['0141_1001',0,10,20,'ct'],
+                           # ['0090_0001',0,10,20,'mr'],
+                           ['0108_0001_aorta',0,10,20,'ct'],
+                           ['0183_1002_aorta',0,10,20,'ct'],
+                           ['0184_0001_aorta',0,10,20,'ct'],
+                           ['0188_0001_aorta',5,-10,-20,'ct'],
+                           ['0189_0001_aorta',0,10,20,'ct'],
+                           ['KDR08_aorta',0,10,20,'mr'],
+                           ['KDR10_aorta',0,10,20,'mr'],
+                           ['KDR12_aorta',0,10,20,'mr'],
+                           ['KDR13_aorta',0,10,20,'mr'],
+                           ['KDR32_aorta',0,10,20,'mr'],
+                           ['KDR33_aorta',0,10,20,'mr'],
+                           ['KDR34_aorta',0,10,20,'mr'],
+                           ['KDR48_aorta',0,10,20,'mr'],
+                           ['KDR57_aorta',0,10,20,'mr'],
+
+                           # ['O0171SC_aorta',0,10,20,'ct'],
+                           # ['O6397SC_aorta',0,10,20,'ct'],
+                           # ['O8693SC_aorta',0,10,20,'ct'],
+
+
+                           # ['O11908_aorta',0,10,20,'ct'],
+                           # ['O20719_2006_aorta',0,10,20,'ct'],
+                            # .vtp
+                            # .vtp
+                            # .vtp
+                            # .vtp
+                            # .vtp
+                            # O51001_2009_aorta.vtp
+                            # O128301_2008_aorta.vtp
+                            # O145207_aorta.vtp
+                            # O150323_2009_aorta.vtp
+                            # O227241_2006_aorta.vtp
+                            # O351095_2016_aorta.vtp
+                            # O690801_2007_aorta.vtp
+                            # O344211000_2006_aorta.vtp
                            ]
 
         ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
@@ -550,7 +604,7 @@ if __name__=='__main__':
             else: testing_samples_done.append(test_case)
             print(test_case)
 
-            dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, global_scale)
+            dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, global_scale, dir_seg)
             dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
             ## Create directories for results
             create_directories(dir_output, write_samples)
@@ -598,7 +652,7 @@ if __name__=='__main__':
                     assembly_binary     = sf.remove_other_vessels(assembly_binary, seed)
                 assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
                 vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+'_surface.vtp')
-                for level in range(10,50,10):
+                for level in [10,40]:#range(10,50,10):
                     surface_smooth      = vf.smooth_surface(assembly_surface, level)
                     vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+str(level)+'_surface_smooth.vtp')
 
@@ -611,65 +665,67 @@ if __name__=='__main__':
 
             #print('Number of outlets: ' + str(len(final_caps[1])))
 
-            evaluate_tracing = EvaluateTracing(case, initial_seed, dir_seg, dir_surf, dir_cent, assembly_binary, surface_smooth)
-            missed_branches, perc_caught, total_perc = evaluate_tracing.count_branches()
-            final_dice = evaluate_tracing.calc_dice_score()
-            ave_dice = vessel_tree.calc_ave_dice()
+            if calc_restults:
+                evaluate_tracing = EvaluateTracing(case, initial_seed, dir_seg, dir_surf, dir_cent, assembly_binary, surface_smooth)
+                missed_branches, perc_caught, total_perc = evaluate_tracing.count_branches()
+                if dir_seg:
+                    final_dice = evaluate_tracing.calc_dice_score()
+                    ave_dice = vessel_tree.calc_ave_dice()
 
-            masked_dir = '/Users/numisveinsson/Downloads/tests_masks/test_global_masks/mask_'+case+'.vtk'
-            masked_dice = evaluate_tracing.masked_dice(masked_dir)
-            print(f"******* Masked dice: {masked_dice} **************")
-            final_dice = masked_dice
+                    if masked:
+                        masked_dir = '/Users/numisveinsson/Downloads/tests_masks/test_global_masks/mask_'+case+'.vtk'
+                        masked_dice = evaluate_tracing.masked_dice(masked_dir)
+                        print(f"******* Masked dice: {masked_dice} **************")
+                        final_dice = masked_dice
 
-            final_ave_step_dice.append(ave_dice)
-            final_n_steps_taken.append(n_steps_taken)
-            final_dice_scores.append(final_dice)
-            final_perc_caught.append(perc_caught)
-            final_tot_perc.append(total_perc)
-            final_missed_branches.append(missed_branches)
 
-            if modality == 'ct': ct_dice.append(final_dice)
-            elif modality == 'mr': mr_dice.append(final_dice)
-            if modality == 'ct': ct_cent.append(total_perc)
-            elif modality == 'mr': mr_cent.append(total_perc)
+                final_ave_step_dice.append(ave_dice)
+                final_dice_scores.append(final_dice)
+                final_n_steps_taken.append(n_steps_taken)
+                final_perc_caught.append(perc_caught)
+                final_tot_perc.append(total_perc)
+                final_missed_branches.append(missed_branches)
 
-            # final_centerline_poly = vmtkfs.calc_centerline(assembly_surface, "pointlist", final_caps[0], final_caps[1], number = 0)
-            # vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerline_from_caps.vtp')
-
-        global_dict['test'].append(test)
-        global_dict['ct dice'].append(np.array(ct_dice).mean())
-        global_dict['mr dice'].append(np.array(mr_dice).mean())
-        global_dict['ct cent'].append(np.array(ct_cent).mean())
-        global_dict['mr cent'].append(np.array(mr_cent).mean())
+                if modality == 'ct': ct_dice.append(final_dice)
+                elif modality == 'mr': mr_dice.append(final_dice)
+                if modality == 'ct': ct_cent.append(total_perc)
+                elif modality == 'mr': mr_cent.append(total_perc)
 
         print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
-        for i in range(len(testing_samples_done)):
-            print(testing_samples_done[i][0])
-            print('Steps taken: ', final_n_steps_taken[i])
-            print('Ave dice per step: ', final_ave_step_dice[i])
-            print('Dice: ', final_dice_scores[i])
-            print('Percent caught: ', final_perc_caught[i])
-            print('Total centerline caught: ', final_tot_perc[i])
-            print(str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
+        if calc_restults:
+            global_dict['test'].append(test)
+            global_dict['ct dice'].append(np.array(ct_dice).mean())
+            global_dict['mr dice'].append(np.array(mr_dice).mean())
+            global_dict['ct cent'].append(np.array(ct_cent).mean())
+            global_dict['mr cent'].append(np.array(mr_cent).mean())
 
-        now = datetime.now()
-        dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
-        info_file_name = "info_"+test+".txt"
-        f = open(dir_output0 +info_file_name,'a')
-        for i in range(len(testing_samples_done)):
-            f.write(testing_samples_done[i][0])
-            f.write('\nSteps taken: ' + str(final_n_steps_taken[i]))
-            f.write('\nAve dice per step: ' + str(final_ave_step_dice[i]))
-            f.write('\nDice: ' +str(final_dice_scores[i]))
-            f.write('\nPercent caught: ' +str(final_perc_caught[i]))
-            f.write('\nTotal cent caught: ' +str(final_tot_perc[i]))
-            f.write('\n'+str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
-        for key in global_dict.keys():
-            f.write(f"\n{key}: {global_dict[key]}")
-        f.close()
+            for i in range(len(testing_samples_done)):
+                print(testing_samples_done[i][0])
+                print('Steps taken: ', final_n_steps_taken[i])
+                print('Ave dice per step: ', final_ave_step_dice[i])
+                print('Dice: ', final_dice_scores[i])
+                print('Percent caught: ', final_perc_caught[i])
+                print('Total centerline caught: ', final_tot_perc[i])
+                print(str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
 
-    with open(dir_output0+'results.pickle', 'wb') as handle:
-        pickle.dump(global_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            now = datetime.now()
+            dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
+            info_file_name = "info_"+test+".txt"
+            f = open(dir_output0 +info_file_name,'a')
+            for i in range(len(testing_samples_done)):
+                f.write(testing_samples_done[i][0])
+                f.write('\nSteps taken: ' + str(final_n_steps_taken[i]))
+                f.write('\nAve dice per step: ' + str(final_ave_step_dice[i]))
+                f.write('\nDice: ' +str(final_dice_scores[i]))
+                f.write('\nPercent caught: ' +str(final_perc_caught[i]))
+                f.write('\nTotal cent caught: ' +str(final_tot_perc[i]))
+                f.write('\n'+str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
+            for key in global_dict.keys():
+                f.write(f"\n{key}: {global_dict[key]}")
+            f.close()
+    if calc_restults:
+        with open(dir_output0+'results.pickle', 'wb') as handle:
+            pickle.dump(global_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     import pdb; pdb.set_trace()
     with open('filename.pickle', 'rb') as handle:

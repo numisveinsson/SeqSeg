@@ -115,6 +115,59 @@ def read_geo(fname):
 
     return reader
 
+def read_img(fname):
+    """
+    Read image from file, chose corresponding vtk reader
+    Args:
+        fname: vti image
+
+    Returns:
+        vtk reader
+    """
+    _, ext = os.path.splitext(fname)
+    if ext == '.vti':
+        reader = vtk.vtkXMLImageDataReader()
+    else:
+        raise ValueError('File extension ' + ext + ' unknown.')
+    reader.SetFileName(fname)
+    reader.Update()
+
+    return reader
+
+def write_img(fname, input):
+    """
+    Write image to file
+    Args:
+        fname: file name
+    """
+    _, ext = os.path.splitext(fname)
+    if ext == '.mha':
+        writer = vtk.vtkXMLPolyDataWriter()
+    elif ext == '.vti':
+        writer = vtk.vtkXMLImageDataWriter()
+    else:
+        raise ValueError('File extension ' + ext + ' unknown.')
+    writer.SetFileName(fname)
+    writer.SetInputData(input)
+    writer.Update()
+    writer.Write()
+
+def change_vti_vtk(fname):
+    """
+    Change image file from vti to vtk
+    Args:
+        fname: file name
+    """
+    # Read in the VTI file
+    reader = vtk.vtkXMLImageDataReader()
+    reader.SetFileName(fname)
+    reader.Update()
+
+    # Write out the VTK file
+    writer = vtk.vtkDataSetWriter()
+    writer.SetFileName(fname.replace('.vti','.vtk'))
+    writer.SetInputConnection(reader.GetOutputPort())
+    writer.Write()
 
 def write_geo(fname, input):
     """

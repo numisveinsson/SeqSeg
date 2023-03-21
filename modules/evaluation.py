@@ -9,11 +9,12 @@ class EvaluateTracing:
     def __init__(self, case, seed, dir_seg_truth, dir_surf_vtp_truth, dir_cent_vtp_truth, seg_pred, surf_vtp_prediction):
         self.name = case
         self.seed = seed
-        seg_truth = sitk.ReadImage(dir_seg_truth)
-        seg_truth = sitk.GetArrayFromImage(seg_truth).astype('int')
-        if seg_truth.max() > 1:
-            seg_truth = seg_truth/(seg_truth.max())
-        self.seg_truth = seg_truth
+        if dir_seg_truth:
+            seg_truth = sitk.ReadImage(dir_seg_truth)
+            seg_truth = sitk.GetArrayFromImage(seg_truth).astype('int')
+            if seg_truth.max() > 1:
+                seg_truth = seg_truth/(seg_truth.max())
+            self.seg_truth = seg_truth
         self.seg_pred = seg_pred
         self.surf_truth = dir_surf_vtp_truth
         self.surf_pred = surf_vtp_prediction

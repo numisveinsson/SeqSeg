@@ -32,7 +32,7 @@ class Segmentation:
         np_arr_add = sf.sitk_to_numpy(volume_seg).astype(float)
 
         # Calculate boundaries
-        cut = 0
+        cut = 1
         edges = np.array(index_extract) + np.array(size_extract) - cut
         index_extract = np.array(index_extract) + cut
 

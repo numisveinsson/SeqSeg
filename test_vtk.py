@@ -32,6 +32,17 @@ if __name__=='__main__':
     # vmtkfs.write_centerline(centerline_poly, cfn)
     # import pdb; pdb.set_trace()
 
+    from modules import vtk_functions as vf
+    dir = '/Users/numisveinsson/Documents_numi/vmr_data_new/images/'
+    imgs = os.listdir(dir)
+    imgs = [img for img in imgs if '.vti' in img]
+
+    for img in imgs:
+        vf.change_vti_vtk(dir + img)
+        print(f"Done: {img}")
+    import pdb; pdb.set_trace()
+    ####
+
     fname = '/Users/numisveinsson/Documents/Berkeley/Research/Automatic_Centerline_ML/output_test27_0146_1001_0/final_assembly0146_1001_test27_0_surface_smooth.vtp'
 
     surf = vf.read_geo(fname).GetOutput()
