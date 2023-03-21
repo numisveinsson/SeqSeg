@@ -8,8 +8,12 @@ def vmr_directories(directory, model, global_scale, dir_seg):
     for a specific model in the
     Vascular Model Repository
     """
-    if global_scale:
-        dir_image = directory +'scaled_images/'+model+'.vtk'
+    if not cropped:
+        if global_scale:
+            dir_image = directory +'scaled_images/'+model+'.vtk'
+        else:
+            dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
+        dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
     else:
         dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
 

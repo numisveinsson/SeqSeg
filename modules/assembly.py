@@ -64,6 +64,14 @@ class Segmentation:
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
         self.assembly = sf.numpy_to_sitk(np_arr, self.image_reader)
 
+    def create_mask(self):
+        "Function to create a global image mask of areas that were segmented"
+        mask = (self.number_updates > 0).astype(int)
+        mask = sf.numpy_to_sitk(mask,self.image_reader)
+        # import pdb; pdb.set_trace()
+        self.mask = mask
+
+        return mask
     def upsample(self, template_size=[1000,1000,1000]):
         from prediction import centering
         import pdb; pdb.set_trace()
@@ -185,11 +193,11 @@ class VesselTree:
             print('Average time for ' + names[j]+ ' : ', time_sum[j]/counter)
         print(np.array(time_sum/counter).tolist())
 
-    def calc_caps(self):
+    def calc_caps(self, global_assembly):
         'Temp try at calculating global caps'
         final_caps = []
-        for point in vessel_tree.caps:
-            if not vf.is_point_in_image(assembly, point):
+        for point in self.caps:
+            if not vf.is_point_in_image(global_assembly, point):
                 final_caps.append(point)
             #else:
                 #print('Inside \n')
@@ -208,7 +216,7 @@ class VesselTree:
 
 
     def plot_graph(self):
-        import networkx
+        import networkx as nx
         import matplotlib.pyplot as plt
 
         G = nx.DiGraph()
