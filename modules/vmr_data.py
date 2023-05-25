@@ -1,4 +1,4 @@
-def vmr_directories(directory, model, global_scale, dir_seg):
+def vmr_directories(directory, model, global_scale, dir_seg_exist, cropped, original):
     """
     Function to return the directories of
         Image Volume
@@ -10,17 +10,20 @@ def vmr_directories(directory, model, global_scale, dir_seg):
     """
     if not cropped:
         if global_scale:
-            dir_image = directory +'scaled_images/'+model+'.vtk'
+            dir_image = directory +'scaled_images/'+model.replace('_aorta','')+'.vtk'
+            dir_seg = directory +'truths/'+model.replace('_aorta','')+'.vtk'
         else:
-            dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
-        dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
+            if original:
+                dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
+                dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
+            else:
+                dir_image = directory +'images/'+model.replace('_aorta','')+'.vtk'
+                dir_seg = directory +'truths/'+model.replace('_aorta','')+'.vtk'
     else:
         dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
 
-    if 'KDR' in model: dir_image = directory +'images/'+model[0:5]+'.vtk'
-
-    if dir_seg:
-        dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
+    if not dir_seg_exist:
+        dir_seg = None
 
     dir_cent = directory + 'centerlines/'+model+'.vtp'
     dir_surf = directory + 'surfaces/'+model+'.vtp'

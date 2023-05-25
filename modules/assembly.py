@@ -1,6 +1,6 @@
 import pdb
-import modules.sitk_functions as sf
-from modules import vtk_functions as vf
+from .sitk_functions import *
+from .vtk_functions import is_point_in_image, write_vtk_polydata
 import numpy as np
 import SimpleITK as sitk
 import operator
@@ -11,28 +11,28 @@ class Segmentation:
 
     def __init__(self, case, image_file, weighted = False):
         self.name = case
-        self.image_reader = sf.read_image(image_file)
+        self.image_reader = read_image(image_file)
 
-        new_img = sf.create_new(self.image_reader)
+        new_img = create_new(self.image_reader)
         self.assembly = new_img
 
-        self.number_updates = np.zeros(sf.sitk_to_numpy(self.assembly).shape)
+        self.number_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
 
         self.weighted = weighted
 
         if weighted:
             # also keep track of how many updates to pixels
-            self.n_updates = np.zeros(sf.sitk_to_numpy(self.assembly).shape)
+            self.n_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
             #print("Creating weighted segmentation")
 
     def add_segmentation(self, volume_seg, index_extract, size_extract, weight=None):
 
         # Load the volumes
-        np_arr = sf.sitk_to_numpy(self.assembly).astype(float)
-        np_arr_add = sf.sitk_to_numpy(volume_seg).astype(float)
+        np_arr = sitk_to_numpy(self.assembly).astype(float)
+        np_arr_add = sitk_to_numpy(volume_seg).astype(float)
 
         # Calculate boundaries
-        cut = 1
+        cut = 0
         edges = np.array(index_extract) + np.array(size_extract) - cut
         index_extract = np.array(index_extract) + cut
 
@@ -62,24 +62,24 @@ class Segmentation:
 
         # Update the global volume
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
-        self.assembly = sf.numpy_to_sitk(np_arr, self.image_reader)
+        self.assembly = numpy_to_sitk(np_arr, self.image_reader)
 
     def create_mask(self):
         "Function to create a global image mask of areas that were segmented"
         mask = (self.number_updates > 0).astype(int)
-        mask = sf.numpy_to_sitk(mask,self.image_reader)
+        mask = numpy_to_sitk(mask,self.image_reader)
         # import pdb; pdb.set_trace()
         self.mask = mask
 
         return mask
     def upsample(self, template_size=[1000,1000,1000]):
-        from prediction import centering
+        from .prediction import centering
         import pdb; pdb.set_trace()
         or_im = sitk.GetImageFromArray(self.assembly)
         or_im.SetSpacing(self.image_resampled.GetSpacing())
         or_im.SetOrigin(self.image_resampled.GetOrigin())
         or_im.SetDirection(self.image_resampled.GetDirection())
-        target_im = sf.create_new(or_im)
+        target_im = create_new(or_im)
         target_im.SetSize(template_size)
         new_spacing = (np.array(or_im.GetSize())*np.array(or_im.GetSpacing()))/np.array(template_size)
         target_im.SetSpacing(new_spacing)
@@ -90,7 +90,7 @@ class Segmentation:
 
     def upsample_sitk(self, template_size=[1000,1000,1000]):
 
-        from prediction import resample_spacing
+        from .prediction import resample_spacing
         resampled, ref_im = resample_spacing(self.assembly, template_size=template_size)
         return resampled
 
@@ -197,14 +197,21 @@ class VesselTree:
         'Temp try at calculating global caps'
         final_caps = []
         for point in self.caps:
-            if not vf.is_point_in_image(global_assembly, point):
+            if not is_point_in_image(global_assembly, point):
                 final_caps.append(point)
             #else:
                 #print('Inside \n')
 
         print('Number of outlets: ' + str(len(final_caps)))
-        #final_caps = vf.orient_caps(final_caps, init_step)
+        #final_caps = orient_caps(final_caps, init_step)
         return final_caps
+
+    def get_end_points(self):
+        points = [self.steps[0]['point']]
+        for branch in self.branches:
+            id = branch[-1]
+            points.append(self.steps[id]['point'])
+        return points
 
     def write_csv(self):
         """
@@ -289,7 +296,7 @@ def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
             sitk.WriteImage(predicted_vessel, directory + 'seg.vtk')
 
             if step_seg['surf_file']:
-                vf.write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
+                write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
 
 
 def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=None):

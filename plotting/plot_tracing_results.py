@@ -44,26 +44,35 @@ def combine_tests(data,tests,new_name):
 
 if __name__=='__main__':
 
+    set_values  = True
+
     results_dir = '/Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs/'
     results_dir2 = '/Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs_global/'
 
-    fn = '_local_our_vs_unet'
+    fn = '_global_our_vs_unet'
 
     tests = ['Our', '3D U-Net']
     tests_our = ['test55','test53']
     tests_unet = ['test114','test115']
 
-    with open(results_dir+'results.pickle', 'rb') as handle:
-        data = pickle.load(handle)
-    with open(results_dir2+'results_2.pickle', 'rb') as handle:
-        data1 = pickle.load(handle)
+    if set_values:
+        data = {'test': ['Our'],
+                'ct dice': [0.90], 'mr dice': [0.867],
+                'ct cent': [0.886], 'mr cent': [0.943]}
+        data1 = {'test': ['3D U-Net'],
+                'ct dice': [0.642], 'mr dice': [0.484],
+                'ct cent': [0.232], 'mr cent': [0.267]}
+    else:
+        with open(results_dir+'results.pickle', 'rb') as handle:
+            data = pickle.load(handle)
+        with open(results_dir2+'results_2.pickle', 'rb') as handle:
+            data1 = pickle.load(handle)
 
-    # Function to combine two tests(one for ct, other for mr)
-    data = combine_tests(data, tests_our,tests[0])
-    data1 = combine_tests(data1, tests_unet,tests[1])
+        # Function to combine two tests(one for ct, other for mr)
+        data = combine_tests(data, tests_our,tests[0])
+        data1 = combine_tests(data1, tests_unet,tests[1])
 
-    #data1, tests = combine_tests(data, tests_our,'3D U-Net')
-    import pdb; pdb.set_trace()
+        #data1, tests = combine_tests(data, tests_our,'3D U-Net')
 
     for key in data.keys():
         for i in range(len(data1['test'])):
@@ -88,8 +97,8 @@ if __name__=='__main__':
                 data[names_new[i]] = data.pop(key)
 
     # Packages
-    dice_pkg = [data_dice, 'DICE', 'Global DICE For Different Models', 'dice'+fn]
-    cent_pkg = [data_cent, 'Portion of Centerline Captured', 'Tracing Score For Different Models', 'cent'+fn]
+    dice_pkg = [data_dice, 'Dice', 'Global Dice For Different Methods', 'dice'+fn]
+    cent_pkg = [data_cent, 'Centerline Overlap', 'Tracing Score For Different Methods', 'cent'+fn]
 
     for pkg in [dice_pkg, cent_pkg]:
 
@@ -97,10 +106,11 @@ if __name__=='__main__':
         labels = ("CT", "MR")
         x_label = 'Modality'
         y_label = pkg[1]
-        file_save = results_dir+pkg[3]+'.png'
-        colormap = 'viridis'
-
-        plot_bar_grouped(pkg[0], labels, x_label, y_label, title, file_save, y_lim = (0,1), colormap = colormap)
+        file_save = './'+pkg[3]+'.png'
+        colormap = None #'viridis'
+        colors = ['#F8CECC','#DAE8FC']#None
+        edge_colors = ['#B85450','#6C8EBF']#None
+        plot_bar_grouped(pkg[0], labels, x_label, y_label, title, file_save, y_lim = (0,1), colormap = colormap, colors = colors, edge_colors = edge_colors)
 
 
 

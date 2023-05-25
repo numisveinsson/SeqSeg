@@ -1,5 +1,5 @@
-from modules import vtk_functions as vf
-from prediction import dice_score
+from .vtk_functions import read_geo, collect_arrays, is_point_in_image
+from .prediction import dice_score
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 import numpy as np
 import SimpleITK as sitk
@@ -27,9 +27,9 @@ class EvaluateTracing:
         move_distance_radius = 0.1
 
         ## Centerline
-        cent = vf.read_geo(self.cent_truth).GetOutput()  # read in geometry
+        cent = read_geo(self.cent_truth).GetOutput()  # read in geometry
         num_points = cent.GetNumberOfPoints()   # number of points in centerline
-        cent_data = vf.collect_arrays(cent.GetPointData())
+        cent_data = collect_arrays(cent.GetPointData())
         c_loc = v2n(cent.GetPoints().GetData())             # point locations as numpy array
         radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
         cent_id = cent_data['CenterlineId']
@@ -74,7 +74,7 @@ class EvaluateTracing:
                         total_length = np.cumsum(np.insert(np.linalg.norm(np.diff(locs[min_count:], axis=0), axis=1), 0, 0))[-1]
                         #print(f"Min count is: {min_count}")
                     # Do something at this location
-                    if not vf.is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
+                    if not is_point_in_image(self.seg_pred, locs[count]): #+ step_seg['radius']*step_seg['tangent']):
                         on_cent = False
                         missed_branches += 1
                         #print(f"Total length: {total_length}")
