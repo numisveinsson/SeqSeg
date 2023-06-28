@@ -207,10 +207,10 @@ class VesselTree:
         return final_caps
 
     def get_end_points(self):
-        points = [self.steps[0]['point']]
+        points = [self.steps[0]['point'] - self.steps[0]['tangent'] * 2 * self.steps[0]['radius']]
         for branch in self.branches:
             id = branch[-1]
-            points.append(self.steps[id]['point'])
+            points.append(self.steps[id]['point'] + self.steps[id]['tangent'] * 1 * self.steps[id]['radius'])
         return points
 
     def write_csv(self):

@@ -73,7 +73,7 @@ if __name__=='__main__':
             # ['test58',False, 'mr']
             ]# 'test49', 'test27']
 
-    calc_restults = True
+    calc_restults = False
 
     if calc_restults:
         global_dict             = {}
@@ -91,7 +91,7 @@ if __name__=='__main__':
     original = False # is this new vmr or old
     masked = False
 
-    max_step_size  = 20
+    max_step_size  = 300
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold      = 0.5 # Threshold for binarization of prediction
     write_samples  = True
@@ -121,27 +121,27 @@ if __name__=='__main__':
                            # ['0176_0000',0,10,20,'ct'],
                            # ['0141_1001',0,10,20,'ct'],
                            # ['0090_0001',0,10,20,'mr'],
-                           # ['0108_0001_aorta',0,10,20,'ct'],
-                           ['0183_1002_aorta',3,-1,-2,'ct'],
-                           # ['0184_0001_aorta',3,-1,-2,'ct'],
-                           #['0188_0001_aorta',5,-1,-10,'ct'],
-                           #['0189_0001_aorta',0,0,1,'ct'],
+                           ['0108_0001_aorta',4,-10,-20,'ct'],
+                           ['0183_1002_aorta',3,-10,-20,'ct'],
+                           ['0184_0001_aorta',3,-10,-20,'ct'],
+                           ['0188_0001_aorta',5,-10,-20,'ct'],
+                           ['0189_0001_aorta',0,0,1,'ct'],
 
-                           # ['KDR08_aorta',0,10,20,'mr'],
-                           # ['KDR10_aorta',0,10,20,'mr'],
-                           # ['KDR12_aorta',0,10,20,'mr'],
-                           # ['KDR13_aorta',0,10,20,'mr'],
-                           # ['KDR32_aorta',0,10,20,'mr'],
-                           # ['KDR33_aorta',3,-10,-20,'mr'],
-                           # ['KDR34_aorta',0,10,20,'mr'],
-                           # ['KDR48_aorta',0,10,20,'mr'],
-                           # ['KDR57_aorta',4,-10,-20,'mr'],
-                           # ['O0171SC_aorta',0,10,20,'ct'],
-                           # ['O6397SC_aorta',0,10,20,'ct'],
-                           # ['O8693SC_aorta',0,10,20,'ct'],
-                           # ['O344211000_2006_aorta',0,10,20,'ct'],
-                           # ['O11908_aorta',0,10,20,'ct'],
-                           # ['O20719_2006_aorta',0,10,20,'ct'],
+                           ['KDR08_aorta',0,10,20,'mr'],
+                           ['KDR10_aorta',0,10,20,'mr'],
+                           ['KDR12_aorta',0,10,20,'mr'],
+                           ['KDR13_aorta',0,10,20,'mr'],
+                           ['KDR32_aorta',0,10,20,'mr'],
+                           ['KDR33_aorta',3,-10,-20,'mr'],
+                           ['KDR34_aorta',0,10,20,'mr'],
+                           ['KDR48_aorta',0,10,20,'mr'],
+                           ['KDR57_aorta',4,-10,-20,'mr'],
+                           ['O0171SC_aorta',0,10,20,'ct'],
+                           ['O6397SC_aorta',0,10,20,'ct'],
+                           ['O8693SC_aorta',0,10,20,'ct'],
+                           ['O344211000_2006_aorta',0,10,20,'ct'],
+                           ['O11908_aorta',0,10,20,'ct'],
+                           ['O20719_2006_aorta',0,10,20,'ct'],
                            # these are left:
                            # ['O51001_2009_aorta',0,10,20,'ct'],
                            # ['O128301_2008_aorta',0,10,20,'ct'],
@@ -205,35 +205,37 @@ if __name__=='__main__':
             if take_time:
                 vessel_tree.time_analysis()
 
-            ## Assembly work
-            assembly_org = assembly_obj.assembly
-            assembly_ups = assembly_obj.upsample_sitk()
-            print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
-            sitk.WriteImage(assembly_org, dir_output+'/final_assembly_'+case+'_'+test +'_'+str(i)+'.vtk')
-
-            for assembly,name in zip([assembly_ups, assembly_org],['upsampled', 'original']):
-                assembly_binary     = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
-                if name == 'original':
-                    seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
-                    assembly_binary     = sf.remove_other_vessels(assembly_binary, seed)
-                assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
-                vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+'_surface.vtp')
-                for level in [10,40]:#range(10,50,10):
-                    surface_smooth      = vf.smooth_surface(assembly_surface, level)
-                    vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+str(level)+'_surface_smooth.vtp')
-            import pdb; pdb.set_trace()
+            # End points
             end_points = vessel_tree.get_end_points()
             in_source = end_points[0].tolist()
             in_target_lists = [point.tolist() for point in end_points[1:]]
             in_target = []
             for target in in_target_lists:
                 in_target += target
-            path = vmtkfs.calc_centerline(   surface_smooth, "pointlist", var_source=in_source, var_target=in_target)
-            vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerline_smooth.vtp')
-            path1 = vmtkfs.calc_centerline(surface_smooth, "profileidlist", number = 0)
-            vf.write_vtk_polydata(path1, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerline_smooth1.vtp')
+
+            ## Assembly work
+            assembly_org = assembly_obj.assembly
+            #assembly_ups = assembly_obj.upsample_sitk()
+            print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
+            sitk.WriteImage(assembly_org, dir_output+'/final_assembly_'+case+'_'+test +'_'+str(i)+'.vtk')
+
+            assembly = assembly_org
+            name = 'original'
+            #for assembly,name in zip([assembly_ups, assembly_org],['upsampled', 'original']):
+            assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
+            seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
+            assembly_binary     = sf.remove_other_vessels(assembly_binary, seed)
+            assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
+            vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+'_surface.vtp')
+            for level in [10,40]:#range(10,50,10):
+                surface_smooth      = vf.smooth_surface(assembly_surface, level)
+                vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+str(level)+'_surface_smooth.vtp')
+                path = vmtkfs.calc_centerline(   surface_smooth, "pointlist", var_source=in_source, var_target=in_target)
+                vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+str(level)+'_centerline_smooth.vtp')
 
 
+            #path1 = vmtkfs.calc_centerline(surface_smooth, "profileidlist", number = 0)
+            #vf.write_vtk_polydata(path1, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerline_smooth1.vtp')
 
 
             final_surface = vf.appendPolyData(surfaces)

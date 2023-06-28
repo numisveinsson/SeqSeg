@@ -59,7 +59,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     i = 0 # numbering chronological order
     while vessel_tree.potential_branches and i < (max_step_size +1):
 
-        if i in range(0, max_step_size, max_step_size//10):
+        if i in range(0, max_step_size, max_step_size//10 +1):
             print(f"*** Step number {i} ***")
 
         try:
@@ -120,8 +120,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             step_seg['img_file'] = volume_fn
             if write_samples:
                 sitk.WriteImage(cropped_volume, volume_fn)
-                if seg_file:
-                    sitk.WriteImage(seg_volume, seg_fn)
+                # if seg_file:
+                #     sitk.WriteImage(seg_volume, seg_fn)
             if take_time:
                 print("\n Extracting and writing volumes: " + str(time.time() - start_time_loc) + " s\n")
             if run_time:
@@ -190,7 +190,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'.vtp'
             cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'.vtp'
             if write_samples:
-                sitk.WriteImage(predicted_vessel, pd_fn)
+                #sitk.WriteImage(predicted_vessel, pd_fn)
                 write_vtk_polydata(surface_smooth, sfn)
             step_seg['seg_file'] = pd_fn
             step_seg['surf_file'] = sfn

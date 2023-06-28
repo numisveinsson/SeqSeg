@@ -126,12 +126,12 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, pro
     end_bounds = index_extract+size_extract
 
 
-    for i, ind in enumerate(np.logical_and(end_bounds > size_im,(end_bounds- size_im) < 1/2*size_extract )):
+    for i, ind in enumerate(np.logical_and(end_bounds > size_im,(end_bounds- size_im) < 1/4*size_extract )):
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             size_extract[i] = size_im[i] - index_extract[i]
 
-    for i, ind in enumerate(np.logical_and(index_extract < np.zeros(3),(np.zeros(3)-index_extract) < 1/2*size_extract )):
+    for i, ind in enumerate(np.logical_and(index_extract < np.zeros(3),(np.zeros(3)-index_extract) < 1/4*size_extract )):
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             index_extract[i] = 0
