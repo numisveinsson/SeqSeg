@@ -1,0 +1,3 @@
+[submodule "vmtk"]
+	path = vmtk
+	url = https://github.com/numisveinsson/vmtk.git
