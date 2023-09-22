@@ -6,9 +6,18 @@ from .sitk_functions import *
 from .vtk_functions import *
 from .vmtk_functions import *
 from .assembly import Segmentation, VesselTree, print_error, create_step_dict
-from .model import UNet3DIsensee
-from .prediction import Prediction
+#from .model import UNet3DIsensee
+#from .prediction import Prediction
 
+import sys
+sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
+
+from nnunetv2.paths import nnUNet_results, nnUNet_raw
+import torch
+from batchgenerators.utilities.file_and_folder_operations import join
+from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
+
+import pdb
 def trace_centerline(output_folder, image_file, case, model_folder, modality,
                     img_shape, threshold, potential_branches, max_step_size,
                     seg_file=None,      global_scale=False, write_samples=True,
@@ -39,11 +48,31 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
     assembly_segs = Segmentation(case, image_file, weighted)
-    model         = UNet3DIsensee((img_shape[0], img_shape[1], img_shape[2], 1),
-                                num_class=1)
-    unet = model.build()
-    model_name = os.path.realpath(model_folder) + '/weights_unet.hdf5'
-    unet.load_weights(model_name)
+    #model         = UNet3DIsensee((img_shape[0], img_shape[1], img_shape[2], 1),
+    #                            num_class=1)
+    #unet = model.build()
+    #model_name = os.path.realpath(model_folder) + '/weights_unet.hdf5'
+    #unet.load_weights(model_name)
+    print('About to load predictor object')
+    # instantiate the nnUNetPredictor
+    predictor = nnUNetPredictor(
+        tile_step_size=0.5,
+        use_gaussian=True,
+        use_mirroring=True,
+        perform_everything_on_gpu=True,
+        device=torch.device('cpu', 0),
+        verbose=False,
+        verbose_preprocessing=False,
+        allow_tqdm=True
+    )
+    print('About to load model')
+    # initializes the network architecture, loads the checkpoint
+    predictor.initialize_from_trained_model_folder(
+        join(nnUNet_results, model_folder),
+        use_folds=(0,),
+        checkpoint_name='checkpoint_best.pth',
+    )
+    print('Done loading model, ready to predict')
 
     ## Note: make initial seed within loop
     initial_seed = assembly_segs.assembly.TransformPhysicalPointToIndex(vessel_tree.steps[0]['point'].tolist())
@@ -59,7 +88,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     i = 0 # numbering chronological order
     while vessel_tree.potential_branches and i < (max_step_size +1):
 
-        if i in range(0, max_step_size, max_step_size//10 +1):
+        if i in range(0, max_step_size, max_step_size*0 +1):
             print(f"*** Step number {i} ***")
 
         try:
@@ -130,31 +159,56 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 start_time_loc = time.time()
 
             # Prediction
-            predict = Prediction(   unet,
-                                    model_name,
-                                    modality,
-                                    cropped_volume,
-                                    img_shape,
-                                    output_folder+'predictions',
-                                    threshold,
-                                    seg_volume,
-                                    global_scale)
-            predict.volume_prediction(1)
-            predict.resample_prediction()
-            if seg_file:
-                d = predict.dice()
-                print(f"Local dice: {d:.4f}")
-                step_seg['dice'] = d
-                dice_list.append(d)
+            spacing = spacing_im.tolist()
+            spacing = spacing[::-1]
+            props={}
+            props['spacing'] = spacing
+            img_np = sitk.GetArrayFromImage(cropped_volume)
+            img_np = img_np[None]
+            img_np = img_np.astype('float32')
+            # prediction0 = predictor.predict_from_files([[volume_fn]],
+            #                      None,
+            #                      save_probabilities=False, overwrite=False,
+            #                      num_processes_preprocessing=1, num_processes_segmentation_export=1,
+            #                      folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
 
-            predicted_vessel = predict.prediction
+            # prediction1 = predictor.predict_from_list_of_npy_arrays([img_np],
+            #                                         None,
+            #                                         [props],
+            #                                         None, 1, save_probabilities=False,
+            #                                         num_processes_segmentation_export=2)
+            
+            prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
+            # predict = Prediction(   unet,
+            #                         model_name,
+            #                         modality,
+            #                         cropped_volume,
+            #                         img_shape,
+            #                         output_folder+'predictions',
+            #                         threshold,
+            #                         seg_volume,
+            #                         global_scale)
+            # predict.volume_prediction(1)
+            # predict.resample_prediction()
+            # if seg_file:
+            #     d = predict.dice()
+            #     print(f"Local dice: {d:.4f}")
+            #     step_seg['dice'] = d
+            #     dice_list.append(d)
+
+            predicted_vessel = prediction[0]
+            pred_img = sitk.GetImageFromArray(predicted_vessel)
+            pred_img = copy_settings(pred_img, cropped_volume)
             # perc = sitk.GetArrayFromImage(predicted_vessel).mean()
             # mag = mag+0.1
             #print(f"Perc as 1: {perc:.3f}")
+            prob_prediction = sitk.GetImageFromArray(prediction[1][1])
+            prob_prediction = copy_settings(prob_prediction, cropped_volume)
 
-            step_seg['prob_predicted_vessel'] = predict.prob_prediction
+            step_seg['prob_predicted_vessel'] = prob_prediction
             seed = np.rint(np.array(size_extract)/2).astype(int).tolist()
-            predicted_vessel = remove_other_vessels(predicted_vessel, seed)
+            
+            predicted_vessel = remove_other_vessels(pred_img, seed)
 
             #print("Now the components are: ")
             #labels, means = connected_comp_info(predicted_vessel, True)
@@ -207,7 +261,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             _ , source_id = orient_caps(caps, old_point_ref)
 
 
-            #print('Number of caps: ', len(caps))
+            print('Number of caps: ', len(caps))
             if len(caps) < 2: print(error)
 
             # polydata_point = points2polydata([step_seg['caps'][0]])
@@ -252,7 +306,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 if len(vessel_tree.steps) % N == 0 and len(vessel_tree.steps) >= (N+buffer):
                     for j in range(1,N+1):
                         if vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel']:
-                            #print(f"Adding step {-(j+buffer)} and number of steps are {len(vessel_tree.steps)}")
+                            print(f"Adding step {-(j+buffer)} and number of steps are {len(vessel_tree.steps)}")
                             assembly_segs.add_segmentation( vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'],
                                                             vessel_tree.steps[-(j+buffer)]['img_index'],
                                                             vessel_tree.steps[-(j+buffer)]['img_size'],
@@ -363,7 +417,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 #print("\n*** Error for surface: \n" + str(i))
                 del vessel_tree.branches[branch][-1]
                 print("\n Moving onto another branch")
-
                 list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
                 for id in vessel_tree.branches[branch][1:]:
                     list_surf_branch.append(vessel_tree.steps[id]['surface'])

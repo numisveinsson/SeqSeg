@@ -163,8 +163,8 @@ class Prediction:
         return 0#dist
 
 def dice_score(pred, true):
-    pred = pred.astype(np.int)
-    true = true.astype(np.int)
+    pred = pred.astype(np.int8)
+    true = true.astype(np.int8)
     num_class = np.unique(true)
 
     #change to one hot

@@ -74,10 +74,11 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
         centerline_calc.TargetPoints = var_target
 
     centerline_calc.Execute()
-    # print("Centerline Calc Executed")
-    # print(centerline_calc.Centerlines)
+    print("Centerline Calc Executed")
+    #print(centerline_calc.Centerlines)
 
     if centerline_calc.Centerlines.GetNumberOfPoints() != 0:
+        print(f'Centerline has: {centerline_calc.Centerlines.GetNumberOfPoints()}, points', flush=True)
         calc_branch = vmtkscripts.vmtkBranchExtractor()
         calc_branch.Centerlines = centerline_calc.Centerlines
         calc_branch.Execute()

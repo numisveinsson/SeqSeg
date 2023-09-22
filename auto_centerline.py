@@ -64,14 +64,10 @@ def create_directories(output_folder, write_samples):
 if __name__=='__main__':
     #       [name    , global_scale]
     tests = [
-             ['test55',True, 'ct'],
-             ['test53',True, 'mr'],
-            #['test54',True],
-
-            #['test56',False],
-            # ['test57',False, 'ct'],
-            # ['test58',False, 'mr']
-            ]# 'test49', 'test27']
+             ['3d_fullres',True, 'ct'],
+            #  ['2d',True, 'ct'],
+            # ['3d_lowres',True, 'ct'],
+            ]
 
     calc_restults = False
 
@@ -83,15 +79,15 @@ if __name__=='__main__':
         global_dict['ct cent']  = []
         global_dict['mr cent']  = []
 
-    dir_output0    = '//Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/outputs_new/'
+    dir_output0    = 'output/'
     directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
-    directory_data = '/Users/numisveinsson/Documents_numi/vmr_data_new/'
+    directory_data = '/global/scratch/users/numi/vascular_data_3d/'
     dir_seg = True
     cropped_volume = False
     original = False # is this new vmr or old
     masked = False
 
-    max_step_size  = 300
+    max_step_size  = 50
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold      = 0.5 # Threshold for binarization of prediction
     write_samples  = True
@@ -102,11 +98,12 @@ if __name__=='__main__':
     for test in tests:
 
         global_scale = test[1]
+
         modality_model = test[2]
         test         = test[0]
         print('\n test is: \n', test)
         ## Weight directory
-        dir_model_weights = '/Users/numisveinsson/Documents_numi/Automatic_Centerline_Data/weights/' + test + '/'
+        dir_model_weights = 'Dataset002_SEQAORTAS/nnUNetTrainer__nnUNetPlans__'+test
 
         testing_samples = [#['0002_0001',0,150,170,'ct']  ,
                            # ['0002_0001',1,150, 170,'ct'] ,
@@ -115,33 +112,34 @@ if __name__=='__main__':
                            #['0001_0001',8,110,130,'ct'],
                            # ['0005_1001',0,300,320,'ct']  ,
                            #  ['0005_1001',1,200,220,'ct']  ,
-                           # ['0146_1001',0,10,20,'ct'],
+                        #    ['0176_0000',0,10,20,'ct'],
+                        #    ['0141_1001',0,10,20,'ct'],
+                        #    ['0146_1001',0,10,20,'ct'],
                            # ['0006_0001',0,10,20,'mr'],
                            # ['0063_1001',0,10,20,'mr'],
-                           # ['0176_0000',0,10,20,'ct'],
-                           # ['0141_1001',0,10,20,'ct'],
-                           # ['0090_0001',0,10,20,'mr'],
+
+                        #    ['0090_0001',0,10,20,'mr'],
                            ['0108_0001_aorta',4,-10,-20,'ct'],
                            ['0183_1002_aorta',3,-10,-20,'ct'],
                            ['0184_0001_aorta',3,-10,-20,'ct'],
                            ['0188_0001_aorta',5,-10,-20,'ct'],
                            ['0189_0001_aorta',0,0,1,'ct'],
 
-                           ['KDR08_aorta',0,10,20,'mr'],
-                           ['KDR10_aorta',0,10,20,'mr'],
-                           ['KDR12_aorta',0,10,20,'mr'],
-                           ['KDR13_aorta',0,10,20,'mr'],
-                           ['KDR32_aorta',0,10,20,'mr'],
-                           ['KDR33_aorta',3,-10,-20,'mr'],
-                           ['KDR34_aorta',0,10,20,'mr'],
-                           ['KDR48_aorta',0,10,20,'mr'],
-                           ['KDR57_aorta',4,-10,-20,'mr'],
-                           ['O0171SC_aorta',0,10,20,'ct'],
-                           ['O6397SC_aorta',0,10,20,'ct'],
-                           ['O8693SC_aorta',0,10,20,'ct'],
-                           ['O344211000_2006_aorta',0,10,20,'ct'],
-                           ['O11908_aorta',0,10,20,'ct'],
-                           ['O20719_2006_aorta',0,10,20,'ct'],
+                        #    ['KDR08_aorta',0,10,20,'mr'],
+                        #    ['KDR10_aorta',0,10,20,'mr'],
+                        #    ['KDR12_aorta',0,10,20,'mr'],
+                        #    ['KDR13_aorta',0,10,20,'mr'],
+                        #    ['KDR32_aorta',0,10,20,'mr'],
+                        #    ['KDR33_aorta',3,-10,-20,'mr'],
+                        #    ['KDR34_aorta',0,10,20,'mr'],
+                        #    ['KDR48_aorta',0,10,20,'mr'],
+                        #    ['KDR57_aorta',4,-10,-20,'mr'],
+                        #    ['O0171SC_aorta',0,10,20,'ct'],
+                        #    ['O6397SC_aorta',0,10,20,'ct'],
+                        #    ['O8693SC_aorta',0,10,20,'ct'],
+                        #    ['O344211000_2006_aorta',0,10,20,'ct'],
+                        #    ['O11908_aorta',0,10,20,'ct'],
+                        #    ['O20719_2006_aorta',0,10,20,'ct'],
                            # these are left:
                            # ['O51001_2009_aorta',0,10,20,'ct'],
                            # ['O128301_2008_aorta',0,10,20,'ct'],
@@ -226,24 +224,24 @@ if __name__=='__main__':
             seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
             assembly_binary     = sf.remove_other_vessels(assembly_binary, seed)
             assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
-            vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+'_surface.vtp')
+            vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_'+'_surface.vtp')
             for level in [10,40]:#range(10,50,10):
                 surface_smooth      = vf.smooth_surface(assembly_surface, level)
-                vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+str(level)+'_surface_smooth.vtp')
-                path = vmtkfs.calc_centerline(   surface_smooth, "pointlist", var_source=in_source, var_target=in_target)
-                vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_'+str(level)+'_centerline_smooth.vtp')
+                vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_'+str(level)+'_surface_smooth.vtp')
+                #path = vmtkfs.calc_centerline(   surface_smooth, "pointlist", var_source=in_source, var_target=in_target)
+                #vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_'+str(level)+'_centerline_smooth.vtp')
 
 
             #path1 = vmtkfs.calc_centerline(surface_smooth, "profileidlist", number = 0)
-            #vf.write_vtk_polydata(path1, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerline_smooth1.vtp')
+            #vf.write_vtk_polydata(path1, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_centerline_smooth1.vtp')
 
 
             final_surface = vf.appendPolyData(surfaces)
             final_centerline = vf.appendPolyData(centerlines)
             final_points = vf.appendPolyData(points)
-            vf.write_vtk_polydata(final_surface,    dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_surfaces.vtp')
-            vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_centerlines.vtp')
-            vf.write_vtk_polydata(final_points,     dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(max_step_size)+'_points.vtp')
+            vf.write_vtk_polydata(final_surface,    dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_surfaces.vtp')
+            vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_centerlines.vtp')
+            vf.write_vtk_polydata(final_points,     dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_points.vtp')
 
             #print('Number of outlets: ' + str(len(final_caps[1])))
 
@@ -252,7 +250,7 @@ if __name__=='__main__':
                 missed_branches, perc_caught, total_perc = evaluate_tracing.count_branches()
                 if dir_seg:
                     final_dice = evaluate_tracing.calc_dice_score()
-                    ave_dice = vessel_tree.calc_ave_dice()
+                    #ave_dice = vessel_tree.calc_ave_dice()
 
                     if masked:
                         masked_dir = '/Users/numisveinsson/Downloads/tests_masks/test_global_masks/mask_'+case+'.vtk'
@@ -261,7 +259,7 @@ if __name__=='__main__':
                         final_dice = masked_dice
 
 
-                final_ave_step_dice.append(ave_dice)
+                #final_ave_step_dice.append(ave_dice)
                 final_dice_scores.append(final_dice)
                 final_n_steps_taken.append(n_steps_taken)
                 final_perc_caught.append(perc_caught)
@@ -284,7 +282,7 @@ if __name__=='__main__':
             for i in range(len(testing_samples_done)):
                 print(testing_samples_done[i][0])
                 print('Steps taken: ', final_n_steps_taken[i])
-                print('Ave dice per step: ', final_ave_step_dice[i])
+                #print('Ave dice per step: ', final_ave_step_dice[i])
                 print('Dice: ', final_dice_scores[i])
                 print('Percent caught: ', final_perc_caught[i])
                 print('Total centerline caught: ', final_tot_perc[i])
@@ -297,7 +295,7 @@ if __name__=='__main__':
             for i in range(len(testing_samples_done)):
                 f.write(testing_samples_done[i][0])
                 f.write('\nSteps taken: ' + str(final_n_steps_taken[i]))
-                f.write('\nAve dice per step: ' + str(final_ave_step_dice[i]))
+                #f.write('\nAve dice per step: ' + str(final_ave_step_dice[i]))
                 f.write('\nDice: ' +str(final_dice_scores[i]))
                 f.write('\nPercent caught: ' +str(final_perc_caught[i]))
                 f.write('\nTotal cent caught: ' +str(final_tot_perc[i]))
@@ -309,6 +307,6 @@ if __name__=='__main__':
         with open(dir_output0+'results.pickle', 'wb') as handle:
             pickle.dump(global_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    import pdb; pdb.set_trace()
-    with open('filename.pickle', 'rb') as handle:
-        b = pickle.load(handle)
+    # import pdb; pdb.set_trace()
+    # with open('filename.pickle', 'rb') as handle:
+    #     b = pickle.load(handle)
