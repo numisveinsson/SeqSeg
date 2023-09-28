@@ -126,8 +126,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 pfn = output_folder + 'points/point_'+case+'_'+str(i)+'.vtp'
                 write_geo(pfn, polydata_point)
 
-            perc, mag = 1,1
+            # perc = 1
+            mag = 1
             # while perc>0.42 and mag < 1.3:
+
             # Extract Volume
             size_extract, index_extract = map_to_image(  step_seg['point'],
                                                             step_seg['radius']*mag,
@@ -199,9 +201,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             predicted_vessel = prediction[0]
             pred_img = sitk.GetImageFromArray(predicted_vessel)
             pred_img = copy_settings(pred_img, cropped_volume)
-            # perc = sitk.GetArrayFromImage(predicted_vessel).mean()
+            
+            perc = predicted_vessel.mean()
             # mag = mag+0.1
-            #print(f"Perc as 1: {perc:.3f}")
+            print(f"Perc as 1: {perc:.3f}")
+            
             prob_prediction = sitk.GetImageFromArray(prediction[1][1])
             prob_prediction = copy_settings(prob_prediction, cropped_volume)
 
@@ -409,6 +413,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 print("Giving chance for surface: " + str(i))
                 if take_time:
                     print('Radius is ', step_seg['radius'])
+                if step_seg['seg_file'] and perc>0.33 and vessel_tree.steps[i]['chances'] > 0:
+                    print(f'Magnifying radius, perc: {perc}')
+                    vessel_tree.steps[i]['radius'] *= 1.1
                 vessel_tree.steps[i]['point'] = vessel_tree.steps[i]['point'] + vessel_tree.steps[i]['radius']*vessel_tree.steps[i]['tangent']
                 vessel_tree.steps[i]['chances'] += 1
 

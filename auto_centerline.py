@@ -64,8 +64,8 @@ def create_directories(output_folder, write_samples):
 if __name__=='__main__':
     #       [name    , global_scale]
     tests = [
-             ['3d_fullres',True, 'ct'],
-            #  ['2d',True, 'ct'],
+            #  ['3d_fullres',True, 'ct'],
+             ['2d',True, 'ct'],
             # ['3d_lowres',True, 'ct'],
             ]
 
@@ -87,7 +87,7 @@ if __name__=='__main__':
     original = False # is this new vmr or old
     masked = False
 
-    max_step_size  = 50
+    max_step_size  = 2000
     nn_input_shape = [64, 64, 64] # Input shape for NN
     threshold      = 0.5 # Threshold for binarization of prediction
     write_samples  = True
@@ -105,25 +105,41 @@ if __name__=='__main__':
         ## Weight directory
         dir_model_weights = 'Dataset002_SEQAORTAS/nnUNetTrainer__nnUNetPlans__'+test
 
-        testing_samples = [#['0002_0001',0,150,170,'ct']  ,
-                           # ['0002_0001',1,150, 170,'ct'] ,
-                           #['0001_0001',0,30,50,'ct'],
-                           #['0001_0001',7,30,50,'ct'],
-                           #['0001_0001',8,110,130,'ct'],
-                           # ['0005_1001',0,300,320,'ct']  ,
-                           #  ['0005_1001',1,200,220,'ct']  ,
+        testing_samples = [
+                        #    ['0002_0001',0,150,170,'ct']  ,
+                        #    ['0002_0001',1,150, 170,'ct'] ,
+                        #    ['0001_0001',0,30,50,'ct'],
+                        #    ['0001_0001',7,30,50,'ct'],
+                        #    ['0001_0001',8,110,130,'ct'],
+                        #    ['0005_1001',0,300,320,'ct']  ,
+                        #    ['0005_1001',1,200,220,'ct']  ,
                         #    ['0176_0000',0,10,20,'ct'],
                         #    ['0141_1001',0,10,20,'ct'],
-                        #    ['0146_1001',0,10,20,'ct'],
-                           # ['0006_0001',0,10,20,'mr'],
-                           # ['0063_1001',0,10,20,'mr'],
-
+                        #    ['0146_1001',0,0,10,'ct'],
+                        #    ['0006_0001',0,10,20,'mr'],
+                        #    ['0063_1001',0,10,20,'mr'],
                         #    ['0090_0001',0,10,20,'mr'],
-                           ['0108_0001_aorta',4,-10,-20,'ct'],
+
+                        #    ['0108_0001_aorta',4,-10,-20,'ct'],
                            ['0183_1002_aorta',3,-10,-20,'ct'],
                            ['0184_0001_aorta',3,-10,-20,'ct'],
                            ['0188_0001_aorta',5,-10,-20,'ct'],
-                           ['0189_0001_aorta',0,0,1,'ct'],
+                           ['0189_0001_aorta',0,100,110,'ct'],
+
+                        #    ['O0171SC_aorta',0,10,20,'ct'],
+                        #    ['O6397SC_aorta',0,10,20,'ct'],
+                        #    ['O8693SC_aorta',0,10,20,'ct'],
+                        #    ['O344211000_2006_aorta',0,10,20,'ct'],
+                        #    ['O11908_aorta',0,10,20,'ct'],
+                        #    ['O20719_2006_aorta',0,10,20,'ct'],
+                        #   these are left:
+                        #    ['O51001_2009_aorta',0,10,20,'ct'],
+                        #    ['O128301_2008_aorta',0,10,20,'ct'],
+                        #    ['O145207_aorta',0,10,20,'ct'],
+                        #    ['O150323_2009_aorta',0,10,20,'ct'],
+                        #    ['O227241_2006_aorta',0,10,20,'ct'],
+                        #    ['O351095_aorta',0,10,20,'ct'],
+                        #    ['O690801_2007_aorta',0,10,20,'ct'],
 
                         #    ['KDR08_aorta',0,10,20,'mr'],
                         #    ['KDR10_aorta',0,10,20,'mr'],
@@ -134,20 +150,6 @@ if __name__=='__main__':
                         #    ['KDR34_aorta',0,10,20,'mr'],
                         #    ['KDR48_aorta',0,10,20,'mr'],
                         #    ['KDR57_aorta',4,-10,-20,'mr'],
-                        #    ['O0171SC_aorta',0,10,20,'ct'],
-                        #    ['O6397SC_aorta',0,10,20,'ct'],
-                        #    ['O8693SC_aorta',0,10,20,'ct'],
-                        #    ['O344211000_2006_aorta',0,10,20,'ct'],
-                        #    ['O11908_aorta',0,10,20,'ct'],
-                        #    ['O20719_2006_aorta',0,10,20,'ct'],
-                           # these are left:
-                           # ['O51001_2009_aorta',0,10,20,'ct'],
-                           # ['O128301_2008_aorta',0,10,20,'ct'],
-                           # ['O145207_aorta',0,10,20,'ct'],
-                           # ['O150323_2009_aorta',0,10,20,'ct'],
-                           # ['O227241_2006_aorta',0,10,20,'ct'],
-                           # ['O351095_aorta',0,10,20,'ct'],
-                           # ['O690801_2007_aorta',0,10,20,'ct'],
 
                            ]
 
@@ -221,8 +223,12 @@ if __name__=='__main__':
             name = 'original'
             #for assembly,name in zip([assembly_ups, assembly_org],['upsampled', 'original']):
             assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
+            sitk.WriteImage(assembly_binary, dir_output+'/final_seg_'+case+'_'+test +'_'+str(i)+'.vtk')
+            
             seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
             assembly_binary     = sf.remove_other_vessels(assembly_binary, seed)
+            sitk.WriteImage(assembly_binary, dir_output+'/final_seg_rem'+case+'_'+test +'_'+str(i)+'.vtk')
+
             assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
             vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_'+'_surface.vtp')
             for level in [10,40]:#range(10,50,10):
