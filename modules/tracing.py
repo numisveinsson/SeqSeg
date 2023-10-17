@@ -18,12 +18,12 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 import pdb
-def trace_centerline(output_folder, image_file, case, model_folder, modality,
-                    img_shape, threshold, potential_branches, max_step_size,
-                    seg_file=None,      global_scale=False, write_samples=True,
+def trace_centerline(output_folder, image_file, case, model_folder, fold, modality,
+                    potential_branches, max_step_size,
+                    seg_file=None,    write_samples=True,
                     take_time=False,    retrace_cent=False, weighted=False
                     ):
-    animation = False
+    animation = True
 
     allowed_steps = 10
     prevent_retracing = True
@@ -48,11 +48,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
     assembly_segs = Segmentation(case, image_file, weighted)
-    #model         = UNet3DIsensee((img_shape[0], img_shape[1], img_shape[2], 1),
-    #                            num_class=1)
-    #unet = model.build()
-    #model_name = os.path.realpath(model_folder) + '/weights_unet.hdf5'
-    #unet.load_weights(model_name)
+
     print('About to load predictor object')
     # instantiate the nnUNetPredictor
     predictor = nnUNetPredictor(
@@ -69,7 +65,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
     # initializes the network architecture, loads the checkpoint
     predictor.initialize_from_trained_model_folder(
         join(nnUNet_results, model_folder),
-        use_folds=(0,),
+        use_folds=(fold,),
         checkpoint_name='checkpoint_best.pth',
     )
     print('Done loading model, ready to predict')
@@ -140,11 +136,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             step_seg['img_index'] = index_extract
             step_seg['img_size'] = size_extract
             cropped_volume = extract_volume(reader_im, index_extract, size_extract)
-            volume_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'.vtk'
+            volume_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'.mha'
 
             if seg_file:
                 seg_volume = extract_volume(reader_seg, index_extract, size_extract)
-                seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.vtk'
+                seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
             else:
                 seg_volume=None
 
@@ -181,22 +177,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             #                                         num_processes_segmentation_export=2)
             
             prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
-            # predict = Prediction(   unet,
-            #                         model_name,
-            #                         modality,
-            #                         cropped_volume,
-            #                         img_shape,
-            #                         output_folder+'predictions',
-            #                         threshold,
-            #                         seg_volume,
-            #                         global_scale)
-            # predict.volume_prediction(1)
-            # predict.resample_prediction()
-            # if seg_file:
-            #     d = predict.dice()
-            #     print(f"Local dice: {d:.4f}")
-            #     step_seg['dice'] = d
-            #     dice_list.append(d)
 
             predicted_vessel = prediction[0]
             pred_img = sitk.GetImageFromArray(predicted_vessel)
@@ -216,7 +196,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
 
             #print("Now the components are: ")
             #labels, means = connected_comp_info(predicted_vessel, True)
-            pd_fn = output_folder +'predictions/seg_'+case+'_'+str(i)+'.vtk'
+            pd_fn = output_folder +'predictions/seg_'+case+'_'+str(i)+'.mha'
             if take_time:
                 print("\n Prediction, forward pass: " + str(time.time() - start_time_loc) + " s\n")
             if run_time:
@@ -235,7 +215,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
 
             vtkimage = exportSitk2VTK(cropped_volume)
             length = predicted_vessel.GetSize()[0]*predicted_vessel.GetSpacing()[0]
-            surface_smooth = bound_polydata_by_image(vtkimage[0], surface_smooth, length*1/20)
+            surface_smooth = bound_polydata_by_image(vtkimage[0], surface_smooth, length*1/40)
 
             #surface_smooth = get_largest_connected_polydata(surface_smooth)
 
@@ -248,7 +228,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
             sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'.vtp'
             cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'.vtp'
             if write_samples:
-                #sitk.WriteImage(predicted_vessel, pd_fn)
+                sitk.WriteImage(predicted_vessel, pd_fn)
                 write_vtk_polydata(surface_smooth, sfn)
             step_seg['seg_file'] = pd_fn
             step_seg['surf_file'] = sfn
@@ -277,6 +257,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                                                             "profileidlist",
                                                             var_source=[source_id],
                                                             number = i)
+            write_centerline(centerline_poly, cfn)
+            centerline_poly = calc_branches(centerline_poly)
             #centerline_poly = calc_centerline(surface_smooth, "profileidlist", number = i)
             #centerline_poly = get_largest_connected_polydata(centerline_poly)
             step_seg['cent_file'] = cfn
@@ -285,6 +267,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 surface_smooth1 = smooth_surface(surface, 15)
                 surface_smooth1 = bound_polydata_by_image(vtkimage[0], surface_smooth1, length*1/20)
                 centerline_poly1 = calc_centerline(surface_smooth1, "profileidlist")
+                centerline_poly1 = calc_branches(centerline_poly1)
                 if centerline_poly1.GetNumberOfPoints() > 5:
                     sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_1.vtp'
                     surface_smooth = surface_smooth1
@@ -318,7 +301,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                             vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'] = None
                             vessel_tree.caps = vessel_tree.caps + vessel_tree.steps[-(j+buffer)]['caps']
                     if len(vessel_tree.steps) % (N*5) == 0 and write_samples:
-                            sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.vtk')
+                            #sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.mha')
                             assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=0.5, upperThreshold=1)
                             assembly = remove_other_vessels(assembly, initial_seed)
                             surface_assembly = evaluate_surface(assembly, 1)
@@ -338,10 +321,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality,
                 # print('Animation step added')
                 surfaces_animation.append(surface_smooth)
                 surface_accum = appendPolyData(surfaces_animation)
-                write_vtk_polydata(surface_accum, dir_output+'animation/animation_'+str(i).zfill(3)+'.vtp')
+                write_vtk_polydata(surface_accum, output_folder+'animation/animationsurf_'+str(i).zfill(3)+'.vtp')
                 cent_animation.append(centerline_poly)
                 cent_accum = appendPolyData(cent_animation)
-                write_vtk_polydata(cent_accum, dir_output+'animation/animation_'+str(2*i+1).zfill(3)+'.vtp')
+                write_vtk_polydata(cent_accum, output_folder+'animation/animationcent_'+str(i).zfill(3)+'.vtp')
 
             point_tree, radius_tree, angle_change = get_next_points( centerline_poly,
                                                                         step_seg['point'],

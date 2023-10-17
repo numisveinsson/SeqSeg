@@ -754,7 +754,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
             continue
 
         id_along_cent = len(locs)*9//10
-        id_along_cent_save = len(locs)*9//10
+        id_along_cent_save = len(locs)*3//4
 
         vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
 

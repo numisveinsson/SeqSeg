@@ -36,5 +36,9 @@ export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
-python3 auto_centerline.py
+python3 auto_centerline.py \
+    --dataset none \
+    --model none \
+    --output none \
+    --modality ct
 
