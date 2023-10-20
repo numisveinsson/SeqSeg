@@ -79,6 +79,28 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
 
     return centerline_calc.Centerlines
 
+def resample_centerline(Centerlines):
+    """
+    Function to resample centerline
+    """
+    centerline_calc = vmtkscripts.vmtkCenterlineResampling()
+    centerline_calc.Centerlines = Centerlines
+    centerline_calc.Execute()
+    print('Centerline Resampler Executed')
+
+    return centerline_calc.Centerlines
+
+def smooth_centerline(Centerlines):
+    """
+    Function to resample centerline
+    """
+    centerline_calc = vmtkscripts.vmtkCenterlineSmoothing()
+    centerline_calc.Centerlines = Centerlines
+    centerline_calc.Execute()
+    print('Centerline Smoother Executed')
+
+    return centerline_calc.Centerlines
+
 def calc_branches(Centerlines):
 
     if Centerlines.GetNumberOfPoints() != 0:

@@ -11,6 +11,8 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+slurm*
+*output*
 .Python
 build/
 develop-eggs/

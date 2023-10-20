@@ -85,11 +85,11 @@ def get_testing_samples(dataset):
     elif dataset == 'Dataset007_SEQPULMONARYMR':
         testing_samples = [
 
-            # ['0085_1001',0,10,20,'mr'], # Pulmonary MR
+            ['0085_1001',0,0,10,'mr'], # Pulmonary MR
             # ['0085_1001',0,200,220,'mr'], # Pulmonary MR
-            ['0085_1001',1,200,220,'mr'], # Pulmonary MR
-            # ['0081_0001',0,10,20,'mr'], # Pulmonary MR
-            ['0081_0001',1,200,220,'mr'], # Pulmonary MR
+            # ['0085_1001',1,200,220,'mr'], # Pulmonary MR
+            # ['0081_0001',0,20,30,'mr'], # Pulmonary MR
+            # ['0081_0001',1,200,220,'mr'], # Pulmonary MR
             # ['0081_0001',1,2000,220,'mr'], # Pulmonary MR
         ]
     else:

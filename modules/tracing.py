@@ -217,7 +217,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             length = predicted_vessel.GetSize()[0]*predicted_vessel.GetSpacing()[0]
             surface_smooth = bound_polydata_by_image(vtkimage[0], surface_smooth, length*1/40)
 
-            #surface_smooth = get_largest_connected_polydata(surface_smooth)
+            surface_smooth = get_largest_connected_polydata(surface_smooth)
 
             if take_time:
                 print("\n Calc and smooth surface: " + str(time.time() - start_time_loc) + " s\n")
@@ -258,9 +258,15 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                                                             var_source=[source_id],
                                                             number = i)
             write_centerline(centerline_poly, cfn)
+
+            centerline_poly = resample_centerline(centerline_poly)
+            write_centerline(centerline_poly, cfn.replace('.vtp', 'resampled.vtp'))
+            centerline_poly = smooth_centerline(centerline_poly)
+            write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
+            # centerline_poly = get_largest_connected_polydata(centerline_poly)
+            # write_centerline(centerline_poly, cfn.replace('.vtp', 'largest.vtp'))
             centerline_poly = calc_branches(centerline_poly)
-            #centerline_poly = calc_centerline(surface_smooth, "profileidlist", number = i)
-            #centerline_poly = get_largest_connected_polydata(centerline_poly)
+            
             step_seg['cent_file'] = cfn
             if not centerline_poly or centerline_poly.GetNumberOfPoints() < 5:
                 print("\n Attempting with more smoothing \n")
