@@ -1,6 +1,8 @@
 import os
 import SimpleITK as sitk
 import numpy as np
+from modules import vtk_functions as vf
+from vtk.util.numpy_support import vtk_to_numpy as v2n
 
 def dice(pred, truth):
 
@@ -44,29 +46,119 @@ def hausdorff(pred, truth):
     if pred.GetPixelID() != sitk.sitkUInt8:
         pred = sitk.Cast(pred, sitk.sitkUInt8)
 
+    # check that image origin is the same
+    if truth.GetOrigin() != pred.GetOrigin():
+        pred.SetOrigin(truth.GetOrigin())
+
     haus_filter = sitk.HausdorffDistanceImageFilter()
     haus_filter.Execute(pred, truth)
 
-    return haus_filter.GetHausdorffDistance()
+    return haus_filter.GetAverageHausdorffDistance()
 
-def only_keep_mask(pred, mask):
+def percent_centerline_length(pred, cent_truth):
+
+    # check if cent_truth is string or sitk image
+    if isinstance(cent_truth, str):
+        cent_truth = vf.read_geo(cent_truth).GetOutput()
+    # now cent_truth is vtkPolyData
+    num_cells = cent_truth.GetNumberOfCells()   # number of cells in centerline
+
+    centerline_length = 0
+    cent_length_init = 0
+    # check if cells are within pred
+    for i in range(num_cells):
     
-    filter = sitk.GetArrayFromImage(mask)
-    pred = sitk.GetArrayFromImage(pred)
-    pred[filter == 0] = 0
+            cell = cent_truth.GetCell(i)
+            num_points = cell.GetNumberOfPoints()
+            points = cell.GetPoints()
+            # calulate length of cell
+            length = 0
+            for j in range(num_points-1):
+                p1 = points.GetPoint(j)
+                p2 = points.GetPoint(j+1)
+                length += np.linalg.norm(np.array(p1)-np.array(p2))
+            centerline_length += length
+            # check if points are within pred
+            loc1 = points.GetPoint(0)
+            loc2 = points.GetPoint(num_points-1)
+            index1 = pred.TransformPhysicalPointToIndex(loc1)
+            index2 = pred.TransformPhysicalPointToIndex(loc2)
+            # check if location is in pred
+            try:
+                if pred[index1] == 1 and pred[index2] == 1:
+                    cent_length_init += length
+            except:
+                # print('Index out of bounds')
+                # if location is not within boundary, remove point
+                centerline_length -= length
+    
+    return cent_length_init/centerline_length
 
-    return sitk.GetImageFromArray(masked_pred)
+
+
+def percent_centerline_points(pred, cent_truth):
+
+    # check if cent_truth is string or sitk image
+    if isinstance(cent_truth, str):
+        cent_truth = vf.read_geo(cent_truth).GetOutput()
+
+    num_points = cent_truth.GetNumberOfPoints()   # number of points in centerline
+    cent_data = vf.collect_arrays(cent_truth.GetPointData())
+    c_loc = v2n(cent_truth.GetPoints().GetData())             # point locations as numpy array    
+
+    num_points_init = num_points
+
+    # check if points are within pred
+    for i in range(num_points):
+
+        location = c_loc[i]
+        index = pred.TransformPhysicalPointToIndex(location.tolist())
+
+        # check if location is in pred
+        try:
+            if pred[index] == 0:
+                num_points_init -= 1
+
+        except:
+            # if location is not within boundary, remove point
+            num_points -= 1
+            num_points_init -= 1
+
+    return num_points_init/num_points
+
+def only_keep_mask(pred0, mask):
+    
+    filter_mask = sitk.GetArrayFromImage(mask)
+    pred = sitk.GetArrayFromImage(pred0)
+    pred[filter_mask == 0] = 0
+
+    from modules import sitk_functions as sf
+    pred = sf.numpy_to_sitk(pred, pred0)
+
+    return pred
 
 def process_case_name(case_name):
+
     'Change this function if naming convention changes'
-    return case_name[15:24]
+
+    case_name = case_name[:-17]
+
+    if 'seg' in case_name:
+        name = case_name[13:]
+    else:
+        name = case_name[15:]
+    
+    return name
 
 def read_truth(case, truth_folder):
 
     try:
         truth = sitk.ReadImage(truth_folder+case+'.vtk')
     except:
-        truth = sitk.ReadImage(truth_folder+case+'.mha')
+        try:
+            truth = sitk.ReadImage(truth_folder+case+'.mha')
+        except:
+            truth = sitk.ReadImage(truth_folder+case+'.nii.gz')
 
     return truth
 
@@ -76,13 +168,79 @@ def read_seg(pred_folder, seg):
 
     return pred
 
-def pre_process(pred):
-    
+def from_prob_to_binary(pred):
+
+    # convert to binary
     pred_binary = sitk.BinaryThreshold(pred, lowerThreshold=0.5, upperThreshold=1)
 
     return pred_binary
 
-def calc_metric(metric, pred, truth, mask):
+def keep_largest_label(pred_binary):
+
+    # get connected components
+    ccimage = sitk.ConnectedComponent(pred_binary)
+    # check how many labels there are
+    label_stats = sitk.LabelShapeStatisticsImageFilter()
+    label_stats.Execute(ccimage)
+    labels = label_stats.GetLabels()
+    # print(f"Number of labels: {len(labels)}")
+    # check which label is largest
+    label_sizes = [label_stats.GetPhysicalSize(l) for l in labels]
+    # print(f"Label sizes: {label_sizes}")
+    # sort labels by size
+    labels = [x for _,x in sorted(zip(label_sizes,labels), reverse=True)]
+    # print(f"Sorted labels: {labels}")
+    # keep only largest label
+    label = labels[0]
+    # print(f"Keeping label {label}")
+    labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=label, upperThreshold=label)
+
+    return labelImage
+
+def pre_process(pred, write_postprocessed):
+    
+    # only change to binary if prediction is probability map
+    if pred.GetPixelID() != sitk.sitkUInt8:
+
+        pred  = from_prob_to_binary(pred)
+    #else:
+        #print("Prediction is already binary")
+
+    labelImage = keep_largest_label(pred)
+
+    if write_postprocessed:
+        sitk.WriteImage(labelImage, pred_folder+folder+'/postprocessed/'+case+'.mha')
+        # marching cubes
+        from modules import vtk_functions as vf
+        surface = vf.evaluate_surface(labelImage) # Marching cubes
+        # surface_smooth = vf.smooth_surface(surface, 12) # Smooth marching cubes
+        vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'.vtp', surface)
+    # print np array of label image
+    # labelImageArray = sitk.GetArrayFromImage(labelImage)
+    # print(f"Label image array: {labelImageArray}")
+
+    return labelImage
+
+def get_case_names(folder, pred_folder):
+
+    segs = os.listdir(pred_folder+folder)
+    #only keep segmentation files and ignore hidden files
+    segs = [seg for seg in segs if '.' not in seg[0]]
+    # only keep files not folders
+    segs = [seg for seg in segs if '.' in seg]
+    # sort
+    segs.sort()
+
+    segs = [process_case_name(seg) for seg in segs]
+
+    return segs
+
+
+
+def calc_metric(metric, pred, truth, mask=None, centerline=None):
+
+    if mask is not None:
+        pred = only_keep_mask(pred, mask)
 
     if metric == 'dice':
 
@@ -92,70 +250,179 @@ def calc_metric(metric, pred, truth, mask):
 
         score = hausdorff(pred, truth)
 
-    elif metric == 'dice mask':
+    elif metric == 'centerline overlap':
 
-        masked_pred = only_keep_mask(pred, mask)
-        score = dice(masked_pred, truth)
+        score = percent_centerline_length(pred, centerline)
 
-    elif metric == 'hausdorff mask':
-
-        masked_pred = only_keep_mask(pred, mask)
-        score = hausdorff(masked_pred, truth)
-    
     return score
+
+def get_names_folders(list_folders):
+
+    names = []
+
+    for i,folder in enumerate(list_folders):
+
+        if 'pred_seqseg' in folder: 
+
+            names.append('SeqSeg')
+
+        elif 'pred_benchmark_2d' in folder:
+
+            names.append('2D Global\nnnU-Net')
+
+        elif 'pred_benchmark_3d' in folder:
+
+            names.append('3D Global\nnnU-Net')
+
+        else:
+            names.append(folder)
+
+    return names
+
+def get_metric_name(metric):
+    if metric == 'dice':
+        return 'Dice Score'
+    elif metric == 'hausdorff':
+        return 'Avg. Hausdorff Distance'
+    elif metric == 'centerline overlap':
+        return 'Centerline Overlap'
+    else:
+        return metric
 
 if __name__=='__main__':
 
+    name_graph = 'Comparison'
+    save_name = 'nnewdataset_aorta_nokeep'
     preprocess_pred = True
+    masked = True
+    write_postprocessed = True
 
     #input folder of segmentation results
-    pred_folder = '/Users/numisveins/Downloads/preds/'
-    truth_folder = '/Users/numisveins/Downloads/truths/'
-    mask_folder = ''
+    pred_folder = '/Users/numisveins/Downloads/preds_new_aortas/'
+    pred_folders = os.listdir(pred_folder)
+    #only keep folders and ignore hidden files
+    pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder]
+    pred_folders.sort()
+    # pred_folders = [folder for folder in pred_folders if '3d' not in folder]
+
+    truth_folder = '/Users/numisveins/Documents/vascular_data_3d/truths/'
+    cent_folder = '/Users/numisveins/Documents/vascular_data_3d/centerlines/'
+    mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
 
     # output folder for plots
-    output_folder = '/Users/numisveins/Downloads/'
+    output_folder = ''
 
-    #metrics
-    metrics = ['hausdorff', 'dice']#, 'dice mask', 'hausdorff mask']
+    # modalities
+    modalities = ['ct', 'mr']
+    # metrics
+    metrics = ['centerline overlap','dice', 'hausdorff']#  'dice mask', 'hausdorff mask']
 
-    for metric in metrics:
 
-        print(f"\nCalculating {metric}...")
-        scores = []
+    for modality in modalities:
 
-        for seg in os.listdir(pred_folder):
+        for metric in metrics:
+
+            print(f"\nCalculating {metric} for {modality} data...")
+                # keep track of scores to plot
+            scores = {}
+
+            folders_mod = [folder for folder in pred_folders if modality in folder]
+            case_names = get_case_names([fo for fo in folders_mod if 'seqseg' in fo][0], pred_folder)
+
+            for folder in folders_mod:
+                
+                print(f"\n{folder}:")
+
+                scores[folder] = []
+
+                segs = os.listdir(pred_folder+folder)
+                #only keep segmentation files and ignore hidden files
+                segs = [seg for seg in segs if '.' not in seg[0]]
+                # only keep files not folders
+                segs = [seg for seg in segs if '.' in seg]
+                # sort
+                segs.sort()
+
+                if write_postprocessed:
+                    try:
+                        os.mkdir(pred_folder+folder+'/'+'postprocessed')
+                    except Exception as e:
+                        print(e)
+
+                for i,seg in enumerate(segs):
+
+                    if 'seqseg' in folder:
+                        case = process_case_name(seg)
+                    else:
+                        # remove file extension
+                        case = case_names[i]
+
+                    pred = read_seg(pred_folder+folder+'/', seg)
+                    truth = read_truth(case, truth_folder)
+
+                    if preprocess_pred and 'seqseg' in folder:
+                        pred = pre_process(pred, write_postprocessed)
+
+                    if masked and 'seqseg' in folder:
+                        mask = read_truth('mask_'+case, mask_folder)
+                    else: mask = None
+
+                    if metric == 'centerline overlap':
+                        centerline = vf.read_geo(cent_folder+'/'+case+'.vtp').GetOutput()
+                    else: centerline = None
+
+                    score = calc_metric(metric, pred, truth, mask, centerline)
+
+                    scores[folder].append(score)
+
+                    print(f"{case}: {score}")
+
+                print(f"Average {metric}: {np.mean(scores[folder])}")
+
+            # Make box plot for modality
+            import matplotlib.pyplot as plt
+            plt.figure()
+            # set font to Times New Roman
+            plt.rcParams["font.family"] = "Times New Roman"
+            # set font size to 14
+            plt.rcParams.update({'font.size': 20})
             
-            case = process_case_name(seg)
+            # create boxplot with colors
+            colors = ['pink', 'lightblue', 'lightgreen', 'orange', 'purple', 'yellow', 'brown', 'black', 'grey']
+            boxplot = plt.boxplot(scores.values(), patch_artist=True)
+            for patch, color in zip(boxplot['boxes'], colors):
+                patch.set_facecolor(color)
+            # add legend
+            # plt.legend(boxplot['boxes'], scores.keys())
 
-            pred = read_seg(pred_folder, seg)
-            truth = read_truth(case, truth_folder)
+            # add x axis labels
+            plt.xticks(range(1, len(scores.keys())+1), get_names_folders(scores.keys()))
+            #plt.title(f'{modality.upper()}')
+            # set y axis lower limit to 0
+            if 'hausdorff' in metric:
+                plt.ylim(bottom=0)
+                plt.ylim(top=0.5)
+            plt.ylabel(f'{get_metric_name(metric)}')
+            # plt.xlabel('Method')
+            if 'dice' in metric:
+                plt.ylim(top=1)
+                plt.ylim(bottom=0.5)
+            if 'centerline' in metric:
+                plt.ylim(top=1)
+                plt.ylim(bottom=0)
 
-            if preprocess_pred:
-                pred = pre_process(pred)
+            # add grid on y axis
+            plt.grid(axis='y')
+            plt.tight_layout() # make sure labels are not cut off
+            # add two horizontal lines at means
+            means = [np.mean(scores[folder]) for folder in scores.keys()]
+            # add horizontal lines at means with same color as boxplot
+            # for mean, color in zip(means, colors):
+            #     plt.hlines(mean, 0.5, len(scores.keys())+0.5, colors=color, linestyles='dashed', label='mean', linewidth=1)
 
-            if 'mask' in metric:
-                mask = read_truth(case, mask_folder)
-            else: mask = None
-
-            score = calc_metric(metric, pred, truth, mask)
-
-            scores.append(score)
-
-            print(f"{case}: {score}")
-
-        print(f"Average {metric}: {np.mean(scores)}")
-
-        # Make box plot
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.boxplot(scores)
-        plt.title(f'{metric} scores')
-        # set y axis lower limit to 0
-        plt.ylim(bottom=0)
-        plt.ylabel(f'{metric} score')
-        if metric.includes('dice'):
-            plt.ylim(top=1)
-        plt.savefig(output_folder + f'{metric}_scores.png')
-        plt.close()
+            # plt.hlines(means, 0.5, len(scores.keys())+0.5, colors='r', linestyles='dashed', label='mean', linewidth=1)
+            # save plot
+            plt.savefig(output_folder + f'{save_name}_{metric}_{modality}_scores.png',bbox_inches="tight")
+            plt.savefig(output_folder + f'{save_name}_{metric}_{modality}_scores.svg',bbox_inches="tight")
+            plt.close()
 
