@@ -98,7 +98,7 @@ def read_geo(fname):
     """
     Read geometry from file, chose corresponding vtk reader
     Args:
-        fname: vtp surface or vtu volume mesh
+        fname: vtp surface or vtu volume mesh file
 
     Returns:
         vtk reader, point data, cell data
@@ -626,7 +626,7 @@ def vtk_marching_cube(vtkLabel, bg_id, seg_id, smooth=None):
     Returns:
         mesh: vtk PolyData of the surface mesh
     """
-    contour = vtk.vtkDiscreteMarchingCubes()
+    contour = vtk.vtkMarchingCubes()
     contour.SetInputData(vtkLabel)
     contour.SetValue(0, seg_id)
     contour.Update()

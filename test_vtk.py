@@ -12,7 +12,42 @@ import SimpleITK as sitk
 
 from modules import sitk_functions as sf
 from modules import vtk_functions as vf
-from modules import vmtk_functions as vmtkfs
+import vtk
+# from modules import vmtk_functions as vmtkfs
+
+def organize_polydata(polydata):
+    # Get the lines from the polydata
+    lines = []
+    # Iterate through cells and extract lines
+    for i in range(polydata.GetNumberOfCells()):
+        cell = polydata.GetCell(i)
+        if cell.GetCellType() == 4:
+            line = []
+            for j in range(cell.GetNumberOfPoints()):
+                point_id = cell.GetPointId(j)
+                point = polydata.GetPoint(point_id)
+                line.append(point)
+            lines.append(line)
+
+    return lines
+
+def calc_distance_between_points(point1, point2):
+    # Calculate the distance between two points
+    distance = np.sqrt(np.sum((np.array(point1) - np.array(point2))**2))
+    return distance
+
+def calc_dist_lines(lines):
+    # Calculate the distance along the centerline between each pair of points in line
+    # Input: lines - list of lines, each line is a list of points
+    dists = []
+    for i in range(len(lines)):
+        line = lines[i]
+        dist = []
+        for j in range(len(line)-1):
+            dist.append(calc_distance_between_points(line[j], line[j+1]))
+        dists.append(dist)
+    return dists
+
 
 if __name__=='__main__':
 
@@ -30,7 +65,16 @@ if __name__=='__main__':
     #
     # cfn = '/Users/numisveinsson/Downloads/centerline.vtp'
     # vmtkfs.write_centerline(centerline_poly, cfn)
-    # import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
+
+    cent_file = '/Users/numisveins/Downloads/3d_fullres_0081_0001_0/centerlines/cent_0081_0001_41.vtp'
+
+    centerline = vf.read_geo(cent_file).GetOutput()
+    # get centerline lines
+    lines = organize_polydata(centerline)
+
+
+
 
     from modules import vtk_functions as vf
     dir = '/Users/numisveinsson/Documents_numi/vmr_data_new/images/'

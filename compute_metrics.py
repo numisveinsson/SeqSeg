@@ -199,6 +199,13 @@ def keep_largest_label(pred_binary):
 
 def pre_process(pred, write_postprocessed):
     
+    if write_postprocessed:
+        # marching cubes
+        from modules import vtk_functions as vf
+        surface = vf.evaluate_surface(pred, 0.5) # Marching cubes
+        # surface_smooth = vf.smooth_surface(surface, 12) # Smooth marching cubes
+        vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'.vtp', surface)
+
     # only change to binary if prediction is probability map
     if pred.GetPixelID() != sitk.sitkUInt8:
 
@@ -210,11 +217,7 @@ def pre_process(pred, write_postprocessed):
 
     if write_postprocessed:
         sitk.WriteImage(labelImage, pred_folder+folder+'/postprocessed/'+case+'.mha')
-        # marching cubes
-        from modules import vtk_functions as vf
-        surface = vf.evaluate_surface(labelImage) # Marching cubes
-        # surface_smooth = vf.smooth_surface(surface, 12) # Smooth marching cubes
-        vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'.vtp', surface)
+
     # print np array of label image
     # labelImageArray = sitk.GetArrayFromImage(labelImage)
     # print(f"Label image array: {labelImageArray}")
@@ -222,7 +225,7 @@ def pre_process(pred, write_postprocessed):
     return labelImage
 
 def get_case_names(folder, pred_folder):
-
+    
     segs = os.listdir(pred_folder+folder)
     #only keep segmentation files and ignore hidden files
     segs = [seg for seg in segs if '.' not in seg[0]]
@@ -232,7 +235,7 @@ def get_case_names(folder, pred_folder):
     segs.sort()
 
     segs = [process_case_name(seg) for seg in segs]
-
+    
     return segs
 
 
@@ -292,16 +295,18 @@ def get_metric_name(metric):
 if __name__=='__main__':
 
     name_graph = 'Comparison'
-    save_name = 'nnewdataset_aorta_nokeep'
+    save_name = 'newdataset_aorta_nokeep'
     preprocess_pred = True
     masked = True
     write_postprocessed = True
+
+    print_case_names = True
 
     #input folder of segmentation results
     pred_folder = '/Users/numisveins/Downloads/preds_new_aortas/'
     pred_folders = os.listdir(pred_folder)
     #only keep folders and ignore hidden files
-    pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder]
+    pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder and 'gt' not in folder]
     pred_folders.sort()
     # pred_folders = [folder for folder in pred_folders if '3d' not in folder]
 
@@ -310,13 +315,12 @@ if __name__=='__main__':
     mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
 
     # output folder for plots
-    output_folder = ''
+    output_folder = 'plots/'
 
     # modalities
     modalities = ['ct', 'mr']
     # metrics
-    metrics = ['centerline overlap','dice', 'hausdorff']#  'dice mask', 'hausdorff mask']
-
+    metrics = ['dice', 'hausdorff', 'centerline overlap']#  'dice mask', 'hausdorff mask']
 
     for modality in modalities:
 
@@ -344,10 +348,8 @@ if __name__=='__main__':
                 segs.sort()
 
                 if write_postprocessed:
-                    try:
-                        os.mkdir(pred_folder+folder+'/'+'postprocessed')
-                    except Exception as e:
-                        print(e)
+                    os.makedirs(pred_folder+folder+'/'+'postprocessed', exist_ok=True)
+
 
                 for i,seg in enumerate(segs):
 
@@ -360,9 +362,15 @@ if __name__=='__main__':
                     pred = read_seg(pred_folder+folder+'/', seg)
                     truth = read_truth(case, truth_folder)
 
-                    if preprocess_pred and 'seqseg' in folder:
+                    if preprocess_pred and 'pred' in folder:
                         pred = pre_process(pred, write_postprocessed)
-
+                    if write_postprocessed:
+                        # marching cubes
+                        from modules import vtk_functions as vf
+                        surface = vf.evaluate_surface(pred, 0.5) # Marching cubes
+                        # surface_smooth = vf.smooth_surface(surface, 12) # Smooth marching cubes
+                        vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'.vtp', surface)
+                    
                     if masked and 'seqseg' in folder:
                         mask = read_truth('mask_'+case, mask_folder)
                     else: mask = None
@@ -374,10 +382,14 @@ if __name__=='__main__':
                     score = calc_metric(metric, pred, truth, mask, centerline)
 
                     scores[folder].append(score)
-
-                    print(f"{case}: {score}")
-
-                print(f"Average {metric}: {np.mean(scores[folder])}")
+                    if print_case_names:
+                        print(f"{case}: {score:.3f}")
+                    else:
+                        print(f"{score:.3f}")
+                if print_case_names:
+                    print(f"Average {metric}: {np.mean(scores[folder]):.3f}")
+                else:
+                    print(f"{np.mean(scores[folder]):.3f}")
 
             # Make box plot for modality
             import matplotlib.pyplot as plt
