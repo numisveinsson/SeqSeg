@@ -719,9 +719,8 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
 
     return locs[count], rads[count]
 
-def get_next_points(centerline_poly, current_point, old_point, old_radius):
+def get_point_ids_post_proc(centerline_poly):
 
-    #print('Calculating next steps')
     cent = centerline_poly
     num_points = cent.GetNumberOfPoints()               # number of points in centerline
     cent_data = collect_arrays(cent.GetPointData())           # point locations as numpy array
@@ -731,8 +730,85 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
     points_in_cells = get_points_cells(cent)
 
     cent_id = cell_data['CenterlineIds']
-
     num_cent = max(cent_id)+1 # number of centerlines (one is assembled of multiple)
+
+    point_ids_list = []
+    for ip in range(num_cent):
+            
+            point_ids = []
+            cell_ids = [i for i in range(len(cent_id)) if cent_id[i]==ip]
+    
+            for i in cell_ids:
+                point_ids = point_ids + points_in_cells[1][i]
+            
+            point_ids_list.append(point_ids)
+
+    return point_ids_list
+
+def get_point_ids_no_post_proc(centerline_poly):
+    """
+    For this case, the polydata does not have CenterlineIds,
+    so we need to find the centerline ids manually based on the
+    connectivity of the points
+    Args:
+        centerline_poly: vtk polydata of centerline
+    Returns:
+        point_ids: point ids of centerline (list of lists)
+    """
+    # the centerline is composed of vtk lines
+    # Get the lines from the polydata
+    point_ids_list = []
+    # Iterate through cells and extract lines
+    for i in range(centerline_poly.GetNumberOfCells()):
+        cell = centerline_poly.GetCell(i)
+        if cell.GetCellType() == 4:
+            point_ids = []
+            for j in range(cell.GetNumberOfPoints()):
+                point_id = cell.GetPointId(j)
+                # point = centerline_poly.GetPoint(point_id)
+                point_ids.append(point_id)
+            point_ids_list.append(point_ids)
+
+    return point_ids_list
+
+
+def get_point_ids(centerline_poly, post_proc = True):
+    """
+    Get the point ids of the centerline
+    Args:
+        centerline_poly: vtk polydata of centerline
+        post_proc: boolean if post processing was used
+    Returns:
+        point_ids: point ids of centerline
+    """
+    if post_proc:
+        point_ids = get_point_ids_post_proc(centerline_poly)
+    else:
+        point_ids = get_point_ids_no_post_proc(centerline_poly)
+
+    return point_ids
+
+
+
+def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = True):
+    """
+    Get the next point along the centerline
+    Args:
+        centerline_poly: vtk polydata of centerline
+        current_point: current location
+        old_point: previous location
+        old_radius: previous radius
+    Returns:
+        next_point: next location
+        next_radius: next radius
+    """
+
+    point_ids_list = get_point_ids(centerline_poly, post_proc = post_proc)
+
+    #print('Calculating next steps')
+    cent_data = collect_arrays(centerline_poly.GetPointData())           # point locations as numpy array
+    radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
+    points_in_cells = get_points_cells(centerline_poly)
 
     old_vector = current_point-old_point
     old_vector = old_vector/np.linalg.norm(old_vector)
@@ -740,13 +816,10 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius):
     points = []
     vessel_r = []
     angles = []
-    for ip in range(num_cent):
+    for ip in range(len(point_ids_list)):
 
-        cell_ids = [i for i in range(len(cent_id)) if cent_id[i]==ip]
+        point_ids = point_ids_list[ip]
 
-        point_ids = []
-        for i in cell_ids:
-            point_ids = point_ids + points_in_cells[1][i]
         locs = points_in_cells[0][point_ids] ## Locations of the points on line
         rads = radii[point_ids]
         if len(locs) < 4:
