@@ -14,7 +14,7 @@ from vtk.util.numpy_support import vtk_to_numpy as v2n
 from vtk.util.numpy_support import get_vtk_array_type
 
 def calc_caps(polyData):
-
+    import pdb; pdb.set_trace()
     # Now extract feature edges
     boundaryEdges = vtk.vtkFeatureEdges()
     boundaryEdges.SetInputData(polyData)
@@ -30,7 +30,7 @@ def calc_caps(polyData):
     connects = v2n(conn.GetOutput().GetPointData().GetArray(0))
 
     caps_locs = []
-    for i in range(connects.max()+1):
+    for i in range(int(connects.max())+1):
 
         locs = data[0][connects == i]
         center = np.mean(locs, axis=0)
@@ -790,7 +790,7 @@ def get_point_ids(centerline_poly, post_proc = True):
 
 
 
-def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = True):
+def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = False):
     """
     Get the next point along the centerline
     Args:

@@ -265,7 +265,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
             # centerline_poly = get_largest_connected_polydata(centerline_poly)
             # write_centerline(centerline_poly, cfn.replace('.vtp', 'largest.vtp'))
-            centerline_poly = calc_branches(centerline_poly)
+            # centerline_poly = calc_branches(centerline_poly)
             
             step_seg['cent_file'] = cfn
             if not centerline_poly or centerline_poly.GetNumberOfPoints() < 5:
@@ -273,7 +273,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 surface_smooth1 = smooth_surface(surface, 15)
                 surface_smooth1 = bound_polydata_by_image(vtkimage[0], surface_smooth1, length*1/20)
                 centerline_poly1 = calc_centerline(surface_smooth1, "profileidlist")
-                centerline_poly1 = calc_branches(centerline_poly1)
+                # centerline_poly1 = calc_branches(centerline_poly1)
                 if centerline_poly1.GetNumberOfPoints() > 5:
                     sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_1.vtp'
                     surface_smooth = surface_smooth1
