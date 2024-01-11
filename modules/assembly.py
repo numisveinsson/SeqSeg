@@ -102,6 +102,9 @@ class VesselTree:
         self.bifurcations = [0]
         self.branches = [[0]]
         self.steps = [init_step]
+        if len(pot_branches) > 1:
+            for i in range(len(pot_branches)-1):
+                pot_branches[i+1]['connection'] = [0,0]
         self.potential_branches = pot_branches
         self.caps = []
 

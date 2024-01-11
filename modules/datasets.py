@@ -72,11 +72,4 @@ def get_testing_samples_json(dir_json):
     with open(dir_json) as f:
         data = json.load(f)
 
-    testing_samples = []
-    for case in data:
-        name = case['name']
-        seeds = case['seeds']
-        for i, seed in enumerate(seeds):
-            testing_samples.append([name, i, seed[0], seed[1], 'ct'])
-
-    return testing_samples
+    return data

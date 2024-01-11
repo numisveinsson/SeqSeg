@@ -27,7 +27,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
     allowed_steps = 10
     prevent_retracing = True
-    volume_size_ratio = 5
+    volume_size_ratio = 5.5 # usually 5
     magnify_radius = 1
     number_chances = 2
     run_time = False
@@ -356,13 +356,13 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                                                 point_tree[0],
                                                 radius_tree[0]*magnify_radius,
                                                 angle_change[0])
-                #print("Next radius is: " + str(radius_tree[0]*magnify_radius))
+                print("Next radius is: " + str(radius_tree[0]*magnify_radius))
                 vessel_tree.add_step(i, next_step, branch)
 
                 if len(radius_tree) > 1:
-                    # print('\n _ \n')
-                    # print("\n BIFURCATION BIFURCATION BIFURCATION\n")
-                    # print('\n _ \n')
+                    print('\n _ \n')
+                    print("\n BIFURCATION BIFURCATION BIFURCATION\n")
+                    print('\n _ \n')
                     for j in range(1, len(radius_tree)):
                         dict = create_step_dict(step_seg['point'],
                                                 step_seg['radius'],
@@ -457,7 +457,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 if len(vessel_tree.potential_branches) == 1:
                     break
                 next_step = vessel_tree.potential_branches.pop(1)
-                if next_step['radius'] == vessel_tree.steps[0]['radius']:
+                if next_step['point'][0] == vessel_tree.steps[0]['point'][0]:
                     next_step = vessel_tree.potential_branches.pop(1)
 
                 branch += 1

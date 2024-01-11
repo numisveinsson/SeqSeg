@@ -55,7 +55,7 @@ def create_directories(output_folder, write_samples):
         except Exception as e: print(e)
 
 
-def get_testing_samples(dataset):
+def get_testing_samples(dataset, directory):
 
     if dataset == 'Dataset005_SEQAORTANDFEMOMR':
         testing_samples = [
@@ -102,7 +102,7 @@ def get_testing_samples(dataset):
 
     elif dataset == 'Dataset010_SEQCOROASOCACT':
 
-        dir_asoca_json = 'test_data.json'
+        dir_asoca_json = directory + 'test.json'
         testing_samples = get_testing_samples_json(dir_asoca_json)
 
     else:
@@ -184,12 +184,13 @@ if __name__=='__main__':
 
     dir_output0    = 'output_new/'
     directory_data = '/global/scratch/users/numi/vascular_data_3d/'
+    directory_data = '/global/scratch/users/numi/ASOCA_test/'
     dir_seg = True
     cropped_volume = False
     original = True # is this new vmr or old
     masked = False
 
-    max_step_size  = 2000
+    max_step_size  = 500
     write_samples  = True
     retrace_cent   = False
     take_time      = False
@@ -201,14 +202,14 @@ if __name__=='__main__':
         dataset = test[1]
         fold = test[2]
         modality_model = test[3]
-        test = test[0]
         json_file_present = test[4]
         img_format = test[5]
+        test = test[0]
 
         ## Weight directory
         dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test
 
-        testing_samples = get_testing_samples(dataset)
+        testing_samples = get_testing_samples(dataset, directory_data)
 
         ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
         testing_samples_done = []
@@ -217,11 +218,18 @@ if __name__=='__main__':
         for test_case in testing_samples:
 
             if json_file_present:
-                dir_image, dir_seg, dir_cent, dir_surf = get_directories(directory_data, case, img_format, dir_seg =True)
-                dir_seg = None
-                dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
                 ## Information
+                import pdb; pdb.set_trace()
+                modality = modality_model
+                i = 0
                 case = test_case['name']
+                dir_image, dir_seg, dir_cent, dir_surf = get_directories(directory_data, case, img_format, dir_seg =False)
+                dir_seg = None
+                dir_output = dir_output0 +test+'_'+case+'/'
+                ## Create directories for results
+                create_directories(dir_output, write_samples)
+
+                ## Seed points
                 potential_branches = []
                 for seed in test_case['seeds']:
                     step  = create_step_dict(np.array(seed[0]), seed[2], np.array(seed[1]), seed[2], 0)
@@ -230,6 +238,7 @@ if __name__=='__main__':
                         vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_seed_point.vtp', vf.points2polydata([seed[0]]))
 
                 print(test_case)
+                initial_seed = np.array(seed[1])
 
                 # dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
                 # dir_seg = None
@@ -259,6 +268,8 @@ if __name__=='__main__':
                 dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
                 dir_seg = None
                 dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
+                ## Create directories for results
+                create_directories(dir_output, write_samples)
 
                 ## Get inital seed point + radius
                 old_seed, old_radius = vf.get_seed(dir_cent, i, id_old)
@@ -268,9 +279,6 @@ if __name__=='__main__':
                     vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
                 init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
                 potential_branches = [init_step]
-
-            ## Create directories for results
-            create_directories(dir_output, write_samples)
 
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
