@@ -14,7 +14,7 @@ from vtk.util.numpy_support import vtk_to_numpy as v2n
 from vtk.util.numpy_support import get_vtk_array_type
 
 def calc_caps(polyData):
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     # Now extract feature edges
     boundaryEdges = vtk.vtkFeatureEdges()
     boundaryEdges.SetInputData(polyData)
@@ -27,7 +27,7 @@ def calc_caps(polyData):
 
     conn = connectivity_all(output)
     data = get_points_cells(conn.GetOutput())
-    connects = v2n(conn.GetOutput().GetPointData().GetArray(0))
+    connects = v2n(conn.GetOutput().GetPointData().GetArray(2))
 
     caps_locs = []
     for i in range(int(connects.max())+1):

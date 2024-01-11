@@ -240,7 +240,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 old_point_ref = prev_step['old point']
             elif i == 0:
                 old_point_ref = step_seg['old point']
+
             caps = calc_caps(surface_smooth)
+
             step_seg['caps'] = caps
             _ , source_id = orient_caps(caps, old_point_ref)
 

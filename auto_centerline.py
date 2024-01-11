@@ -54,6 +54,14 @@ def create_directories(output_folder, write_samples):
             os.mkdir(output_folder+'animation')
         except Exception as e: print(e)
 
+def get_testing_samples(directory, img_ext):
+    cases_im = os.listdir(directory+'images/')
+    cases_im = [f for f in cases_im if f.endswith(img_ext)]
+    cases_im = [f.replace(img_ext, '') for f in cases_im]
+    print(f"Found {len(cases_im)} images with extension {img_ext}")
+    cases_im.sort()
+    return cases_im
+
 def get_testing_samples(dataset):
 
     if dataset == 'Dataset005_SEQAORTANDFEMOMR':
@@ -88,10 +96,22 @@ def get_testing_samples(dataset):
             ['0085_1001',0,0,10,'mr'], # Pulmonary MR
             # ['0085_1001',0,200,220,'mr'], # Pulmonary MR
             # ['0085_1001',1,200,220,'mr'], # Pulmonary MR
-            # ['0081_0001',0,20,30,'mr'], # Pulmonary MR
+            ['0081_0001',0,20,30,'mr'], # Pulmonary MR
             # ['0081_0001',1,200,220,'mr'], # Pulmonary MR
             # ['0081_0001',1,2000,220,'mr'], # Pulmonary MR
         ]
+    elif dataset == 'Dataset009_SEQAORTASMICCT':
+        testing_samples = [
+
+            ['0085_1001',0,0,10,'mr'], # Pulmonary MR
+
+        ]
+
+    elif dataset == 'Dataset010_SEQCOROASOCACT':
+
+        dir_asoca = 
+        testing_samples = get_testing_samples(dir_asoca)
+
     else:
         print('Dataset not found')
         testing_samples =  None
@@ -153,11 +173,9 @@ if __name__=='__main__':
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0,'ct'],
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr'],
             #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct'],
-             ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr'],
-            #  ['3d_fullres',True, 'mr'],
-            #  ['2d',True, 'ct'],
-            #  ['2d',True, 'mr'],
-            # ['3d_lowres',True, 'ct'],
+            #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr'],
+             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','mr'],
+             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','mr'],
             ]
 
     calc_restults = False
@@ -171,14 +189,13 @@ if __name__=='__main__':
         global_dict['mr cent']  = []
 
     dir_output0    = 'output_new/'
-    directory_data = '/Users/numisveinsson/Documents/Side_SV_projects/SV_ML_Training/vascular_data_3d/'
     directory_data = '/global/scratch/users/numi/vascular_data_3d/'
     dir_seg = True
     cropped_volume = False
     original = True # is this new vmr or old
     masked = False
 
-    max_step_size  = 1000
+    max_step_size  = 2000
     write_samples  = True
     retrace_cent   = False
     take_time      = False
