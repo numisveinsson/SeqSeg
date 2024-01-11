@@ -4,6 +4,8 @@ import numpy as np
 from modules import vtk_functions as vf
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 
+from scipy.stats import ttest_ind
+
 def dice(pred, truth):
 
     if not isinstance(pred, np.ndarray):
@@ -295,7 +297,7 @@ def get_metric_name(metric):
 if __name__=='__main__':
 
     name_graph = 'Comparison'
-    save_name = 'newdataset_aorta_nokeep'
+    save_name = 'test_nokeep'
     preprocess_pred = True
     masked = True
     write_postprocessed = True
@@ -308,7 +310,10 @@ if __name__=='__main__':
     #only keep folders and ignore hidden files
     pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder and 'gt' not in folder]
     pred_folders.sort()
+    print(f"Prediction folders: {pred_folders}")
     # pred_folders = [folder for folder in pred_folders if '3d' not in folder]
+
+    import pdb; pdb.set_trace()
 
     truth_folder = '/Users/numisveins/Documents/vascular_data_3d/truths/'
     cent_folder = '/Users/numisveins/Documents/vascular_data_3d/centerlines/'
@@ -318,7 +323,7 @@ if __name__=='__main__':
     output_folder = 'plots/'
 
     # modalities
-    modalities = ['ct', 'mr']
+    modalities = ['mr', 'ct']
     # metrics
     metrics = ['dice', 'hausdorff', 'centerline overlap']#  'dice mask', 'hausdorff mask']
 
@@ -362,7 +367,7 @@ if __name__=='__main__':
                     pred = read_seg(pred_folder+folder+'/', seg)
                     truth = read_truth(case, truth_folder)
 
-                    if preprocess_pred and 'pred' in folder:
+                    if preprocess_pred and 'segseg' in folder:
                         pred = pre_process(pred, write_postprocessed)
                     if write_postprocessed:
                         # marching cubes
@@ -390,6 +395,11 @@ if __name__=='__main__':
                     print(f"Average {metric}: {np.mean(scores[folder]):.3f}")
                 else:
                     print(f"{np.mean(scores[folder]):.3f}")
+
+            # t-test to compare score from folder with 'seqseg' in name to score from folder without 'seqseg' in name
+            if len(scores.keys()) > 1:
+                t, p = ttest_ind(scores[list(scores.keys())[0]], scores[list(scores.keys())[1]])
+                print(f"p-value: {p:.3f}")
 
             # Make box plot for modality
             import matplotlib.pyplot as plt
@@ -428,6 +438,19 @@ if __name__=='__main__':
             plt.tight_layout() # make sure labels are not cut off
             # add two horizontal lines at means
             means = [np.mean(scores[folder]) for folder in scores.keys()]
+
+            # add p-values from t-test
+            if len(scores.keys()) > 1:
+                for i in range(len(scores.keys())-1):
+                    for j in range(i+1, len(scores.keys())):
+                        t, p = ttest_ind(scores[list(scores.keys())[i]], scores[list(scores.keys())[j]])
+                        if p < 0.05:
+                            plt.text(i+1.5, 0.5, '*', fontsize=20, horizontalalignment='center', verticalalignment='center')
+                        if p < 0.01:
+                            plt.text(i+1.5, 0.4, '**', fontsize=20, horizontalalignment='center', verticalalignment='center')
+                        if p < 0.001:
+                            plt.text(i+1.5, 0.3, '***', fontsize=20, horizontalalignment='center', verticalalignment='center')
+
             # add horizontal lines at means with same color as boxplot
             # for mean, color in zip(means, colors):
             #     plt.hlines(mean, 0.5, len(scores.keys())+0.5, colors=color, linestyles='dashed', label='mean', linewidth=1)
@@ -435,6 +458,6 @@ if __name__=='__main__':
             # plt.hlines(means, 0.5, len(scores.keys())+0.5, colors='r', linestyles='dashed', label='mean', linewidth=1)
             # save plot
             plt.savefig(output_folder + f'{save_name}_{metric}_{modality}_scores.png',bbox_inches="tight")
-            plt.savefig(output_folder + f'{save_name}_{metric}_{modality}_scores.svg',bbox_inches="tight")
+            # plt.savefig(output_folder + f'{save_name}_{metric}_{modality}_scores.svg',bbox_inches="tight")
             plt.close()
 

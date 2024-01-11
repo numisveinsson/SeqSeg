@@ -111,6 +111,9 @@ if __name__ == "__main__":
         for col, mesh_file in enumerate(mesh_files):
             # Load the mesh using PyVista
             mesh = pv.read(mesh_file)
+
+            # Change the origin of the coordinate system to 0, 0, 0
+            mesh.origin = np.array([0, 0, 0])
             
             # Translate the mesh so that its center is on y=0
             translation = np.array([0, -mesh.center[1], 0])

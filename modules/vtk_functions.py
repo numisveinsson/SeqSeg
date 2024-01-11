@@ -753,7 +753,7 @@ def get_point_ids_no_post_proc(centerline_poly):
     Args:
         centerline_poly: vtk polydata of centerline
     Returns:
-        point_ids: point ids of centerline (list of lists)
+        point_ids: point ids of centerline (list of lists)3
     """
     # the centerline is composed of vtk lines
     # Get the lines from the polydata
