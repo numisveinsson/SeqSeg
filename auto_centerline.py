@@ -19,7 +19,7 @@ from modules import sitk_functions as sf
 from modules import vtk_functions as vf
 from modules import vmtk_functions as vmtkfs
 from modules.tracing import trace_centerline
-from modules.vmr_data import vmr_directories
+from modules.datasets import vmr_directories, get_directories, get_testing_samples_json
 from modules.assembly import create_step_dict
 from modules.evaluation import EvaluateTracing
 
@@ -54,13 +54,6 @@ def create_directories(output_folder, write_samples):
             os.mkdir(output_folder+'animation')
         except Exception as e: print(e)
 
-def get_testing_samples(directory, img_ext):
-    cases_im = os.listdir(directory+'images/')
-    cases_im = [f for f in cases_im if f.endswith(img_ext)]
-    cases_im = [f.replace(img_ext, '') for f in cases_im]
-    print(f"Found {len(cases_im)} images with extension {img_ext}")
-    cases_im.sort()
-    return cases_im
 
 def get_testing_samples(dataset):
 
@@ -109,8 +102,8 @@ def get_testing_samples(dataset):
 
     elif dataset == 'Dataset010_SEQCOROASOCACT':
 
-        dir_asoca = 
-        testing_samples = get_testing_samples(dir_asoca)
+        dir_asoca_json = 'test_data.json'
+        testing_samples = get_testing_samples_json(dir_asoca_json)
 
     else:
         print('Dataset not found')
@@ -167,15 +160,16 @@ if __name__=='__main__':
     parser.add_argument('--modality', nargs='+', help='Name of the modality, mr, ct, split by space')
     args = parser.parse_args()
 
-    #       [name , dataset, fold, modality]
+    #       [name , dataset, fold, modality, json file present]
     #       note: fold is either 0,1,2,3 or 'all'
+    #       note: json file present is either True or False
     tests = [
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0,'ct'],
-            #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr'],
-            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct'],
-            #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr'],
-             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','mr'],
-             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','mr'],
+            #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
+            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', False],
+            #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
+            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True],
+             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
             ]
 
     calc_restults = False
@@ -208,6 +202,8 @@ if __name__=='__main__':
         fold = test[2]
         modality_model = test[3]
         test = test[0]
+        json_file_present = test[4]
+        img_format = test[5]
 
         ## Weight directory
         dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test
@@ -220,33 +216,62 @@ if __name__=='__main__':
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
         for test_case in testing_samples:
 
-            ## Information
-            case = test_case[0]
-            i = test_case[1]
-            id_old = test_case[2]
-            id_current = test_case[3]
-            modality = test_case[4]
+            if json_file_present:
+                dir_image, dir_seg, dir_cent, dir_surf = get_directories(directory_data, case, img_format, dir_seg =True)
+                dir_seg = None
+                dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
+                ## Information
+                case = test_case['name']
+                potential_branches = []
+                for seed in test_case['seeds']:
+                    step  = create_step_dict(np.array(seed[0]), seed[2], np.array(seed[1]), seed[2], 0)
+                    potential_branches.append(step)
+                    if write_samples:
+                        vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_seed_point.vtp', vf.points2polydata([seed[0]]))
 
-            if modality != modality_model: 
-                print(f"Modality doesnt match model and case: {modality},{modality_model} ")
-                continue
-            else: testing_samples_done.append(test_case)
-            print(test_case)
+                print(test_case)
 
-            dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
-            dir_seg = None
-            dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
+                # dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
+                # dir_seg = None
+                # dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
+                ## Get inital seed point + radius
+                # old_seed, old_radius = vf.get_seed(dir_cent, i, id_old)
+                # print(old_seed)
+                # initial_seed, initial_radius = vf.get_seed(dir_cent, i, id_current)
+                # if write_samples:
+                #     vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
+                # init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
+                
+            else:
+                ## Information
+                case = test_case[0]
+                i = test_case[1]
+                id_old = test_case[2]
+                id_current = test_case[3]
+                modality = test_case[4]
+
+                if modality != modality_model: 
+                    print(f"Modality doesnt match model and case: {modality},{modality_model} ")
+                    continue
+                else: testing_samples_done.append(test_case)
+                print(test_case)
+
+                dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
+                dir_seg = None
+                dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
+
+                ## Get inital seed point + radius
+                old_seed, old_radius = vf.get_seed(dir_cent, i, id_old)
+                print(old_seed)
+                initial_seed, initial_radius = vf.get_seed(dir_cent, i, id_current)
+                if write_samples:
+                    vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
+                init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
+                potential_branches = [init_step]
+
             ## Create directories for results
             create_directories(dir_output, write_samples)
 
-            ## Get inital seed point + radius
-            old_seed, old_radius = vf.get_seed(dir_cent, i, id_old)
-            print(old_seed)
-            initial_seed, initial_radius = vf.get_seed(dir_cent, i, id_current)
-            if write_samples:
-                vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
-            init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
-            potential_branches = [init_step]
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
                                                                                                     dir_image,
