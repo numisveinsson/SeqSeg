@@ -219,7 +219,6 @@ if __name__=='__main__':
 
             if json_file_present:
                 ## Information
-                import pdb; pdb.set_trace()
                 modality = modality_model
                 i = 0
                 case = test_case['name']
