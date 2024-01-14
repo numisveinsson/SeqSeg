@@ -25,7 +25,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                     ):
     animation = True
 
-    allowed_steps = 20
+    allowed_steps = 20 # usually 10
     prevent_retracing = True
     volume_size_ratio = 5.5 # usually 5
     magnify_radius = 1
@@ -85,7 +85,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
     while vessel_tree.potential_branches and i < (max_step_size +1):
 
         if i in range(0, max_step_size, max_step_size*0 +1):
-            print(f"*** Step number {i} ***")
+            print(f"\n*** Step number {i} ***")
 
         try:
 
@@ -211,9 +211,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             #         write_vtk_polydata(surface_smooth, seg_fn)
 
             surface = evaluate_surface(predicted_vessel) # Marching cubes
-            if step_seg['radius'] > 1.5:
-                surface_smooth = smooth_surface(surface, 12) # Smooth marching cubes
-            else: print(f"Radius too small; no smoothing local surface")
+            if step_seg['radius'] > 0.7: num_iterations = 12
+            elif step_seg['radius'] > 0.5: 
+                print("Small radius; less smoothing")
+                num_iterations = 6
+            else: num_iterations = 0
+            surface_smooth = smooth_surface(surface, num_iterations) # Smooth marching cubes
 
             vtkimage = exportSitk2VTK(cropped_volume)
             length = predicted_vessel.GetSize()[0]*predicted_vessel.GetSpacing()[0]

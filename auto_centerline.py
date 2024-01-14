@@ -10,6 +10,7 @@ start_time = time.time()
 from datetime import datetime
 
 import os
+import sys
 import pickle
 import argparse
 import numpy as np
@@ -94,11 +95,10 @@ def get_testing_samples(dataset, directory):
             # ['0081_0001',1,2000,220,'mr'], # Pulmonary MR
         ]
     elif dataset == 'Dataset009_SEQAORTASMICCT':
-        testing_samples = [
 
-            ['0085_1001',0,0,10,'mr'], # Pulmonary MR
+        dir_json = directory + 'test.json'
+        testing_samples = get_testing_samples_json(dir_json)
 
-        ]
 
     elif dataset == 'Dataset010_SEQCOROASOCACT':
 
@@ -168,8 +168,8 @@ if __name__=='__main__':
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
             #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', False],
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
-            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True],
-             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
+             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
+            #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
             ]
 
     calc_restults = False
@@ -185,12 +185,13 @@ if __name__=='__main__':
     dir_output0    = 'output_new/'
     directory_data = '/global/scratch/users/numi/vascular_data_3d/'
     directory_data = '/global/scratch/users/numi/ASOCA_test/'
+    directory_data = '/global/scratch/users/numi/test_data/miccai_aortas/'
     dir_seg = True
     cropped_volume = False
     original = True # is this new vmr or old
     masked = False
 
-    max_step_size  = 500
+    max_step_size  = 1000
     write_samples  = True
     retrace_cent   = False
     take_time      = False
@@ -216,7 +217,7 @@ if __name__=='__main__':
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
         for test_case in testing_samples:
-
+            
             if json_file_present:
                 ## Information
                 modality = modality_model
@@ -236,8 +237,18 @@ if __name__=='__main__':
                     if write_samples:
                         vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_seed_point.vtp', vf.points2polydata([seed[0]]))
 
+                if not test_case['seeds']:
+                    print(f"No seed given, trying to get one from centerline ground truth")
+                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 0)
+                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 10)
+                    init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
+                    print(f"Seed found from centerline, took first point!")
+                    potential_branches = [init_step]
+                    if write_samples:
+                        vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
+                else:
+                    initial_seed = np.array(seed[1])
                 print(test_case)
-                initial_seed = np.array(seed[1])
 
                 # dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
                 # dir_seg = None
@@ -278,6 +289,10 @@ if __name__=='__main__':
                     vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
                 init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
                 potential_branches = [init_step]
+
+            # print to .txt file all outputs
+            sys.stdout = open(dir_output+"/out.txt", "w")
+            print(test_case)
 
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,

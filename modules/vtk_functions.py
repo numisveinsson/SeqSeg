@@ -700,24 +700,19 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
     cent_data = collect_arrays(cent.GetPointData())
     c_loc = v2n(cent.GetPoints().GetData())             # point locations as numpy array
     radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
-    cent_id = cent_data['CenterlineId']
 
     try:
-        num_cent = len(cent_id[0]) # number of centerlines (one is assembled of multiple)
-    except:
-        num_cent = 1 # in the case of only one centerline
-
-    ip = centerline_num
-    count = point_on_cent
-
-    try:
+        cent_id = cent_data['CenterlineId']
+        ip = centerline_num
         ids = [i for i in range(num_points) if cent_id[i,ip]==1] # ids of points belonging to centerline ip
+            
     except:
         ids = [i for i in range(num_points)]
+
     locs = c_loc[ids]
     rads = radii[ids]
 
-    return locs[count], rads[count]
+    return locs[point_on_cent], rads[point_on_cent]
 
 def get_point_ids_post_proc(centerline_poly):
 
@@ -885,6 +880,9 @@ def evaluate_surface(ref_im, value = 1):
 
 def smooth_surface(polydata, smoothingIterations):
 
+    if smoothingIterations == 0:
+        return polydata
+    
     passBand = 0.001
     featureAngle = 120.0
     smoother = vtk.vtkWindowedSincPolyDataFilter()
