@@ -714,6 +714,46 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
 
     return locs[point_on_cent], rads[point_on_cent]
 
+def sort_centerline(centerline):
+    """
+    Function to sort the centerline data
+    """
+
+    num_points = centerline.GetNumberOfPoints()               # number of points in centerline
+    cent_data = collect_arrays(centerline.GetPointData())
+    c_loc = v2n(centerline.GetPoints().GetData())             # point locations as numpy array
+    radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
+    
+    # get cent_ids, a list of lists
+    # each list is the ids of the points belonging to a centerline
+    try:
+        cent_ids = get_point_ids_post_proc(centerline)
+        bifurc_id = cent_data['BifurcationIdTmp']
+    except:
+        # centerline hasnt been processed
+        cent_ids = get_point_ids_no_post_proc(centerline)
+        bifurc_id = np.zeros(num_points)
+        print(f"\nCenterline has not been processed, no known bifurcations\n")
+    
+    # check if there are duplicate points
+    if np.unique(c_loc, axis=0).shape[0] != c_loc.shape[0]:
+        # remove duplicate points
+        print(f"\nCenterline has duplicate points, removing them\n")
+        _, unique_ids = np.unique(c_loc, axis=0, return_index=True)
+        # same for cent_ids, but keep same order
+        cent_ids_new = []
+        for i in range(len(cent_ids)):
+            cent_ids_new.append([])
+            for j in range(len(cent_ids[i])):
+                if cent_ids[i][j] in unique_ids:
+                    cent_ids_new[i].append(cent_ids[i][j])
+        cent_ids = cent_ids_new
+
+    # pdb.set_trace()
+    num_cent = len(cent_ids)
+    
+    return num_points, c_loc, radii, cent_ids, bifurc_id, num_cent
+    
 def get_point_ids_post_proc(centerline_poly):
 
     cent = centerline_poly
