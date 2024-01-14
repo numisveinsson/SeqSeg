@@ -239,8 +239,8 @@ if __name__=='__main__':
 
                 if not test_case['seeds']:
                     print(f"No seed given, trying to get one from centerline ground truth")
-                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 0)
-                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 10)
+                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 10)
+                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 20)
                     init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
                     print(f"Seed found from centerline, took first point!")
                     print(f"Old seed: {old_seed}, {old_radius}")
