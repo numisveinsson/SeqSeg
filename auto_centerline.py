@@ -216,7 +216,7 @@ if __name__=='__main__':
         testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
-        for test_case in testing_samples:
+        for test_case in testing_samples[7:]:
             
             if json_file_present:
                 ## Information
@@ -243,6 +243,8 @@ if __name__=='__main__':
                     initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 10)
                     init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
                     print(f"Seed found from centerline, took first point!")
+                    print(f"Old seed: {old_seed}, {old_radius}")
+                    print(f"Initial seed: {initial_seed}, {initial_radius} ")
                     potential_branches = [init_step]
                     if write_samples:
                         vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
@@ -293,6 +295,7 @@ if __name__=='__main__':
             # print to .txt file all outputs
             sys.stdout = open(dir_output+"/out.txt", "w")
             print(test_case)
+            print(f"Initial points: {potential_branches}")
 
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,

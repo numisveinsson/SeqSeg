@@ -694,25 +694,16 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
         location coords, radius at the specific point
     """
 
-    ## Centerline
+    # Centerline
     cent = read_geo(cent_fn).GetOutput()
-    num_points = cent.GetNumberOfPoints()               # number of points in centerline
-    cent_data = collect_arrays(cent.GetPointData())
-    c_loc = v2n(cent.GetPoints().GetData())             # point locations as numpy array
-    radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
+    # Sort centerline into data of interest
+    num_points, c_loc, radii, cent_ids, bifurc_id, num_cent = sort_centerline(cent)
+    # Pick the branch of interest
+    cent_id_wanted = cent_ids[centerline_num]
+    # Pick the point along the branch
+    id_point = cent_id_wanted[point_on_cent]
 
-    try:
-        cent_id = cent_data['CenterlineId']
-        ip = centerline_num
-        ids = [i for i in range(num_points) if cent_id[i,ip]==1] # ids of points belonging to centerline ip
-            
-    except:
-        ids = [i for i in range(num_points)]
-
-    locs = c_loc[ids]
-    rads = radii[ids]
-
-    return locs[point_on_cent], rads[point_on_cent]
+    return c_loc[id_point], radii[id_point]
 
 def sort_centerline(centerline):
     """

@@ -27,7 +27,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
     allowed_steps = 20 # usually 10
     prevent_retracing = True
-    volume_size_ratio = 5.5 # usually 5
+    volume_size_ratio = 5 # usually 5
     magnify_radius = 1
     number_chances = 2
     run_time = False
