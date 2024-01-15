@@ -196,6 +196,7 @@ if __name__=='__main__':
     retrace_cent   = False
     take_time      = False
     weighted = True
+    calc_global_centerline = False
 
     for test in tests:
 
@@ -216,7 +217,7 @@ if __name__=='__main__':
         testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
-        for test_case in testing_samples[7:]:
+        for test_case in testing_samples[4:]:
             
             if json_file_present:
                 ## Information
@@ -239,8 +240,8 @@ if __name__=='__main__':
 
                 if not test_case['seeds']:
                     print(f"No seed given, trying to get one from centerline ground truth")
-                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 10)
-                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 20)
+                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 20)
+                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 30)
                     init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
                     print(f"Seed found from centerline, took first point!")
                     print(f"Old seed: {old_seed}, {old_radius}")
@@ -318,18 +319,19 @@ if __name__=='__main__':
                 vessel_tree.time_analysis()
 
             # End points
-            end_points = vessel_tree.get_end_points()
-            in_source = end_points[0].tolist()
-            in_target_lists = [point.tolist() for point in end_points[1:]]
-            in_target = []
-            for target in in_target_lists:
-                in_target += target
+            if calc_global_centerline:
+                end_points = vessel_tree.get_end_points()
+                in_source = end_points[0].tolist()
+                in_target_lists = [point.tolist() for point in end_points[1:]]
+                in_target = []
+                for target in in_target_lists:
+                    in_target += target
 
             ## Assembly work
             assembly_org = assembly_obj.assembly
             #assembly_ups = assembly_obj.upsample_sitk()
             print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
-            sitk.WriteImage(assembly_org, dir_output+'/'+case+'_assembly_' + test +'_'+str(i)+'.mha')
+            #sitk.WriteImage(assembly_org, dir_output+'/'+case+'_assembly_' + test +'_'+str(i)+'.mha')
 
             assembly = assembly_org
             name = 'original'
