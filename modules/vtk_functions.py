@@ -816,7 +816,7 @@ def get_point_ids(centerline_poly, post_proc = True):
 
 
 
-def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = False):
+def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = False, magn_radius = 1, min_radius = 0):
     """
     Get the next point along the centerline
     Args:
@@ -878,7 +878,9 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
             radius_to_save = max(rads[id_along_cent_save], 0.05) ##  have mininum size radius
             if radius_to_save < 0.1 and old_radius > radius_to_save:
                 radius_to_save = (1/2*radius_to_save + 1/2*old_radius)*1.1 ## Have old radius carry into new
-
+            if radius_to_save < min_radius:
+                print(f"Radius too small, saving mininum radius")
+                radius_to_save = min_radius
             vessel_r.append( radius_to_save)
             angles.append(angle)
 
@@ -895,7 +897,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
         else:
             print("Angle not within limit, returning None for ip=" + str(ip))
 
-    arr_rad = np.array(vessel_r)
+    arr_rad = np.array(vessel_r)*magn_radius
     arr_pt = np.array(points)
     arr_angl = np.array(angles)
     sort_index = np.flip(np.argsort(arr_rad)) ## Sort from largest to smallest

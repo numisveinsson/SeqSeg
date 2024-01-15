@@ -27,9 +27,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
     allowed_steps = 20 # usually 10
     prevent_retracing = True
-    volume_size_ratio = 5 # 5.5 for coronaries
-    magnify_radius = 1
+    volume_size_ratio = 5.5 # 5.5 for coronaries
+    magnify_radius = 1 # usually 1
     number_chances = 2
+    min_radius = 0.4
     run_time = False
     use_buffer = True
     forceful_sidebranch = False
@@ -342,7 +343,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             point_tree, radius_tree, angle_change = get_next_points( centerline_poly,
                                                                         step_seg['point'],
                                                                         step_seg['old point'],
-                                                                        step_seg['old radius'])
+                                                                        step_seg['old radius'],
+                                                                        magn_radius = magnify_radius,
+                                                                        min_radius = min_radius)
 
             if take_time:
                 print("\n Calc next point: " + str(time.time() - start_time_loc) + " s\n")
@@ -359,9 +362,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 next_step = create_step_dict(   step_seg['point'],
                                                 step_seg['radius'],
                                                 point_tree[0],
-                                                radius_tree[0]*magnify_radius,
+                                                radius_tree[0],
                                                 angle_change[0])
-                print("Next radius is: " + str(radius_tree[0]*magnify_radius))
+                print("Next radius is: " + str(radius_tree[0]))
                 vessel_tree.add_step(i, next_step, branch)
 
                 if len(radius_tree) > 1:
@@ -372,7 +375,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                         dict = create_step_dict(step_seg['point'],
                                                 step_seg['radius'],
                                                 point_tree[j],
-                                                radius_tree[j]*magnify_radius,
+                                                radius_tree[j],
                                                 angle_change[j])
                         dict['connection'] = [branch, i-1]
                         if forceful_sidebranch:
