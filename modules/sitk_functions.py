@@ -121,10 +121,17 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, pro
         index_extract: index for sitk volume extraction
         voi_min/max: boundaries of volume for caps constraint
     """
-    size_extract = np.ceil(size_volume*radius/spacing_im).astype(int)
-    index_extract = np.rint((point-origin_im - (size_volume/2)*radius)/spacing_im).astype(int)
-    end_bounds = index_extract+size_extract
+    min_resolution_any_dim = 4
+    min_res = 0
 
+    while min_res < min_resolution_any_dim:
+        size_extract = np.ceil(size_volume*radius/spacing_im).astype(int)
+        index_extract = np.rint((point-origin_im - (size_volume/2)*radius)/spacing_im).astype(int)
+        print(f"Subvolume resolution: {size_extract}")
+        radius *= 1.05
+        min_res = size_extract.min()
+    
+    end_bounds = index_extract+size_extract
 
     for i, ind in enumerate(np.logical_and(end_bounds > size_im,(end_bounds- size_im) < 1/2*size_extract )):
         if ind:
