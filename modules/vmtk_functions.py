@@ -21,7 +21,7 @@ def calc_network(Surface):
     centerline_calc.Surface = Surface
     centerline_calc.Execute()
 
-    return centerline_calc.Network,
+    return centerline_calc.Network
 
 # Function that takes in centerlines, writes a file
 

@@ -29,7 +29,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
     prevent_retracing = True
     volume_size_ratio = 5 # 5.5 for coronaries
     magnify_radius = 1 # usually 1
-    number_chances = 2
+    number_chances = 3
     min_radius = 0 # 0.4 for coronaries
     run_time = False
     use_buffer = True
@@ -123,69 +123,70 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 pfn = output_folder + 'points/point_'+case+'_'+str(i)+'.vtp'
                 write_geo(pfn, polydata_point)
 
-            # perc = 1
+            perc = 1
             mag = 1
-            # while perc>0.42 and mag < 1.3:
+            while perc>0.33 and mag < 1.3:
+                if mag > 1:
+                    print(f"Enlarging bounding box because percentage vessel > 0.33")
+                # Extract Volume
+                size_extract, index_extract = map_to_image(  step_seg['point'],
+                                                                step_seg['radius']*mag,
+                                                                volume_size_ratio,
+                                                                origin_im,
+                                                                spacing_im,
+                                                                size_im)
+                step_seg['img_index'] = index_extract
+                step_seg['img_size'] = size_extract
+                cropped_volume = extract_volume(reader_im, index_extract, size_extract)
+                volume_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'.mha'
 
-            # Extract Volume
-            size_extract, index_extract = map_to_image(  step_seg['point'],
-                                                            step_seg['radius']*mag,
-                                                            volume_size_ratio,
-                                                            origin_im,
-                                                            spacing_im,
-                                                            size_im)
-            step_seg['img_index'] = index_extract
-            step_seg['img_size'] = size_extract
-            cropped_volume = extract_volume(reader_im, index_extract, size_extract)
-            volume_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'.mha'
+                if seg_file:
+                    seg_volume = extract_volume(reader_seg, index_extract, size_extract)
+                    seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
+                else:
+                    seg_volume=None
 
-            if seg_file:
-                seg_volume = extract_volume(reader_seg, index_extract, size_extract)
-                seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
-            else:
-                seg_volume=None
+                step_seg['img_file'] = volume_fn
+                if write_samples:
+                    sitk.WriteImage(cropped_volume, volume_fn)
+                    # if seg_file:
+                    #     sitk.WriteImage(seg_volume, seg_fn)
+                if take_time:
+                    print("\n Extracting and writing volumes: " + str(time.time() - start_time_loc) + " s\n")
+                if run_time:
+                    step_seg['time']=[]
+                    step_seg['time'].append(time.time()-start_time_loc)
+                    start_time_loc = time.time()
 
-            step_seg['img_file'] = volume_fn
-            if write_samples:
-                sitk.WriteImage(cropped_volume, volume_fn)
-                # if seg_file:
-                #     sitk.WriteImage(seg_volume, seg_fn)
-            if take_time:
-                print("\n Extracting and writing volumes: " + str(time.time() - start_time_loc) + " s\n")
-            if run_time:
-                step_seg['time']=[]
-                step_seg['time'].append(time.time()-start_time_loc)
-                start_time_loc = time.time()
+                # Prediction
+                spacing = spacing_im.tolist()
+                spacing = spacing[::-1]
+                props={}
+                props['spacing'] = spacing
+                img_np = sitk.GetArrayFromImage(cropped_volume)
+                img_np = img_np[None]
+                img_np = img_np.astype('float32')
+                # prediction0 = predictor.predict_from_files([[volume_fn]],
+                #                      None,
+                #                      save_probabilities=False, overwrite=False,
+                #                      num_processes_preprocessing=1, num_processes_segmentation_export=1,
+                #                      folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
 
-            # Prediction
-            spacing = spacing_im.tolist()
-            spacing = spacing[::-1]
-            props={}
-            props['spacing'] = spacing
-            img_np = sitk.GetArrayFromImage(cropped_volume)
-            img_np = img_np[None]
-            img_np = img_np.astype('float32')
-            # prediction0 = predictor.predict_from_files([[volume_fn]],
-            #                      None,
-            #                      save_probabilities=False, overwrite=False,
-            #                      num_processes_preprocessing=1, num_processes_segmentation_export=1,
-            #                      folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
+                # prediction1 = predictor.predict_from_list_of_npy_arrays([img_np],
+                #                                         None,
+                #                                         [props],
+                #                                         None, 1, save_probabilities=False,
+                #                                         num_processes_segmentation_export=2)
+                
+                prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
 
-            # prediction1 = predictor.predict_from_list_of_npy_arrays([img_np],
-            #                                         None,
-            #                                         [props],
-            #                                         None, 1, save_probabilities=False,
-            #                                         num_processes_segmentation_export=2)
-            
-            prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
-
-            predicted_vessel = prediction[0]
-            pred_img = sitk.GetImageFromArray(predicted_vessel)
-            pred_img = copy_settings(pred_img, cropped_volume)
-            
-            perc = predicted_vessel.mean()
-            # mag = mag+0.1
-            print(f"Perc as 1: {perc:.3f}")
+                predicted_vessel = prediction[0]
+                pred_img = sitk.GetImageFromArray(predicted_vessel)
+                pred_img = copy_settings(pred_img, cropped_volume)
+                
+                perc = predicted_vessel.mean()
+                mag = mag+0.2
+                print(f"Perc as 1: {perc:.3f}")
             
             prob_prediction = sitk.GetImageFromArray(prediction[1][1])
             prob_prediction = copy_settings(prob_prediction, cropped_volume)
@@ -413,8 +414,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 if take_time:
                     print('Radius is ', step_seg['radius'])
                 if step_seg['seg_file'] and perc>0.33 and vessel_tree.steps[i]['chances'] > 0:
-                    print(f'Magnifying radius, perc: {perc}')
-                    vessel_tree.steps[i]['radius'] *= 1.1
+                    print(f'Magnifying radius by 1.2 because percentage vessel is above 0.33: {perc:.3f}')
+                    vessel_tree.steps[i]['radius'] *= 1.2
                 vessel_tree.steps[i]['point'] = vessel_tree.steps[i]['point'] + vessel_tree.steps[i]['radius']*vessel_tree.steps[i]['tangent']
                 vessel_tree.steps[i]['chances'] += 1
 

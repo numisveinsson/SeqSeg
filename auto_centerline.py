@@ -185,7 +185,7 @@ if __name__=='__main__':
         global_dict['ct cent']  = []
         global_dict['mr cent']  = []
 
-    dir_output0    = 'output_new/'
+    dir_output0    = 'output_enlarged_bb/'
     dir_seg = True
     cropped_volume = False
     original = True # is this new vmr or old
@@ -217,7 +217,7 @@ if __name__=='__main__':
         testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
-        for test_case in testing_samples[0:]:
+        for test_case in testing_samples[5:]:
             print(test_case)
             # import pdb; pdb.set_trace()
             if json_file_present:
