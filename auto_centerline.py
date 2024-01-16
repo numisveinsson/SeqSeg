@@ -56,8 +56,9 @@ def create_directories(output_folder, write_samples):
         except Exception as e: print(e)
 
 
-def get_testing_samples(dataset, directory):
+def get_testing_samples(dataset):
 
+    directory = '/global/scratch/users/numi/vascular_data_3d/'
     if dataset == 'Dataset005_SEQAORTANDFEMOMR':
         testing_samples = [
 
@@ -95,13 +96,15 @@ def get_testing_samples(dataset, directory):
             # ['0081_0001',1,2000,220,'mr'], # Pulmonary MR
         ]
     elif dataset == 'Dataset009_SEQAORTASMICCT':
-
+        
+        directory = '/global/scratch/users/numi/test_data/miccai_aortas/'
         dir_json = directory + 'test.json'
         testing_samples = get_testing_samples_json(dir_json)
 
 
     elif dataset == 'Dataset010_SEQCOROASOCACT':
 
+        directory = '/global/scratch/users/numi/ASOCA_test/'
         dir_asoca_json = directory + 'test.json'
         testing_samples = get_testing_samples_json(dir_asoca_json)
 
@@ -148,7 +151,7 @@ def get_testing_samples(dataset, directory):
     #    ['0005_1001',0,300,320,'ct']  ,
     #    ['0005_1001',1,200,220,'ct']  ,
 
-    return testing_samples
+    return testing_samples, directory
 
 if __name__=='__main__':
     """# Set up"""
@@ -168,8 +171,8 @@ if __name__=='__main__':
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
             #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', False],
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
-            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
-             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
+             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
+            #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
             ]
 
     calc_restults = False
@@ -183,9 +186,6 @@ if __name__=='__main__':
         global_dict['mr cent']  = []
 
     dir_output0    = 'output_new/'
-    directory_data = '/global/scratch/users/numi/vascular_data_3d/'
-    directory_data = '/global/scratch/users/numi/ASOCA_test/'
-    directory_data = '/global/scratch/users/numi/test_data/miccai_aortas/'
     dir_seg = True
     cropped_volume = False
     original = True # is this new vmr or old
@@ -211,13 +211,14 @@ if __name__=='__main__':
         ## Weight directory
         dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test
 
-        testing_samples = get_testing_samples(dataset, directory_data)
-
+        testing_samples, directory_data = get_testing_samples(dataset)
+        print(f"Testing samples about to run: {testing_samples}")
         ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
         testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
-        for test_case in testing_samples:
+        for test_case in testing_samples[0:]:
+            print(test_case)
             # import pdb; pdb.set_trace()
             if json_file_present:
                 ## Information
@@ -297,6 +298,7 @@ if __name__=='__main__':
             sys.stdout = open(dir_output+"/out.txt", "w")
             print(test_case)
             print(f"Initial points: {potential_branches}")
+            print(f"Time is: {time.time()}")
 
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,

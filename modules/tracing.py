@@ -27,10 +27,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
     allowed_steps = 20 # usually 10
     prevent_retracing = True
-    volume_size_ratio = 5.5 # 5.5 for coronaries
+    volume_size_ratio = 5 # 5.5 for coronaries
     magnify_radius = 1 # usually 1
     number_chances = 2
-    min_radius = 0.4
+    min_radius = 0 # 0.4 for coronaries
     run_time = False
     use_buffer = True
     forceful_sidebranch = False
