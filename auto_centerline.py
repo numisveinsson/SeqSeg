@@ -191,7 +191,7 @@ if __name__=='__main__':
     original = True # is this new vmr or old
     masked = False
 
-    max_step_size  = 1000
+    max_step_size  = 2000
     write_samples  = True
     retrace_cent   = False
     take_time      = False

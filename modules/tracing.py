@@ -125,7 +125,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
             perc = 1
             mag = 1
-            while perc>0.33 and mag < 1.3:
+            while perc>0.33 and mag < 1.5:
                 if mag > 1:
                     print(f"Enlarging bounding box because percentage vessel > 0.33")
                 # Extract Volume
@@ -185,7 +185,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 pred_img = copy_settings(pred_img, cropped_volume)
                 
                 perc = predicted_vessel.mean()
-                mag = mag+0.2
+                mag = mag+0.1
                 print(f"Perc as 1: {perc:.3f}")
             
             prob_prediction = sitk.GetImageFromArray(prediction[1][1])
@@ -213,8 +213,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             #         write_vtk_polydata(surface_smooth, seg_fn)
 
             surface = evaluate_surface(predicted_vessel) # Marching cubes
-            if step_seg['radius'] > 0.7: num_iterations = 12
-            elif step_seg['radius'] > 0.5: 
+            if step_seg['radius'] > 1: num_iterations = 12
+            elif step_seg['radius'] > 0.5:
                 print("Small radius; less smoothing")
                 num_iterations = 6
             else: num_iterations = 0
@@ -331,8 +331,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 assembly_segs.add_segmentation(step_seg['prob_predicted_vessel'], step_seg['img_index'], step_seg['img_size'], step_seg['radius'])
                 step_seg['prob_predicted_vessel'] = None
 
-            # Print polydata surfaces,cents together for animation
-            if animation and write_samples:
+            # Print polydata surfaces,cents together for animation, only every 10 steps
+            if animation and write_samples and i % 10 == 0:
                 # print('Animation step added')
                 surfaces_animation.append(surface_smooth)
                 surface_accum = appendPolyData(surfaces_animation)

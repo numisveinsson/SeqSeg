@@ -852,7 +852,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
             print("ERROR: too few points for ip: " +str(ip))
             continue
 
-        id_along_cent = len(locs)*9//10
+        id_along_cent = len(locs) -1 #*9//10 used to not want to use last point for vector
         id_along_cent_save = len(locs)*3//4
 
         vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
@@ -875,9 +875,8 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
             #if not next((True for elem in points if np.array_equal(elem, locs[id_along_cent])), False):
             #print("Saving for ip: " +str(ip))
 
-            radius_to_save = max(rads[id_along_cent_save], 0.05) ##  have mininum size radius
-            if radius_to_save < 0.1 and old_radius > radius_to_save:
-                radius_to_save = (1/2*radius_to_save + 1/2*old_radius)*1.1 ## Have old radius carry into new
+            if radius_to_save < 1 and old_radius > radius_to_save:
+                radius_to_save = (1/2*radius_to_save + 1/2*old_radius) ## Have old radius carry into new
             if radius_to_save < min_radius:
                 print(f"Radius too small, saving mininum radius")
                 radius_to_save = min_radius
