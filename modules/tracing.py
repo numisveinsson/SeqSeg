@@ -29,8 +29,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
     prevent_retracing = True
     volume_size_ratio = 5 # 5.5 for coronaries
     magnify_radius = 1 # usually 1
-    number_chances = 3
-    min_radius = 0 # 0.4 for coronaries
+    number_chances = 2
+    min_radius = 0.4 # 0.4 for coronaries
     run_time = False
     use_buffer = True
     forceful_sidebranch = False
@@ -123,11 +123,19 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 pfn = output_folder + 'points/point_'+case+'_'+str(i)+'.vtp'
                 write_geo(pfn, polydata_point)
 
-            perc = 1
             mag = 1
-            while perc>0.33 and mag < 1.5:
-                if mag > 1:
+            perc = 1
+            continue_enlarge = True
+            max_mag = 1.3 # stops when reaches this
+            add_mag = 0.1
+            
+            while perc > 0.33 and continue_enlarge:
+                if mag > 1 and mag <= max_mag:
                     print(f"Enlarging bounding box because percentage vessel > 0.33")
+                if mag >= max_mag:
+                    print(f"Enlarging did not help, keeping original size")
+                    mag = 1
+                    continue_enlarge = False
                 # Extract Volume
                 size_extract, index_extract = map_to_image(  step_seg['point'],
                                                                 step_seg['radius']*mag,
@@ -185,9 +193,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 pred_img = copy_settings(pred_img, cropped_volume)
                 
                 perc = predicted_vessel.mean()
-                mag = mag+0.1
-                print(f"Perc as 1: {perc:.3f}")
-            
+                print(f"Perc as 1: {perc:.3f}, mag: {mag}")
+                mag += add_mag
+
             prob_prediction = sitk.GetImageFromArray(prediction[1][1])
             prob_prediction = copy_settings(prob_prediction, cropped_volume)
 
@@ -232,11 +240,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
 
-            sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'.vtp'
+            sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'smooth.vtp'
+            sfn_un = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp'
             cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'.vtp'
+            # cfn_un = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_unsmooth.vtp'
             if write_samples:
                 sitk.WriteImage(predicted_vessel, pd_fn)
                 write_vtk_polydata(surface_smooth, sfn)
+                write_vtk_polydata(surface, sfn_un)
             step_seg['seg_file'] = pd_fn
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
@@ -262,10 +273,15 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             # write_geo(pfn, polydata_point)
 
             # Centerline
-            centerline_poly = calc_centerline(   surface_smooth,
-                                                            "profileidlist",
-                                                            var_source=[source_id],
-                                                            number = i)
+            # centerline_poly_unsmooth = calc_centerline(  surface,
+            #                                     "profileidlist",
+            #                                     var_source=[source_id],
+            #                                     number = i)
+            centerline_poly = calc_centerline(  surface_smooth,
+                                                "profileidlist",
+                                                var_source=[source_id],
+                                                number = i)
+            # write_centerline(centerline_poly_unsmooth, cfn_un)
             write_centerline(centerline_poly, cfn)
 
             centerline_poly = resample_centerline(centerline_poly)
@@ -331,15 +347,20 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                 assembly_segs.add_segmentation(step_seg['prob_predicted_vessel'], step_seg['img_index'], step_seg['img_size'], step_seg['radius'])
                 step_seg['prob_predicted_vessel'] = None
 
-            # Print polydata surfaces,cents together for animation, only every 10 steps
-            if animation and write_samples and i % 10 == 0:
+            # Print polydata surfaces,cents together for animation
+            if animation and write_samples:
                 # print('Animation step added')
+                # Add to surface and cent lists
                 surfaces_animation.append(surface_smooth)
-                surface_accum = appendPolyData(surfaces_animation)
-                write_vtk_polydata(surface_accum, output_folder+'animation/animationsurf_'+str(i).zfill(3)+'.vtp')
                 cent_animation.append(centerline_poly)
-                cent_accum = appendPolyData(cent_animation)
-                write_vtk_polydata(cent_accum, output_folder+'animation/animationcent_'+str(i).zfill(3)+'.vtp')
+
+                if i % 10 == 0: # only write out every 10 steps
+                    # Create single polydata
+                    surface_accum = appendPolyData(surfaces_animation)
+                    cent_accum = appendPolyData(cent_animation)
+                    # Write out polydata
+                    write_vtk_polydata(surface_accum, output_folder+'animation/animationsurf_'+str(i).zfill(3)+'.vtp')
+                    write_vtk_polydata(cent_accum, output_folder+'animation/animationcent_'+str(i).zfill(3)+'.vtp')
 
             point_tree, radius_tree, angle_change = get_next_points( centerline_poly,
                                                                         step_seg['point'],

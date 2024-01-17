@@ -121,7 +121,7 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, pro
         index_extract: index for sitk volume extraction
         voi_min/max: boundaries of volume for caps constraint
     """
-    min_resolution_any_dim = 4
+    min_resolution_any_dim = 5
     min_res = 0
 
     while min_res < min_resolution_any_dim:

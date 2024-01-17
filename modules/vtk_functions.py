@@ -874,8 +874,10 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
 
             #if not next((True for elem in points if np.array_equal(elem, locs[id_along_cent])), False):
             #print("Saving for ip: " +str(ip))
+            
+            radius_to_save = rads[id_along_cent_save]
 
-            if radius_to_save < 1 and old_radius > radius_to_save:
+            if old_radius > radius_to_save:
                 radius_to_save = (1/2*radius_to_save + 1/2*old_radius) ## Have old radius carry into new
             if radius_to_save < min_radius:
                 print(f"Radius too small, saving mininum radius")
