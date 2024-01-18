@@ -8,7 +8,7 @@ from ast import literal_eval
 from modules import vtk_functions as vf
 from modules import sitk_functions as sf
 from modules.assembly import Segmentation
-from modules.vmr_data import vmr_directories
+from modules.datasets import vmr_directories
 from modules.evaluation import sensitivity_specificity, EvaluateTracing
 from prediction import Prediction, dice_score
 from model import UNet3DIsensee

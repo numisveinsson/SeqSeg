@@ -20,7 +20,7 @@ import SimpleITK as sitk
 from modules import sitk_functions as sf
 from modules import vtk_functions as vf
 from modules import vmtk_functions as vmtkfs
-from modules.vmr_data import vmr_directories
+from modules.datasets import vmr_directories
 from modules.assembly import Segmentation, VesselTreeParallel, Branch
 from prediction import Prediction
 from model import UNet3DIsensee
