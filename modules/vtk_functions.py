@@ -905,6 +905,118 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
 
     return arr_pt[sort_index], arr_rad[sort_index], arr_angl[sort_index]
 
+def convert_seg_to_surfs(seg, target_node_num=1000, bound=False, new_spacing=[1.,1.,1.]):
+    import SimpleITK as sitk
+
+    py_seg = sitk.GetArrayFromImage(seg)
+    # py_seg = eraseBoundary(py_seg, 1, 0)
+    labels = np.unique(py_seg)
+    for i, l in enumerate(labels):
+        py_seg[py_seg==l] = i
+    seg2 = sitk.GetImageFromArray(py_seg)
+    seg2.CopyInformation(seg)
+
+    seg_vtk,_ = exportSitk2VTK(seg2)
+
+    # choose new spacing based on resolution
+    # divide spacing if min dimension is less than 10 pixels
+    spacing = np.array(seg.GetSpacing())
+    dims = np.array(seg.GetSize())
+    if np.min(dims) < 10:
+        new_spacing = (spacing/3.).tolist()
+        seg_vtk = vtkImageResample(seg_vtk,new_spacing,'cubic')
+    
+    poly_l = []
+    for i, _ in enumerate(labels):
+        if i==0:
+            continue
+        p = vtk_marching_cube(seg_vtk, 0, i)
+        p = smooth_polydata(p, iteration=50)
+        rate = max(0., 1. - float(target_node_num)/float(p.GetNumberOfPoints()))
+        p = decimation(p, rate)
+        # p = smooth_polydata(p, iteration=50)
+        arr = np.ones(p.GetNumberOfPoints())*i
+        arr_vtk = n2v(arr)
+        arr_vtk.SetName('RegionId')
+        p.GetPointData().AddArray(arr_vtk)
+        poly_l.append(p)
+    poly = appendPolyData(poly_l)
+    if bound:
+        poly = bound_polydata_by_image(seg_vtk, poly, 1.5)
+    return poly
+
+def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=0.):
+    """
+    This function smooths a vtk polydata
+    Args:
+        poly: vtk polydata to smooth
+        boundary: boundary smooth bool
+    Returns:
+        smoothed: smoothed vtk polydata
+    """
+    smoother = vtk.vtkWindowedSincPolyDataFilter()
+    smoother.SetInputData(poly)
+    smoother.SetPassBand(pow(10., -4. * smoothingFactor))
+    smoother.SetBoundarySmoothing(boundary)
+    smoother.SetFeatureEdgeSmoothing(feature)
+    smoother.SetNumberOfIterations(iteration)
+    smoother.NonManifoldSmoothingOn()
+    smoother.NormalizeCoordinatesOn()
+    smoother.Update()
+
+
+    smoothed = smoother.GetOutput()
+
+
+    return smoothed
+
+def decimation(poly, rate):
+    """
+    Simplifies a VTK PolyData
+    Args:
+        poly: vtk PolyData
+        rate: target rate reduction
+    """
+    decimate = vtk.vtkQuadricDecimation()
+    decimate.SetInputData(poly)
+    decimate.AttributeErrorMetricOn()
+    decimate.ScalarsAttributeOn()
+    decimate.SetTargetReduction(rate)
+    decimate.VolumePreservationOff()
+    decimate.Update()
+    output = decimate.GetOutput()
+    #output = cleanPolyData(output, 0.)
+    return output
+
+def vtkImageResample(image, spacing, opt):
+    """
+    Resamples the vtk image to the given dimenstion
+    Args:
+        image: vtk Image data
+        spacing: image new spacing
+        opt: interpolation option: linear, NN, cubic
+    Returns:
+        image: resampled vtk image data
+    """
+    reslicer = vtk.vtkImageReslice()
+    reslicer.SetInputData(image)
+    if opt=='linear':
+        reslicer.SetInterpolationModeToLinear()
+    elif opt=='NN':
+        reslicer.SetInterpolationModeToNearestNeighbor()
+    elif opt=='cubic':
+        reslicer.SetInterpolationModeToCubic()
+    else:
+        raise ValueError("interpolation option not recognized")
+
+    #size = np.array(image.GetSpacing())*np.array(image.GetDimensions())
+    #new_spacing = size/np.array(dims)
+
+    reslicer.SetOutputSpacing(*spacing)
+    reslicer.Update()
+
+    return reslicer.GetOutput()
+
 def evaluate_surface(ref_im, value = 1):
 
     ref_im, M = exportSitk2VTK(ref_im)

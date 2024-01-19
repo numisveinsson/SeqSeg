@@ -222,7 +222,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             #     if write_samples:
             #         write_vtk_polydata(surface_smooth, seg_fn)
 
-            surface = evaluate_surface(predicted_vessel) # Marching cubes
+            # surface = evaluate_surface(predicted_vessel) # Marching cubes
+            surface = convert_seg_to_surfs(predicted_vessel)
+
             if step_seg['radius'] > 1: num_iterations = 12
             elif step_seg['radius'] > 0.5:
                 print("Small radius; less smoothing")
