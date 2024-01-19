@@ -27,7 +27,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
     allowed_steps = 20 # usually 10
     prevent_retracing = True
-    volume_size_ratio = 5 # 5.5 for coronaries
+    volume_size_ratio = 5.5 # 5.5 for coronaries
     magnify_radius = 1 # usually 1
     number_chances = 2
     min_radius = 0.4 # 0.4 for coronaries
@@ -127,7 +127,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             perc = 1
             continue_enlarge = True
             max_mag = 1.3 # stops when reaches this
-            add_mag = 0.1
+            add_mag = 0.2
+            
+            if step_seg['radius'] > 3: mag = max_mag
             
             while perc > 0.33 and continue_enlarge:
                 if mag > 1 and mag <= max_mag:

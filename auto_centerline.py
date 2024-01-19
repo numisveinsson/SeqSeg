@@ -11,6 +11,7 @@ from datetime import datetime
 
 import os
 import sys
+sys.stdout.flush()
 import pickle
 import argparse
 import numpy as np
@@ -171,8 +172,8 @@ if __name__=='__main__':
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
             #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', False],
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
-             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
-            #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
+            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
+             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
             ]
 
     calc_restults = False
@@ -185,15 +186,17 @@ if __name__=='__main__':
         global_dict['ct cent']  = []
         global_dict['mr cent']  = []
 
-    dir_output0    = 'output_enlarged_bb/'
-    # dir_output0    = 'output_min_resolution/'
-    # dir_output0    = 'output_min_resolution5/'
+    # dir_output0 = 'output_enlarged_bb/'
+    #dir_output0 = 'output_min_resolution/'
+    #dir_output0 = 'output_min_resolution5/'
+    dir_output0 = 'output_new/'
+
     dir_seg = True
     cropped_volume = False
     original = True # is this new vmr or old
     masked = False
 
-    max_step_size  = 2000
+    max_step_size  = 1000
     write_samples  = True
     retrace_cent   = False
     take_time      = False
@@ -219,7 +222,7 @@ if __name__=='__main__':
         testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
-        for test_case in testing_samples:
+        for test_case in testing_samples[19:]:
             print(test_case)
             # import pdb; pdb.set_trace()
             if json_file_present:
@@ -243,8 +246,8 @@ if __name__=='__main__':
 
                 if not test_case['seeds']:
                     print(f"No seed given, trying to get one from centerline ground truth")
-                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 100)
-                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 110)
+                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 150)
+                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 160)
                     init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
                     print(f"Seed found from centerline, took first point!")
                     print(f"Old seed: {old_seed}, {old_radius}")
