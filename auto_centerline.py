@@ -222,7 +222,7 @@ if __name__=='__main__':
         testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
-        for test_case in testing_samples[19:]:
+        for test_case in testing_samples[9:10]:
             print(test_case)
             # import pdb; pdb.set_trace()
             if json_file_present:

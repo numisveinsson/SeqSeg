@@ -905,7 +905,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
 
     return arr_pt[sort_index], arr_rad[sort_index], arr_angl[sort_index]
 
-def convert_seg_to_surfs(seg, target_node_num=1000, bound=False, new_spacing=[1.,1.,1.]):
+def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,1.,1.]):
     import SimpleITK as sitk
 
     py_seg = sitk.GetArrayFromImage(seg)
@@ -931,10 +931,10 @@ def convert_seg_to_surfs(seg, target_node_num=1000, bound=False, new_spacing=[1.
         if i==0:
             continue
         p = vtk_marching_cube(seg_vtk, 0, i)
-        p = smooth_polydata(p, iteration=50)
+        p = smooth_polydata(p, iteration=20)
         rate = max(0., 1. - float(target_node_num)/float(p.GetNumberOfPoints()))
         p = decimation(p, rate)
-        # p = smooth_polydata(p, iteration=50)
+        p = smooth_polydata(p, iteration=20)
         arr = np.ones(p.GetNumberOfPoints())*i
         arr_vtk = n2v(arr)
         arr_vtk.SetName('RegionId')
@@ -945,7 +945,7 @@ def convert_seg_to_surfs(seg, target_node_num=1000, bound=False, new_spacing=[1.
         poly = bound_polydata_by_image(seg_vtk, poly, 1.5)
     return poly
 
-def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=0.):
+def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=.01):
     """
     This function smooths a vtk polydata
     Args:
