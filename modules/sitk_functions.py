@@ -74,18 +74,6 @@ def remove_other_vessels(image, seed):
 
     return labelImage
 
-def process_prediction(prediction, radius):
-    """
-    Process prediction to check min thickness of vessel
-    Args:
-        SITK image, radius of vessel
-    Returns:
-        SITK image
-    """
-    # check if vessel is too thin
-    
-
-
 def connected_comp_info(original_seg, print_condition):
     """
     Print info on the component being kept
