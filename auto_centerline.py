@@ -222,9 +222,10 @@ if __name__=='__main__':
         testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
+        
         for test_case in testing_samples[9:10]:
             print(test_case)
-            # import pdb; pdb.set_trace()
+            initial_seeds = []
             if json_file_present:
                 ## Information
                 modality = modality_model
@@ -238,38 +239,27 @@ if __name__=='__main__':
 
                 ## Seed points
                 potential_branches = []
-                for seed in test_case['seeds']:
-                    step  = create_step_dict(np.array(seed[0]), seed[2], np.array(seed[1]), seed[2], 0)
-                    potential_branches.append(step)
-                    if write_samples:
-                        vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_seed_point.vtp', vf.points2polydata([seed[0]]))
 
                 if not test_case['seeds']:
                     print(f"No seed given, trying to get one from centerline ground truth")
                     old_seed, old_radius = vf.get_seed(dir_cent, 0, 150)
                     initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 160)
                     init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
-                    print(f"Seed found from centerline, took first point!")
+                    print(f"Seed found from centerline, took point nr {160}!")
                     print(f"Old seed: {old_seed}, {old_radius}")
                     print(f"Initial seed: {initial_seed}, {initial_radius} ")
+                    initial_seeds.append(initial_seed)
                     potential_branches = [init_step]
                     if write_samples:
                         vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
                 else:
-                    initial_seed = np.array(seed[1])
-                print(test_case)
+                    for seed in test_case['seeds']:
+                        step  = create_step_dict(np.array(seed[0]), seed[2], np.array(seed[1]), seed[2], 0)
+                        potential_branches.append(step)
+                        initial_seeds.append(np.array(seed[1]))
+                        if write_samples:
+                            vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_seed_point.vtp', vf.points2polydata([seed[0]]))
 
-                # dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
-                # dir_seg = None
-                # dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
-                ## Get inital seed point + radius
-                # old_seed, old_radius = vf.get_seed(dir_cent, i, id_old)
-                # print(old_seed)
-                # initial_seed, initial_radius = vf.get_seed(dir_cent, i, id_current)
-                # if write_samples:
-                #     vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
-                # init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
-                
             else:
                 ## Information
                 case = test_case[0]
@@ -294,6 +284,7 @@ if __name__=='__main__':
                 old_seed, old_radius = vf.get_seed(dir_cent, i, id_old)
                 print(old_seed)
                 initial_seed, initial_radius = vf.get_seed(dir_cent, i, id_current)
+                initial_seeds.append(initial_seed)
                 if write_samples:
                     vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
                 init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
@@ -346,8 +337,7 @@ if __name__=='__main__':
             assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
             sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_'+ test +'_'+str(i)+'.mha')
             
-            seed = assembly.TransformPhysicalPointToIndex(initial_seed.tolist())
-            assembly_binary     = sf.remove_other_vessels(assembly_binary, seed)
+            assembly_binary = sf.remove_other_vessels(assembly_binary, initial_seeds)
             sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_rem_' + test +'_'+str(i)+'.mha')
 
             assembly_surface    = vf.evaluate_surface(assembly_binary, 1)

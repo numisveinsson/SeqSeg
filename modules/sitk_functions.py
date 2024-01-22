@@ -57,6 +57,7 @@ def remove_other_vessels(image, seed):
     Remove all labelled vessels except the one of interest
     Args:
         SITK image, seed point pointing to point in vessel of interest
+        seed(s): location of seed; either list (single point) or list of lists (multiple points)
     Returns:
         binary image file (either 0 or 1)
     """
