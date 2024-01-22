@@ -52,6 +52,23 @@ def write_image(image, outputImageFileName):
     writer.Execute(image)
     return file_reader
 
+def keep_component_seeds(image, seeds):
+    """
+    Keep only the component containing the seed point
+    Args:
+        SITK image, seed point pointing to point in vessel of interest
+        seed(s): location of seeds; list of np arrays (one or multiple points)
+    """
+    # create list of list of index values for each seed
+    index_seeds = []
+    for i in range(len(seeds)):
+        index_seeds.append(image.TransformPhysicalPointToIndex(seeds[i]))
+
+    # create a new image with only the labels of interest
+    labelImage = remove_other_vessels(image, index_seeds)
+
+    return labelImage
+
 def remove_other_vessels(image, seed):
     """
     Remove all labelled vessels except the one of interest
@@ -63,14 +80,25 @@ def remove_other_vessels(image, seed):
     """
 
     labels, means = connected_comp_info(image, False)
-
     ccimage = sitk.ConnectedComponent(image)
-    label = ccimage[seed]
-    #print("The label we use is: " + str(label))
 
-    if label == 0:
-        label = 1
-    labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=label, upperThreshold=label)
+    if type(seed[0]) == list:
+        labels_seeds = []
+        for i in range(len(seed)):
+            labels_seeds.append(ccimage[seed[i]])
+        # create a new image with only the labels of interest
+        labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=labels_seeds[0], upperThreshold=labels_seeds[0])
+        for i in range(1, len(labels_seeds)):
+            labelImage = labelImage + sitk.BinaryThreshold(ccimage, lowerThreshold=labels_seeds[i], upperThreshold=labels_seeds[i])
+
+
+    else:
+        label = ccimage[seed]
+        #print("The label we use is: " + str(label))
+
+        if label == 0:
+            label = 1
+        labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=label, upperThreshold=label)
 
     return labelImage
 

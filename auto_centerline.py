@@ -258,7 +258,7 @@ if __name__=='__main__':
                         potential_branches.append(step)
                         initial_seeds.append(np.array(seed[1]))
                         if write_samples:
-                            vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_seed_point.vtp', vf.points2polydata([seed[0]]))
+                            vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_oldseed_point.vtp', vf.points2polydata([seed[0]]))
 
             else:
                 ## Information
@@ -337,7 +337,7 @@ if __name__=='__main__':
             assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
             sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_'+ test +'_'+str(i)+'.mha')
             
-            assembly_binary = sf.remove_other_vessels(assembly_binary, initial_seeds)
+            assembly_binary = sf.keep_component_seeds(assembly_binary, initial_seeds)
             sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_rem_' + test +'_'+str(i)+'.mha')
 
             assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
