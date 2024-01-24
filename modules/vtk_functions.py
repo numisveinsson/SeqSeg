@@ -906,6 +906,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
     return arr_pt[sort_index], arr_rad[sort_index], arr_angl[sort_index]
 
 def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,1.,1.]):
+    
     import SimpleITK as sitk
 
     py_seg = sitk.GetArrayFromImage(seg)
@@ -1117,3 +1118,67 @@ def orient_caps(caps, old_point):
     #write_geo(pfn, polydata_point)
 
     return [sourcee, target], source_id
+
+def process_cardiac_mesh(mesh_file):
+
+    mesh = read_geo(mesh_file).GetOutput()
+
+    if mesh.GetPointData().GetNormals() is None:
+        # calculate normals
+        normals = vtk.vtkPolyDataNormals()
+        normals.SetInputData(mesh)
+        normals.ComputePointNormalsOn()
+        normals.ComputeCellNormalsOff()
+        normals.Update()
+        mesh = normals.GetOutput()
+
+    mesh_data = collect_arrays(mesh.GetPointData())
+    point_loc = v2n(mesh.GetPoints().GetData()) # point locations as numpy array
+    region_id = mesh_data['RegionId']  # Region ID as numpy array
+    # get ids of points in region 8
+    region_8 = np.where(region_id == 8)[0]
+    region_3 = np.where(region_id == 3)[0]
+    # get coordinates of points in region 8 and 3
+    region_8_coords = point_loc[region_8, :]
+    region_3_coords = point_loc[region_3, :]
+    # calculate the center of mass of region 8
+    region_8_center = np.mean(region_8_coords, axis=0)
+    region_3_center = np.mean(region_3_coords, axis=0)
+    # calculate the normal vector of region 8
+    region_8_normal = np.mean(mesh_data['Normals'][region_8, :], axis=0)
+    # check if the normal vector is pointing towards the center of mass of region 3
+    if np.dot(region_8_normal, region_3_center - region_8_center) > 0:
+        region_8_normal = -region_8_normal
+
+    return region_8_center, region_8_normal, region_3_center
+
+def write_normals_centers(mesh_dir, region_8_center, region_8_normal, region_3_center):
+
+    # write the normal vector as vtk starting from the center of mass of region 8
+    # to the center of mass of region 3
+    # create a vtkPolyData object
+    line = vtk.vtkPolyData()
+    # create a vtkPoints object and add the points to it
+    points = vtk.vtkPoints()
+    points.InsertNextPoint(region_8_center)
+    points.InsertNextPoint(region_8_center + 3*region_8_normal)
+    points.InsertNextPoint(region_3_center)
+    # add the points to the vtkPolyData object
+    line.SetPoints(points)
+    # create a vtkCellArray object and add the cells to it
+    cells = vtk.vtkCellArray()
+    cells.InsertNextCell(2)
+    cells.InsertCellPoint(0)
+    cells.InsertCellPoint(1)
+    cells.InsertNextCell(2)
+    cells.InsertCellPoint(1)
+    cells.InsertCellPoint(2)
+    # add the cells to the vtkPolyData object
+    line.SetLines(cells)
+    # write the vtkPolyData object to file
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetFileName(os.path.join(mesh_dir, 'normal.vtp'))
+    writer.SetInputData(line)
+    writer.Write()
+
+    

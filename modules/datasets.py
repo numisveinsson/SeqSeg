@@ -73,3 +73,16 @@ def get_testing_samples_json(dir_json):
         data = json.load(f)
 
     return data
+
+def get_testing_samples_cardiac_meshes(mesh_dir):
+    """
+    Get testing samples from cardiac meshes
+    """
+    import os
+    from vtk_functions import process_cardiac_mesh, write_normals_centers
+
+    list_meshes = os.listdir(mesh_dir)
+    
+    region_8_center, region_8_normal, region_3_center = process_cardiac_mesh(os.path.join(mesh_dir, list_meshes[0]))
+
+    write_normals_centers(mesh_dir, region_8_center, region_8_normal, region_3_center)
