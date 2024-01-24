@@ -189,14 +189,14 @@ if __name__=='__main__':
     # dir_output0 = 'output_enlarged_bb/'
     #dir_output0 = 'output_min_resolution/'
     #dir_output0 = 'output_min_resolution5/'
-    dir_output0 = 'output_new/'
+    dir_output0 = 'output_2000_steps/'
 
     dir_seg = True
     cropped_volume = False
     original = True # is this new vmr or old
     masked = False
 
-    max_step_size  = 1000
+    max_step_size  = 2000
     write_samples  = True
     retrace_cent   = False
     take_time      = False
@@ -223,7 +223,7 @@ if __name__=='__main__':
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
         
-        for test_case in testing_samples[9:10]:
+        for test_case in testing_samples:
             print(test_case)
             initial_seeds = []
             if json_file_present:

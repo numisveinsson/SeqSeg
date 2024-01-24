@@ -62,7 +62,8 @@ def keep_component_seeds(image, seeds):
     # create list of list of index values for each seed
     index_seeds = []
     for i in range(len(seeds)):
-        index_seeds.append(image.TransformPhysicalPointToIndex(seeds[i]))
+        index_seeds.append(image.TransformPhysicalPointToIndex(seeds[i].tolist()))
+    print(f"Index of seeds: {index_seeds}")
 
     # create a new image with only the labels of interest
     labelImage = remove_other_vessels(image, index_seeds)
@@ -82,7 +83,9 @@ def remove_other_vessels(image, seed):
     labels, means = connected_comp_info(image, False)
     ccimage = sitk.ConnectedComponent(image)
 
-    if type(seed[0]) == list:
+    # print(f"Seeds to remove around: {seed}")
+
+    if type(seed[0]) == tuple:
         labels_seeds = []
         for i in range(len(seed)):
             labels_seeds.append(ccimage[seed[i]])
@@ -90,8 +93,6 @@ def remove_other_vessels(image, seed):
         labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=labels_seeds[0], upperThreshold=labels_seeds[0])
         for i in range(1, len(labels_seeds)):
             labelImage = labelImage + sitk.BinaryThreshold(ccimage, lowerThreshold=labels_seeds[i], upperThreshold=labels_seeds[i])
-
-
     else:
         label = ccimage[seed]
         #print("The label we use is: " + str(label))
