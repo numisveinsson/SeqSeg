@@ -1,4 +1,4 @@
-import vtk_functions as vf
+import .vtk_functions as vf
 from assembly import create_step_dict
 
 def process_init(test_case, directory_data, dir_output0, img_format, modality_model, cropped_volume, original, json_file_present, test):
