@@ -19,7 +19,8 @@ import SimpleITK as sitk
 
 from modules import sitk_functions as sf
 from modules import vtk_functions as vf
-from modules import vmtk_functions as vmtkfs
+# from modules import vmtk_functions as vmtkfs
+from modules import initialization as init
 from modules.tracing import trace_centerline
 from modules.datasets import vmr_directories, get_directories, get_testing_samples_json
 from modules.assembly import create_step_dict
@@ -211,85 +212,36 @@ if __name__=='__main__':
         modality_model = test[3]
         json_file_present = test[4]
         img_format = test[5]
-        test = test[0]
+        test_name = test[0]
 
         ## Weight directory
-        dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test
+        dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
 
         testing_samples, directory_data = get_testing_samples(dataset)
         print(f"Testing samples about to run: {testing_samples}")
         ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
-        testing_samples_done = []
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
         
         for test_case in testing_samples:
+
             print(test_case)
-            initial_seeds = []
-            if json_file_present:
-                ## Information
-                modality = modality_model
-                i = 0
-                case = test_case['name']
-                dir_image, dir_seg, dir_cent, dir_surf = get_directories(directory_data, case, img_format, dir_seg =False)
-                dir_seg = None
-                dir_output = dir_output0 +test+'_'+case+'/'
-                ## Create directories for results
-                create_directories(dir_output, write_samples)
 
-                ## Seed points
-                potential_branches = []
+            dir_output, dir_image, dir_seg, dir_cent, modality, case, i = init.process_init(test_case, 
+                                                                                            directory_data, 
+                                                                                            dir_output0, 
+                                                                                            img_format, 
+                                                                                            modality_model, 
+                                                                                            cropped_volume, 
+                                                                                            original, 
+                                                                                            json_file_present, 
+                                                                                            test_name)
 
-                if not test_case['seeds']:
-                    print(f"No seed given, trying to get one from centerline ground truth")
-                    old_seed, old_radius = vf.get_seed(dir_cent, 0, 150)
-                    initial_seed, initial_radius = vf.get_seed(dir_cent, 0, 160)
-                    init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
-                    print(f"Seed found from centerline, took point nr {160}!")
-                    print(f"Old seed: {old_seed}, {old_radius}")
-                    print(f"Initial seed: {initial_seed}, {initial_radius} ")
-                    initial_seeds.append(initial_seed)
-                    potential_branches = [init_step]
-                    if write_samples:
-                        vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
-                else:
-                    for seed in test_case['seeds']:
-                        step  = create_step_dict(np.array(seed[0]), seed[2], np.array(seed[1]), seed[2], 0)
-                        potential_branches.append(step)
-                        initial_seeds.append(np.array(seed[1]))
-                        if write_samples:
-                            vf.write_geo(dir_output+ 'points/'+str(test_case['seeds'].index(seed))+'_oldseed_point.vtp', vf.points2polydata([seed[0]]))
+            ## Create directories for results
+            create_directories(dir_output, write_samples)
 
-            else:
-                ## Information
-                case = test_case[0]
-                i = test_case[1]
-                id_old = test_case[2]
-                id_current = test_case[3]
-                modality = test_case[4]
-
-                if modality != modality_model: 
-                    print(f"Modality doesnt match model and case: {modality},{modality_model} ")
-                    continue
-                else: testing_samples_done.append(test_case)
-                print(test_case)
-
-                dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume, original)
-                dir_seg = None
-                dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
-                ## Create directories for results
-                create_directories(dir_output, write_samples)
-
-                ## Get inital seed point + radius
-                old_seed, old_radius = vf.get_seed(dir_cent, i, id_old)
-                print(old_seed)
-                initial_seed, initial_radius = vf.get_seed(dir_cent, i, id_current)
-                initial_seeds.append(initial_seed)
-                if write_samples:
-                    vf.write_geo(dir_output+ 'points/0_seed_point.vtp', vf.points2polydata([old_seed.tolist()]))
-                init_step = create_step_dict(old_seed, old_radius, initial_seed, initial_radius, 0)
-                potential_branches = [init_step]
-
+            potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, write_samples)
+            
             # print to .txt file all outputs
             sys.stdout = open(dir_output+"/out.txt", "w")
             print(test_case)
@@ -329,36 +281,36 @@ if __name__=='__main__':
             assembly_org = assembly_obj.assembly
             #assembly_ups = assembly_obj.upsample_sitk()
             print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
-            #sitk.WriteImage(assembly_org, dir_output+'/'+case+'_assembly_' + test +'_'+str(i)+'.mha')
+            #sitk.WriteImage(assembly_org, dir_output+'/'+case+'_assembly_' + test_name +'_'+str(i)+'.mha')
 
             assembly = assembly_org
             name = 'original'
             #for assembly,name in zip([assembly_ups, assembly_org],['upsampled', 'original']):
             assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)
-            sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_'+ test +'_'+str(i)+'.mha')
+            sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_'+ test_name +'_'+str(i)+'.mha')
             
             assembly_binary = sf.keep_component_seeds(assembly_binary, initial_seeds)
-            sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_rem_' + test +'_'+str(i)+'.mha')
+            sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_rem_' + test_name +'_'+str(i)+'.mha')
 
             assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
-            vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_'+'_surface.vtp')
+            vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_'+'_surface.vtp')
             for level in [10,40]:#range(10,50,10):
                 surface_smooth      = vf.smooth_surface(assembly_surface, level)
-                vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_'+str(level)+'_surface_smooth.vtp')
+                vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_'+str(level)+'_surface_smooth.vtp')
                 #path = vmtkfs.calc_centerline(   surface_smooth, "pointlist", var_source=in_source, var_target=in_target)
-                #vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_'+str(level)+'_centerline_smooth.vtp')
+                #vf.write_vtk_polydata(path, dir_output+'/final_assembly'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_'+str(level)+'_centerline_smooth.vtp')
 
 
             #path1 = vmtkfs.calc_centerline(surface_smooth, "profileidlist", number = 0)
-            #vf.write_vtk_polydata(path1, dir_output+'/final_assembly'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_centerline_smooth1.vtp')
+            #vf.write_vtk_polydata(path1, dir_output+'/final_assembly'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_centerline_smooth1.vtp')
 
 
             final_surface = vf.appendPolyData(surfaces)
             final_centerline = vf.appendPolyData(centerlines)
             final_points = vf.appendPolyData(points)
-            vf.write_vtk_polydata(final_surface,    dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_surfaces.vtp')
-            vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_centerlines.vtp')
-            vf.write_vtk_polydata(final_points,     dir_output+'/final_'+case+'_'+test +'_'+str(i)+'_'+str(n_steps_taken)+'_points.vtp')
+            vf.write_vtk_polydata(final_surface,    dir_output+'/final_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_surfaces.vtp')
+            vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_centerlines.vtp')
+            vf.write_vtk_polydata(final_points,     dir_output+'/final_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_points.vtp')
 
             #print('Number of outlets: ' + str(len(final_caps[1])))
 
