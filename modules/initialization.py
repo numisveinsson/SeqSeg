@@ -2,7 +2,7 @@ from .vtk_functions import *
 from .assembly import create_step_dict
 from .datasets import get_directories, vmr_directories
 
-def process_init(test_case, directory_data, dir_output0, img_format, modality_model, cropped_volume, json_file_present, test):
+def process_init(test_case, directory_data, dir_output0, img_format, modality_model, json_file_present, test):
     if json_file_present:
         ## Information
         modality = modality_model
@@ -22,7 +22,7 @@ def process_init(test_case, directory_data, dir_output0, img_format, modality_mo
             print(f"Modality doesnt match model and case: {modality},{modality_model} ")
         print(test_case)
 
-        dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg, cropped_volume)
+        dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg)
         dir_seg = None
         dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
 

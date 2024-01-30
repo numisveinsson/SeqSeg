@@ -1,4 +1,4 @@
-def vmr_directories(directory, model, dir_seg_exist, cropped, global_scale=None):
+def vmr_directories(directory, model, dir_seg_exist, global_scale=None):
     """
     Function to return the directories of
         Image Volume
@@ -11,9 +11,6 @@ def vmr_directories(directory, model, dir_seg_exist, cropped, global_scale=None)
 
     dir_image = directory +'images/'+model+'.mha'
     dir_seg = directory +'truths/'+model+'.mha'
-
-    if cropped:
-        print('Images not found, check again')
     
     # if global_scale:
     #     dir_image = directory +'scaled_images/'+model.replace('_aorta','')+'.vtk'

@@ -195,7 +195,6 @@ if __name__=='__main__':
     dir_output0 = 'output_2000_steps/'
 
     dir_seg = True
-    cropped_volume = False
     masked = False
 
     max_step_size  = 2000
@@ -232,8 +231,7 @@ if __name__=='__main__':
                                                                                             directory_data, 
                                                                                             dir_output0, 
                                                                                             img_format, 
-                                                                                            modality_model, 
-                                                                                            cropped_volume,
+                                                                                            modality_model,
                                                                                             json_file_present, 
                                                                                             test_name)
 
