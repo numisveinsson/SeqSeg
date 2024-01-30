@@ -1,4 +1,4 @@
-def vmr_directories(directory, model, dir_seg_exist, cropped, original, global_scale=None):
+def vmr_directories(directory, model, dir_seg_exist, cropped, global_scale=None):
     """
     Function to return the directories of
         Image Volume
@@ -8,12 +8,9 @@ def vmr_directories(directory, model, dir_seg_exist, cropped, original, global_s
     for a specific model in the
     Vascular Model Repository
     """
-    if original:
-        dir_image = directory +'images/OSMSC' + model[0:4]+'/OSMSC'+model[0:4]+'-cm.mha'
-        dir_seg = directory + 'images/OSMSC'+model[0:4]+'/'+model+'/'+model+'-cm.mha'
-    else:
-        dir_image = directory +'images/'+model+'.mha'
-        dir_seg = directory +'truths/'+model+'.mha'
+
+    dir_image = directory +'images/'+model+'.mha'
+    dir_seg = directory +'truths/'+model+'.mha'
 
     if cropped:
         print('Images not found, check again')
@@ -73,16 +70,3 @@ def get_testing_samples_json(dir_json):
         data = json.load(f)
 
     return data
-
-def get_testing_samples_cardiac_meshes(mesh_dir):
-    """
-    Get testing samples from cardiac meshes
-    """
-    import os
-    from vtk_functions import process_cardiac_mesh, write_normals_centers
-
-    list_meshes = os.listdir(mesh_dir)
-    
-    region_8_center, region_8_normal, region_3_center = process_cardiac_mesh(os.path.join(mesh_dir, list_meshes[0]))
-
-    write_normals_centers(mesh_dir, region_8_center, region_8_normal, region_3_center)

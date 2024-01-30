@@ -22,7 +22,7 @@ from modules import vtk_functions as vf
 # from modules import vmtk_functions as vmtkfs
 from modules import initialization as init
 from modules.tracing import trace_centerline
-from modules.datasets import vmr_directories, get_directories, get_testing_samples_json
+from modules.datasets import get_testing_samples_json
 from modules.assembly import create_step_dict
 from modules.evaluation import EvaluateTracing
 
@@ -75,17 +75,21 @@ def get_testing_samples(dataset):
         ]
 
     elif dataset == 'Dataset006_SEQAORTANDFEMOCT':
-        testing_samples = [
+        directory = '/global/scratch/users/numi/vascular_data_3d/'
+        dir_json = directory + 'test.json'
+        testing_samples = get_testing_samples_json(dir_json)
+        
+        # [
 
             # ['0176_0000',0,10,20,'ct'], # Aorta CT
             # ['0174_0000',0,10,20,'ct'], # Aorta CT
             # ['0139_1001',0,10,20,'ct'], # Aortofemoral CT
-            ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
+            # ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
             # ['0146_1001',0,0,10,'ct'], # Aortofemoral CT
             # ['0188_0001_aorta',5,-10,-20,'ct'], # Aorta CT
             # ['O150323_2009_aorta',0,10,20,'ct'], # Aorta CT
             # ['O344211000_2006_aorta',0,10,20,'ct'], # Aorta CT
-        ]
+        # ]
     
     elif dataset == 'Dataset007_SEQPULMONARYMR':
         testing_samples = [
@@ -171,7 +175,7 @@ if __name__=='__main__':
     tests = [
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0,'ct'],
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
-            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', False],
+            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.nii.gz'],
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
             #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
              ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
@@ -187,14 +191,11 @@ if __name__=='__main__':
         global_dict['ct cent']  = []
         global_dict['mr cent']  = []
 
-    # dir_output0 = 'output_enlarged_bb/'
-    #dir_output0 = 'output_min_resolution/'
-    #dir_output0 = 'output_min_resolution5/'
+    # dir_output0 = 'output_cardiac_2000_steps/'
     dir_output0 = 'output_2000_steps/'
 
     dir_seg = True
     cropped_volume = False
-    original = True # is this new vmr or old
     masked = False
 
     max_step_size  = 2000
@@ -223,7 +224,7 @@ if __name__=='__main__':
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
         
-        for test_case in testing_samples[5:]:
+        for test_case in testing_samples[18:]:
 
             print(test_case)
 
@@ -232,15 +233,14 @@ if __name__=='__main__':
                                                                                             dir_output0, 
                                                                                             img_format, 
                                                                                             modality_model, 
-                                                                                            cropped_volume, 
-                                                                                            original, 
+                                                                                            cropped_volume,
                                                                                             json_file_present, 
                                                                                             test_name)
 
             ## Create directories for results
             create_directories(dir_output, write_samples)
 
-            potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, write_samples)
+            potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, write_samples)
             
             # print to .txt file all outputs
             sys.stdout = open(dir_output+"/out.txt", "w")

@@ -932,10 +932,10 @@ def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,
         if i==0:
             continue
         p = vtk_marching_cube(seg_vtk, 0, i)
-        p = smooth_polydata(p, iteration=20)
+        p = smooth_polydata(p, iteration=10)
         rate = max(0., 1. - float(target_node_num)/float(p.GetNumberOfPoints()))
         p = decimation(p, rate)
-        p = smooth_polydata(p, iteration=20)
+        # p = smooth_polydata(p, iteration=20)
         arr = np.ones(p.GetNumberOfPoints())*i
         arr_vtk = n2v(arr)
         arr_vtk.SetName('RegionId')
