@@ -175,10 +175,10 @@ if __name__=='__main__':
     tests = [
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0,'ct'],
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
-            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.nii.gz'],
+             ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.nii.gz'],
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
             #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
-             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
+            #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
             ]
 
     calc_restults = False
@@ -191,8 +191,8 @@ if __name__=='__main__':
         global_dict['ct cent']  = []
         global_dict['mr cent']  = []
 
-    # dir_output0 = 'output_cardiac_2000_steps/'
-    dir_output0 = 'output_2000_steps/'
+    dir_output0 = 'output_cardiac_2000_steps/'
+    # dir_output0 = 'output_2000_steps/'
 
     dir_seg = True
     masked = False
