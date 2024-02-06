@@ -1,2 +1,11 @@
 DATA_DIR: '/global/scratch/users/numi/vascular_data_3d/' # '/Users/numisveins/Documents/ASOCA_dataset/', MICCAI_AVT_Data
 OUT_DIR: 'output_miccai_1000/'
+
+MAX_STEPS: 1000
+
+WRITE_STEPS: True # if we want to write out each step
+
+WEIGHTED_ASSEMBLY: True # if assembly should be weighted
+GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
+RETRACE: False # retrace strategry
+TIME_ANALYSIS: False # if we want to write out how long each step takes

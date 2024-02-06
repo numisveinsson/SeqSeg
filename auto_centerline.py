@@ -179,25 +179,25 @@ if __name__=='__main__':
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all', False],
             #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all', True, '.vtk', 'mm'], # mm here means scaling (model is cm but data is mm)
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all', False],
-             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all', True, '.nrrd', 'cm'], # cm here means no scaling (model and data are both mm)
-            #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all', True, '.nrrd'],
+            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all', True, '.nrrd', 'cm'], # cm here means no scaling (model and data are both mm)
+             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all', True, '.nrrd', 'cm'],
             ]
 
     global_config = load_yaml("./config/global.yaml")
     
-    dir_output0 = 'output_miccai_1000/'
+    # dir_output0 = 'output_miccai_1000/'
 
-    # dir_output0 = 'output_2000_steps/'
+    dir_output0 = 'output_2000_steps/'
 
     dir_seg = True
     masked = False
 
-    max_step_size  = 1000
-    write_samples  = True
-    retrace_cent   = False
-    take_time      = False
-    weighted = True
-    calc_global_centerline = False
+    max_step_size  = global_config['MAX_STEPS']
+    write_samples  = global_config['WRITE_STEPS']
+    retrace_cent   = global_config['RETRACE']
+    take_time      = global_config['TIME_ANALYSIS']
+    weighted = global_config['WEIGHTED_ASSEMBLY']
+    calc_global_centerline = global_config['GLOBAL_CENTERLINE']
 
     for test in tests:
 
