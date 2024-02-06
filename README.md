@@ -2,15 +2,23 @@
 Repository for Automatic Vascular Model Creation using localized 3D segmentation for tracing.
 
 ## Set Up
-auto_centerline: Main file to run.
-config.yml: Parameter + Directory file.
+Main package dependencies:
+    nnU-Net
+    Pytorch
+    SITK
+    VTK
+    VMTK
+(see environment.yml file)
 
-## modules
-### tracing
-Contains tracing function.
-### prediction
-Contains ML prediction function.
-### assembly
-Contains global assembly class.
-### evaluation
-Contains evaluation functions for results.
+## Running
+auto_centerline: Main file to run.
+
+Data directory: Assumes the following structure:
+    - images
+    - centerlines (if applicable)
+    - truths (if applicable)
+
+SeqSeg requires a seed point for initialization. This can be given by either:
+    - test.json file: located in data directory (see sample under data)
+    - centerline: if centerlines are given, we initialize using the first points of the centerline
+
