@@ -175,29 +175,19 @@ if __name__=='__main__':
     tests = [
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0,'ct'],
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
-             ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.vtk', 'mm'],
+            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.vtk', 'mm'], # mm here means scaling (model is cm but data is mm)
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
-            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
+             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd', 'cm'], # cm here means no scaling (model and data are both mm)
             #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
             ]
 
-    calc_restults = False
-
-    if calc_restults:
-        global_dict             = {}
-        global_dict['test']     = []
-        global_dict['ct dice']  = []
-        global_dict['mr dice']  = []
-        global_dict['ct cent']  = []
-        global_dict['mr cent']  = []
-
-    dir_output0 = 'output_cardiac_2000_steps/'
+    dir_output0 = 'output_miccai_1000/'
     # dir_output0 = 'output_2000_steps/'
 
     dir_seg = True
     masked = False
 
-    max_step_size  = 2000
+    max_step_size  = 1000
     write_samples  = True
     retrace_cent   = False
     take_time      = False
@@ -242,7 +232,7 @@ if __name__=='__main__':
             potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, unit, write_samples)
             
             # print to .txt file all outputs
-            # sys.stdout = open(dir_output+"/out.txt", "w")
+            sys.stdout = open(dir_output+"/out.txt", "w")
             print(test_case)
             print(f"Initial points: {potential_branches}")
             # print(f"Time is: {time.time()}")
@@ -314,68 +304,5 @@ if __name__=='__main__':
 
             #print('Number of outlets: ' + str(len(final_caps[1])))
 
-            if calc_restults:
-                evaluate_tracing = EvaluateTracing(case, initial_seed, dir_seg, dir_surf, dir_cent, assembly_binary, surface_smooth)
-                missed_branches, perc_caught, total_perc = evaluate_tracing.count_branches()
-                if dir_seg:
-                    final_dice = evaluate_tracing.calc_dice_score()
-                    #ave_dice = vessel_tree.calc_ave_dice()
-
-                    if masked:
-                        masked_dir = '/Users/numisveinsson/Downloads/tests_masks/test_global_masks/mask_'+case+'.vtk'
-                        masked_dice = evaluate_tracing.masked_dice(masked_dir)
-                        print(f"******* Masked dice: {masked_dice} **************")
-                        final_dice = masked_dice
-
-
-                #final_ave_step_dice.append(ave_dice)
-                final_dice_scores.append(final_dice)
-                final_n_steps_taken.append(n_steps_taken)
-                final_perc_caught.append(perc_caught)
-                final_tot_perc.append(total_perc)
-                final_missed_branches.append(missed_branches)
-
-                if modality == 'ct': ct_dice.append(final_dice)
-                elif modality == 'mr': mr_dice.append(final_dice)
-                if modality == 'ct': ct_cent.append(total_perc)
-                elif modality == 'mr': mr_cent.append(total_perc)
 
         print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
-        if calc_restults:
-            global_dict['test'].append(test)
-            global_dict['ct dice'].append(np.array(ct_dice).mean())
-            global_dict['mr dice'].append(np.array(mr_dice).mean())
-            global_dict['ct cent'].append(np.array(ct_cent).mean())
-            global_dict['mr cent'].append(np.array(mr_cent).mean())
-
-            for i in range(len(testing_samples_done)):
-                print(testing_samples_done[i][0])
-                print('Steps taken: ', final_n_steps_taken[i])
-                #print('Ave dice per step: ', final_ave_step_dice[i])
-                print('Dice: ', final_dice_scores[i])
-                print('Percent caught: ', final_perc_caught[i])
-                print('Total centerline caught: ', final_tot_perc[i])
-                print(str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
-
-            now = datetime.now()
-            dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
-            info_file_name = "info_"+test+".txt"
-            f = open(dir_output0 +info_file_name,'a')
-            for i in range(len(testing_samples_done)):
-                f.write(testing_samples_done[i][0])
-                f.write('\nSteps taken: ' + str(final_n_steps_taken[i]))
-                #f.write('\nAve dice per step: ' + str(final_ave_step_dice[i]))
-                f.write('\nDice: ' +str(final_dice_scores[i]))
-                f.write('\nPercent caught: ' +str(final_perc_caught[i]))
-                f.write('\nTotal cent caught: ' +str(final_tot_perc[i]))
-                f.write('\n'+str(final_missed_branches[i][0])+'/'+str(final_missed_branches[i][1])+' branches missed\n')
-            for key in global_dict.keys():
-                f.write(f"\n{key}: {global_dict[key]}")
-            f.close()
-    if calc_restults:
-        with open(dir_output0+'results.pickle', 'wb') as handle:
-            pickle.dump(global_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    # import pdb; pdb.set_trace()
-    # with open('filename.pickle', 'rb') as handle:
-    #     b = pickle.load(handle)
