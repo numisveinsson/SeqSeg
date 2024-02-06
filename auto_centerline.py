@@ -25,6 +25,7 @@ from modules.tracing import trace_centerline
 from modules.datasets import get_testing_samples_json
 from modules.assembly import create_step_dict
 from modules.evaluation import EvaluateTracing
+from modules.params import load_yaml
 
 def create_directories(output_folder, write_samples):
     try:
@@ -163,25 +164,29 @@ if __name__=='__main__':
     """# Set up"""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset',  help='Name of the folder containing the image data')
-    parser.add_argument('--model',  help='Name of the folder containing the image data')
-    parser.add_argument('--output',  help='Name of the output folder')
-    parser.add_argument('--modality', nargs='+', help='Name of the modality, mr, ct, split by space')
+    parser.add_argument('--data_directory',  help='Name of the folder containing the image data')
+    parser.add_argument('--test_name',  help='Name of the folder containing the image data')
+    parser.add_argument('--dataset',  help='Name of the output folder')
+    parser.add_argument('--fold', help='Name of the modality, mr, ct, split by space')
+    parser.add_argument('--fold', help='Name of the modality, mr, ct, split by space')
     args = parser.parse_args()
 
-    #       [name , dataset, fold, modality, json file present]
+    #       [name , dataset, fold, modality, json file present, unit]
     #       note: fold is either 0,1,2,3 or 'all'
     #       note: json file present is either True or False
     tests = [
-            #  ['3d_fullres','Dataset002_SEQAORTAS', 0,'ct'],
-            #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
-            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.vtk', 'mm'], # mm here means scaling (model is cm but data is mm)
-            #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
-             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd', 'cm'], # cm here means no scaling (model and data are both mm)
-            #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
+            #  ['3d_fullres','Dataset002_SEQAORTAS', 0],
+            #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all', False],
+            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all', True, '.vtk', 'mm'], # mm here means scaling (model is cm but data is mm)
+            #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all', False],
+             ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all', True, '.nrrd', 'cm'], # cm here means no scaling (model and data are both mm)
+            #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all', True, '.nrrd'],
             ]
 
+    global_config = load_yaml("./config/global.yaml")
+    
     dir_output0 = 'output_miccai_1000/'
+
     # dir_output0 = 'output_2000_steps/'
 
     dir_seg = True
@@ -199,10 +204,9 @@ if __name__=='__main__':
         print('\n test is: \n', test)
         dataset = test[1]
         fold = test[2]
-        modality_model = test[3]
-        json_file_present = test[4]
-        img_format = test[5]
-        unit = test[6]
+        json_file_present = test[3]
+        img_format = test[4]
+        unit = test[5]
         test_name = test[0]
 
         ## Weight directory
@@ -218,11 +222,10 @@ if __name__=='__main__':
 
             print(test_case)
 
-            dir_output, dir_image, dir_seg, dir_cent, modality, case, i = init.process_init(test_case, 
+            dir_output, dir_image, dir_seg, dir_cent, case, i = init.process_init(test_case, 
                                                                                             directory_data, 
                                                                                             dir_output0, 
-                                                                                            img_format, 
-                                                                                            modality_model,
+                                                                                            img_format,
                                                                                             json_file_present, 
                                                                                             test_name)
 
@@ -244,7 +247,6 @@ if __name__=='__main__':
                                                                                                     case,
                                                                                                     dir_model_weights,
                                                                                                     fold,
-                                                                                                    modality,
                                                                                                     potential_branches,
                                                                                                     max_step_size,
                                                                                                     dir_seg,

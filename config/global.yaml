@@ -1,0 +1,2 @@
+DATA_DIR: '/global/scratch/users/numi/vascular_data_3d/' # '/Users/numisveins/Documents/ASOCA_dataset/', MICCAI_AVT_Data
+OUT_DIR: 'output_miccai_1000/'
