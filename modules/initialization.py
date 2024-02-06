@@ -8,8 +8,6 @@ def process_init(test_case, directory_data, dir_output0, img_format, json_file_p
     path = directory_data + 'data.json'
     json_file_present = os.path.isfile(path)
 
-    
-
     if json_file_present:
         ## Information
         i = 0

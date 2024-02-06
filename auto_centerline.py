@@ -164,13 +164,15 @@ if __name__=='__main__':
     """# Set up"""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_directory',  help='Name of the folder containing the image data')
-    parser.add_argument('--test_name',  help='Name of the folder containing the image data')
-    parser.add_argument('--dataset',  help='Name of the output folder')
-    parser.add_argument('--fold', help='Name of the modality, mr, ct, split by space')
-    parser.add_argument('--img_ext', help='Name of the modality, mr, ct, split by space')
-    parser.add_argument('--scale', help='Name of the modality, mr, ct, split by space')
+    parser.add_argument('--data_directory',                     help='Name of the folder containing the testing data')
+    parser.add_argument('--test_name',  default= '3d_fullres'   help='Name of nnUNet test to use, eg 3d_fullres/2d')
+    parser.add_argument('--dataset',                            help='Name of dataset used to train nnUNet, eg Dataset010_SEQCOROASOCACT')
+    parser.add_argument('--fold',       default= 'all',         help='Which fold to use for nnUNet model')
+    parser.add_argument('--img_ext',                            help='Image extension, eg .nii.gz')
+    parser.add_argument('--scale',      default= 1,             help='Whether to scale image data, needed if units for nnUNet model and testing data are different)
     args = parser.parse_args()
+
+    import pdb; pdb.set_trace()
 
     #       [name , dataset, fold, modality, json file present, unit]
     #       note: fold is either 0,1,2,3 or 'all'
@@ -189,8 +191,6 @@ if __name__=='__main__':
     # dir_output0 = 'output_miccai_1000/'
 
     dir_output0 = 'output_2000_steps/'
-
-    masked = False
 
     max_step_size  = global_config['MAX_STEPS']
     write_samples  = global_config['WRITE_STEPS']
