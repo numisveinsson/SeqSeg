@@ -18,9 +18,9 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 import pdb
-def trace_centerline(output_folder, image_file, scale, case, model_folder, fold,
+def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     potential_branches, max_step_size,
-                    seg_file=None,    write_samples=True,
+                    scale = 1, seg_file=None,    write_samples=True,
                     take_time=False,    retrace_cent=False, weighted=False
                     ):
     animation = True

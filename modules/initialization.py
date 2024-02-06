@@ -1,14 +1,20 @@
 from .vtk_functions import *
 from .assembly import create_step_dict
 from .datasets import get_directories, vmr_directories
+import os
 
 def process_init(test_case, directory_data, dir_output0, img_format, json_file_present, test):
+
+    path = directory_data + 'data.json'
+    json_file_present = os.path.isfile(path)
+
+    
+
     if json_file_present:
         ## Information
         i = 0
         case = test_case['name']
         dir_image, dir_seg, dir_cent, dir_surf = get_directories(directory_data, case, img_format, dir_seg =False)
-        dir_seg = None
         dir_output = dir_output0 +test+'_'+case+'/'
 
     else:
@@ -19,8 +25,9 @@ def process_init(test_case, directory_data, dir_output0, img_format, json_file_p
         print(test_case)
 
         dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg)
-        dir_seg = None
         dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
+
+    dir_seg = os.path.isdir(directory_data + 'truths')
 
     return dir_output, dir_image, dir_seg, dir_cent, case, i
     

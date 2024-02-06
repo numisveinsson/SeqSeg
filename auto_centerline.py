@@ -168,7 +168,8 @@ if __name__=='__main__':
     parser.add_argument('--test_name',  help='Name of the folder containing the image data')
     parser.add_argument('--dataset',  help='Name of the output folder')
     parser.add_argument('--fold', help='Name of the modality, mr, ct, split by space')
-    parser.add_argument('--fold', help='Name of the modality, mr, ct, split by space')
+    parser.add_argument('--img_ext', help='Name of the modality, mr, ct, split by space')
+    parser.add_argument('--scale', help='Name of the modality, mr, ct, split by space')
     args = parser.parse_args()
 
     #       [name , dataset, fold, modality, json file present, unit]
@@ -177,9 +178,9 @@ if __name__=='__main__':
     tests = [
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0],
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all', False],
-            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all', True, '.vtk', 0.1], # mm here means scaling (model is cm but data is mm)
+            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all', True, '.vtk', 0.1], # 0.1 here means scaling (model is cm but data is mm)
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all', False],
-            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all', True, '.nrrd', 1], # cm here means no scaling (model and data are both mm)
+            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all', True, '.nrrd', 1], # 1 here means no scaling (model and data are both mm)
              ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all', True, '.nrrd', 1],
             ]
 
@@ -189,7 +190,6 @@ if __name__=='__main__':
 
     dir_output0 = 'output_2000_steps/'
 
-    dir_seg = True
     masked = False
 
     max_step_size  = global_config['MAX_STEPS']
@@ -243,12 +243,12 @@ if __name__=='__main__':
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
                                                                                                     dir_image,
-                                                                                                    scale,
                                                                                                     case,
                                                                                                     dir_model_weights,
                                                                                                     fold,
                                                                                                     potential_branches,
                                                                                                     max_step_size,
+                                                                                                    scale,
                                                                                                     dir_seg,
                                                                                                     write_samples,
                                                                                                     take_time,
