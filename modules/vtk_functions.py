@@ -1119,10 +1119,7 @@ def orient_caps(caps, old_point):
 
     return [sourcee, target], source_id
 
-def process_cardiac_mesh(mesh_file, unit):
-
-    if unit == 'mm': scale = 1 # mm coords need to change to cm
-    elif unit == 'cm': scale = 1 # cm is default
+def process_cardiac_mesh(mesh_file, scale = 1):
 
     mesh = read_geo(mesh_file).GetOutput()
 

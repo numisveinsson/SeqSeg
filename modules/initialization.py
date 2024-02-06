@@ -25,16 +25,16 @@ def process_init(test_case, directory_data, dir_output0, img_format, json_file_p
     return dir_output, dir_image, dir_seg, dir_cent, case, i
     
 
-def initialization(json_file_present, test_case, dir_output, dir_cent, dir_data, unit, write_samples=False):
+def initialization(json_file_present, test_case, dir_output, dir_cent, dir_data, scale = 1, write_samples=False):
 
     if json_file_present:
-        potential_branches, initial_seeds = initialize_json(test_case, dir_output, dir_cent, dir_data, unit, write_samples)
+        potential_branches, initial_seeds = initialize_json(test_case, dir_output, dir_cent, dir_data, scale, write_samples)
     else:
         potential_branches, initial_seeds = initialize_dict(test_case, dir_output, dir_cent, write_samples)
 
     return potential_branches, initial_seeds
 
-def initialize_json(test_case, dir_output, dir_cent, dir_data, unit, write_samples=False):
+def initialize_json(test_case, dir_output, dir_cent, dir_data, scale, write_samples=False):
     """
 
     """
@@ -45,7 +45,7 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, unit, write_sampl
     if not test_case['seeds']:
         if test_case['cardiac_mesh']:
             print(f"Cardiac mesh given, getting seed from aortic root")
-            old_seed, old_radius, initial_seed, initial_radius = get_seeds_cardiac_mesh(dir_data, test_case['name'], unit)
+            old_seed, old_radius, initial_seed, initial_radius = get_seeds_cardiac_mesh(dir_data, test_case['name'], scale)
         
         else:
             print(f"No seed given, trying to get one from centerline ground truth")

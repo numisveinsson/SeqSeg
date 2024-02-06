@@ -18,7 +18,7 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 import pdb
-def trace_centerline(output_folder, image_file, unit, case, model_folder, fold,
+def trace_centerline(output_folder, image_file, scale, case, model_folder, fold,
                     potential_branches, max_step_size,
                     seg_file=None,    write_samples=True,
                     take_time=False,    retrace_cent=False, weighted=False
@@ -42,12 +42,9 @@ def trace_centerline(output_folder, image_file, unit, case, model_folder, fold,
 
     if seg_file:
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
-    print(f"Reading in image file: {image_file}, unit: {unit}")
+    print(f"Reading in image file: {image_file}, scale: {scale}")
     reader_im, origin_im, size_im, spacing_im = import_image(image_file)
     print(f"Image data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
-
-    if unit == 'mm': scale = 0.1 # mm coords need to change to cm
-    elif unit == 'cm': scale = 1 # cm is default
 
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)

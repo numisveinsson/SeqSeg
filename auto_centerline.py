@@ -177,10 +177,10 @@ if __name__=='__main__':
     tests = [
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0],
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all', False],
-            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all', True, '.vtk', 'mm'], # mm here means scaling (model is cm but data is mm)
+            #  ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all', True, '.vtk', 0.1], # mm here means scaling (model is cm but data is mm)
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all', False],
-            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all', True, '.nrrd', 'cm'], # cm here means no scaling (model and data are both mm)
-             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all', True, '.nrrd', 'cm'],
+            #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all', True, '.nrrd', 1], # cm here means no scaling (model and data are both mm)
+             ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all', True, '.nrrd', 1],
             ]
 
     global_config = load_yaml("./config/global.yaml")
@@ -206,7 +206,7 @@ if __name__=='__main__':
         fold = test[2]
         json_file_present = test[3]
         img_format = test[4]
-        unit = test[5]
+        scale = test[5]
         test_name = test[0]
 
         ## Weight directory
@@ -232,7 +232,7 @@ if __name__=='__main__':
             ## Create directories for results
             create_directories(dir_output, write_samples)
 
-            potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, unit, write_samples)
+            potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, scale, write_samples)
             
             # print to .txt file all outputs
             sys.stdout = open(dir_output+"/out.txt", "w")
@@ -243,7 +243,7 @@ if __name__=='__main__':
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
                                                                                                     dir_image,
-                                                                                                    unit,
+                                                                                                    scale,
                                                                                                     case,
                                                                                                     dir_model_weights,
                                                                                                     fold,
