@@ -29,16 +29,16 @@ def process_init(test_case, directory_data, dir_output0, img_format, modality_mo
     return dir_output, dir_image, dir_seg, dir_cent, modality, case, i
     
 
-def initialization(json_file_present, test_case, dir_output, dir_cent, dir_data, write_samples=False):
+def initialization(json_file_present, test_case, dir_output, dir_cent, dir_data, unit, write_samples=False):
 
     if json_file_present:
-        potential_branches, initial_seeds = initialize_json(test_case, dir_output, dir_cent, dir_data, write_samples)
+        potential_branches, initial_seeds = initialize_json(test_case, dir_output, dir_cent, dir_data, unit, write_samples)
     else:
         potential_branches, initial_seeds = initialize_dict(test_case, dir_output, dir_cent, write_samples)
 
     return potential_branches, initial_seeds
 
-def initialize_json(test_case, dir_output, dir_cent, dir_data, write_samples=False):
+def initialize_json(test_case, dir_output, dir_cent, dir_data, unit, write_samples=False):
     """
 
     """
@@ -49,7 +49,7 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, write_samples=Fal
     if not test_case['seeds']:
         if test_case['cardiac_mesh']:
             print(f"Cardiac mesh given, getting seed from aortic root")
-            old_seed, old_radius, initial_seed, initial_radius = get_seeds_cardiac_mesh(dir_data, test_case['name'])
+            old_seed, old_radius, initial_seed, initial_radius = get_seeds_cardiac_mesh(dir_data, test_case['name'], unit)
         
         else:
             print(f"No seed given, trying to get one from centerline ground truth")
@@ -97,7 +97,7 @@ def initialize_dict(test_case, dir_output, dir_cent, write_samples=False):
 
     return potential_branches, initial_seeds
 
-def get_seeds_cardiac_mesh(mesh_dir, name):
+def get_seeds_cardiac_mesh(mesh_dir, name, unit):
     """
     Get testing samples from cardiac meshes
     """
@@ -105,15 +105,16 @@ def get_seeds_cardiac_mesh(mesh_dir, name):
     from .vtk_functions import process_cardiac_mesh, write_normals_centers
 
     # radius estimate 
-    radius_est = 1.4
+    if unit == 'mm': radius_est = 13
+    elif unit == 'cm': radius_est = 1.3
 
     # list_meshes = os.listdir(mesh_dir)
     mesh_dir += '/cardiac_meshes/'
     
-    region_8_center, region_8_normal, region_3_center = process_cardiac_mesh(os.path.join(mesh_dir, name+'.vtp'))
+    region_8_center, region_8_normal, region_3_center = process_cardiac_mesh(os.path.join(mesh_dir, name+'.vtp'), unit)
 
     write_normals_centers(mesh_dir, region_8_center, region_8_normal, region_3_center)
 
     # old_seed, old_radius, initial_seed, initial_radius
     
-    return region_8_center, radius_est, region_8_center+radius_est*region_8_normal, radius_est
+    return region_8_center, radius_est, region_8_center+2*radius_est*region_8_normal, radius_est

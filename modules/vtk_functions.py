@@ -946,7 +946,7 @@ def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,
         poly = bound_polydata_by_image(seg_vtk, poly, 1.5)
     return poly
 
-def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=.01):
+def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=.1):
     """
     This function smooths a vtk polydata
     Args:
@@ -1119,7 +1119,10 @@ def orient_caps(caps, old_point):
 
     return [sourcee, target], source_id
 
-def process_cardiac_mesh(mesh_file):
+def process_cardiac_mesh(mesh_file, unit):
+
+    if unit == 'mm': scale = 1 # mm coords need to change to cm
+    elif unit == 'cm': scale = 1 # cm is default
 
     mesh = read_geo(mesh_file).GetOutput()
 
@@ -1139,8 +1142,8 @@ def process_cardiac_mesh(mesh_file):
     region_8 = np.where(region_id == 8)[0]
     region_3 = np.where(region_id == 3)[0]
     # get coordinates of points in region 8 and 3
-    region_8_coords = point_loc[region_8, :]
-    region_3_coords = point_loc[region_3, :]
+    region_8_coords = point_loc[region_8, :] * scale
+    region_3_coords = point_loc[region_3, :] * scale
     # calculate the center of mass of region 8
     region_8_center = np.mean(region_8_coords, axis=0)
     region_3_center = np.mean(region_3_coords, axis=0)

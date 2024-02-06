@@ -18,7 +18,7 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 import pdb
-def trace_centerline(output_folder, image_file, case, model_folder, fold, modality,
+def trace_centerline(output_folder, image_file, unit, case, model_folder, fold, modality,
                     potential_branches, max_step_size,
                     seg_file=None,    write_samples=True,
                     take_time=False,    retrace_cent=False, weighted=False
@@ -42,9 +42,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
     if seg_file:
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
-
+    print(f"Reading in image file: {image_file}, unit: {unit}")
     reader_im, origin_im, size_im, spacing_im = import_image(image_file)
     print(f"Image data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
+
+    if unit == 'mm': scale = 0.1 # mm coords need to change to cm
+    elif unit == 'cm': scale = 1 # cm is default
 
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
@@ -169,7 +172,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
                     start_time_loc = time.time()
 
                 # Prediction
-                spacing = spacing_im.tolist()
+                spacing = (spacing_im* scale).tolist()
                 spacing = spacing[::-1]
                 props={}
                 props['spacing'] = spacing
@@ -270,7 +273,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
 
 
             print('Number of caps: ', len(caps))
-            if len(caps) < 2: print(error)
+            if len(caps) < 2 and i != 0 : print(error)
 
             # polydata_point = points2polydata([step_seg['caps'][0]])
             # pfn = '/Users/numisveinsson/Downloads/point.vtp'
@@ -284,7 +287,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold, modali
             centerline_poly = calc_centerline(  surface_smooth,
                                                 "profileidlist",
                                                 var_source=[source_id],
-                                                number = i)
+                                                number = i,
+                                                caps = caps,
+                                                point = step_seg['point'])
             # write_centerline(centerline_poly_unsmooth, cfn_un)
             write_centerline(centerline_poly, cfn)
 

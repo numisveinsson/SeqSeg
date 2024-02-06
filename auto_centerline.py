@@ -175,7 +175,7 @@ if __name__=='__main__':
     tests = [
             #  ['3d_fullres','Dataset002_SEQAORTAS', 0,'ct'],
             #  ['3d_fullres','Dataset005_SEQAORTANDFEMOMR', 'all','mr', False],
-             ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.nii.gz'],
+             ['3d_fullres','Dataset006_SEQAORTANDFEMOCT', 'all','ct', True, '.vtk', 'mm'],
             #  ['3d_fullres','Dataset007_SEQPULMONARYMR', 'all','mr', False],
             #  ['3d_fullres','Dataset009_SEQAORTASMICCT', 'all','ct', True, '.nrrd'],
             #  ['3d_fullres','Dataset010_SEQCOROASOCACT', 'all','ct', True, '.nrrd'],
@@ -212,6 +212,7 @@ if __name__=='__main__':
         modality_model = test[3]
         json_file_present = test[4]
         img_format = test[5]
+        unit = test[6]
         test_name = test[0]
 
         ## Weight directory
@@ -223,7 +224,7 @@ if __name__=='__main__':
 
         final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
         
-        for test_case in testing_samples[18:]:
+        for test_case in testing_samples[2:]:
 
             print(test_case)
 
@@ -238,17 +239,18 @@ if __name__=='__main__':
             ## Create directories for results
             create_directories(dir_output, write_samples)
 
-            potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, write_samples)
+            potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, unit, write_samples)
             
             # print to .txt file all outputs
-            sys.stdout = open(dir_output+"/out.txt", "w")
+            # sys.stdout = open(dir_output+"/out.txt", "w")
             print(test_case)
             print(f"Initial points: {potential_branches}")
-            print(f"Time is: {time.time()}")
+            # print(f"Time is: {time.time()}")
 
             ## Trace centerline
             centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
                                                                                                     dir_image,
+                                                                                                    unit,
                                                                                                     case,
                                                                                                     dir_model_weights,
                                                                                                     fold,

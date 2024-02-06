@@ -43,7 +43,7 @@ def network(filename_in, filename_out):
 
     return Network
 
-def calc_centerline(Surface, method, var_source = None, var_target = None, number = None):
+def calc_centerline(Surface, method, var_source = None, var_target = None, number = None, caps = None, point = None):
     """
     Calculate centerlines in surface model via vmtk
     Methods "pickpoint","openprofiles","carotidprofiles" don't require inputs
@@ -56,13 +56,20 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
     Returns:
         poly: VTK PolyData of centerline
     """
+    
+    if number == 0 and len(caps) == 1:
+        method = "pointlist"
+        var_target = caps[0].tolist()
+        var_source = point.tolist()
+
+
     centerline_calc = vmtkscripts.vmtkCenterlines()
     centerline_calc.Surface = Surface
     centerline_calc.SeedSelectorName = method
-    centerline_calc.AppendEndPoints = 1
 
     if method == "profileidlist":
 
+        centerline_calc.AppendEndPoints = 1
         if var_source == None:
             var_source = [0]
         centerline_calc.SourceIds = var_source
