@@ -164,15 +164,15 @@ if __name__=='__main__':
     """# Set up"""
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_directory',                     help='Name of the folder containing the testing data')
-    parser.add_argument('--test_name',  default= '3d_fullres'   help='Name of nnUNet test to use, eg 3d_fullres/2d')
-    parser.add_argument('--dataset',                            help='Name of dataset used to train nnUNet, eg Dataset010_SEQCOROASOCACT')
-    parser.add_argument('--fold',       default= 'all',         help='Which fold to use for nnUNet model')
-    parser.add_argument('--img_ext',                            help='Image extension, eg .nii.gz')
-    parser.add_argument('--scale',      default= 1,             help='Whether to scale image data, needed if units for nnUNet model and testing data are different)
+    parser.add_argument('-data_dir', '--data_directory', type=str,                      help='Name of the folder containing the testing data')
+    parser.add_argument('-test_name', '--test_name',  default= '3d_fullres', type=str,  help='Name of nnUNet test to use, eg 3d_fullres/2d')
+    parser.add_argument('-dataset','--dataset',           type=str,                     help='Name of dataset used to train nnUNet, eg Dataset010_SEQCOROASOCACT')
+    parser.add_argument('-fold', '--fold', default= 'all',   type=str,                  help='Which fold to use for nnUNet model')
+    parser.add_argument('-img_ext', '--img_ext', type=str,                              help='Image extension, eg .nii.gz')
+    parser.add_argument('-scale', '--scale', default= 1, type=int,                      help='Whether to scale image data, needed if units for nnUNet model and testing data are different')
     args = parser.parse_args()
 
-    import pdb; pdb.set_trace()
+    print(args)
 
     #       [name , dataset, fold, modality, json file present, unit]
     #       note: fold is either 0,1,2,3 or 'all'
@@ -235,7 +235,7 @@ if __name__=='__main__':
             potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, scale, write_samples)
             
             # print to .txt file all outputs
-            sys.stdout = open(dir_output+"/out.txt", "w")
+            # sys.stdout = open(dir_output+"/out.txt", "w")
             print(test_case)
             print(f"Initial points: {potential_branches}")
             # print(f"Time is: {time.time()}")

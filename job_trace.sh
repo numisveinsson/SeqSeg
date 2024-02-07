@@ -37,8 +37,10 @@ export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_prepro
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 python3 auto_centerline.py \
-    --dataset none \
-    --model none \
-    --output none \
-    --modality ct
+    -data_dir /global/scratch/users/numi/vascular_data_3d/ \
+    -test_name 3d_fullres \
+    -dataset Dataset010_SEQCOROASOCACT
+    -fold all \
+    -img_ext .nrrd \
+    -scale 1 \
 
