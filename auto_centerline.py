@@ -169,6 +169,7 @@ if __name__=='__main__':
     parser.add_argument('-dataset',     '--dataset',                            type=str,   help='Name of dataset used to train nnUNet, eg Dataset010_SEQCOROASOCACT')
     parser.add_argument('-fold',        '--fold',      default= 'all',          type=str,   help='Which fold to use for nnUNet model')
     parser.add_argument('-img_ext',     '--img_ext',                            type=str,   help='Image extension, eg .nii.gz')
+    parser.add_argument('-outdir',      '--outdir',                             type=str,   help='Output directory')
     parser.add_argument('-scale',       '--scale',     default= 1,              type=int,   help='Whether to scale image data, needed if units for nnUNet model and testing data are different')
     parser.add_argument('-start',       '--start',     default= 0,              type=int,   help='In the list of testing samples, where to start')
     parser.add_argument('-stop',        '--stop',     default= -1,              type=int,   help='In the list of testing samples, where to stop')
@@ -189,10 +190,8 @@ if __name__=='__main__':
             # ]
 
     global_config = load_yaml("./config/global.yaml")
-    
-    # dir_output0 = 'output_miccai_1000/'
 
-    dir_output0 = 'output_2000_steps/'
+    dir_output0 = args.outdir
 
     max_step_size  = global_config['MAX_STEPS']
     write_samples  = global_config['WRITE_STEPS']
@@ -216,10 +215,8 @@ if __name__=='__main__':
     testing_samples, directory_data = get_testing_samples(dataset)
     print(f"Testing samples about to run: {testing_samples}")
     ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
-
-    final_dice_scores, final_perc_caught, final_tot_perc, final_missed_branches, final_n_steps_taken, final_ave_step_dice = [],[],[],[],[],[]
     
-    for test_case in testing_samples:
+    for test_case in testing_samples[args.start : args.stop]:
 
         print(test_case)
 
