@@ -1,6 +1,10 @@
 MAX_STEPS: 1000
 
+UNIT: cm # important for different smoothing based on size
+
 WRITE_STEPS: True # if we want to write out each step
+ANIMATION: True # to write out animation files
+ANIMATION_STEPS: 10 # write out animation every x steps
 
 WEIGHTED_ASSEMBLY: True # if assembly should be weighted
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
@@ -9,7 +13,7 @@ TIME_ANALYSIS: False # if we want to write out how long each step take
 
 VOLUME_SIZE_RATIO: 5.5
 MAGN_RADIUS: 1
-MIN_RADIUS: 0.4 # mm
+MIN_RADIUS: 0.4 # mm (keep in mm)
 
 NR_CHANCES: 2
 NR_ALLOW_RETRACE_STEPS: 10
@@ -21,3 +25,6 @@ BUFFER_N: 10 # add to assembly steps buff_N steps ago
 
 FORCEFUL_SIDEBRANCH: False
 FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1.1
+
+MEGA_SUBVOLUME: False # extract centerline from previous N steps, instead of just 1
+NR_MEGA_SUB: 5 # how many steps to assemble into mega subvolume
