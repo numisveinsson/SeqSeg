@@ -36,10 +36,10 @@ export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
-python3 auto_centerline.py \
-    -data_dir /global/scratch/users/numi/vascular_data_3d/ \
+python3 python3 auto_centerline.py \
+    -data_dir global/scratch/users/numi/ASOCA_test/  \
     -test_name 3d_fullres \
-    -dataset Dataset010_SEQCOROASOCACT
+    -dataset Dataset010_SEQCOROASOCACT \
     -fold all \
     -img_ext .nrrd \
     -scale 1 \

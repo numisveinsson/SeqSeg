@@ -1,3 +1,5 @@
+import yaml
+
 def load_yaml(fn):
     """loads a yaml file into a dict"""
     with open(fn,'r') as file_:

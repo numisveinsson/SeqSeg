@@ -3,9 +3,9 @@ from .assembly import create_step_dict
 from .datasets import get_directories, vmr_directories
 import os
 
-def process_init(test_case, directory_data, dir_output0, img_format, json_file_present, test):
+def process_init(test_case, directory_data, dir_output0, img_format, test):
 
-    path = directory_data + 'data.json'
+    path = directory_data + 'test.json'
     json_file_present = os.path.isfile(path)
 
     if json_file_present:
@@ -27,7 +27,7 @@ def process_init(test_case, directory_data, dir_output0, img_format, json_file_p
 
     dir_seg = os.path.isdir(directory_data + 'truths')
 
-    return dir_output, dir_image, dir_seg, dir_cent, case, i
+    return dir_output, dir_image, dir_seg, dir_cent, case, i, json_file_present
     
 
 def initialization(json_file_present, test_case, dir_output, dir_cent, dir_data, scale = 1, write_samples=False):
