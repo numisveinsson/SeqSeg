@@ -169,7 +169,7 @@ if __name__=='__main__':
     parser.add_argument('-outdir',      '--outdir',                             type=str,   help='Output directory')
     parser.add_argument('-scale',       '--scale',     default= 1,              type=int,   help='Whether to scale image data, needed if units for nnUNet model and testing data are different')
     parser.add_argument('-start',       '--start',     default= 0,              type=int,   help='In the list of testing samples, where to start')
-    parser.add_argument('-stop',        '--stop',     default= -1,              type=int,   help='In the list of testing samples, where to stop')
+    parser.add_argument('-stop',        '--stop',      default= -1,             type=int,   help='In the list of testing samples, where to stop')
     args = parser.parse_args()
 
     print(args)
@@ -212,7 +212,6 @@ if __name__=='__main__':
     testing_samples, directory_data = get_testing_samples(dataset)
     print(f"Testing samples about to run:")
     for sample in testing_samples: print(sample)
-    ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
     
     for test_case in testing_samples[args.start : args.stop]:
 
@@ -248,7 +247,8 @@ if __name__=='__main__':
                                                                                                 write_samples,
                                                                                                 take_time,
                                                                                                 retrace_cent,
-                                                                                                weighted)
+                                                                                                weighted,
+                                                                                                global_config)
 
         print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
 

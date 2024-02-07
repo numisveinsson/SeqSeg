@@ -21,24 +21,25 @@ import pdb
 def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     potential_branches, max_step_size,
                     scale = 1, seg_file=None,    write_samples=True,
-                    take_time=False,    retrace_cent=False, weighted=False
+                    take_time=False,    retrace_cent=False, weighted=False,
+                    global_config
                     ):
     animation = True
 
-    allowed_steps = 20 # usually 10
-    prevent_retracing = True
-    volume_size_ratio = 5.5 # 5.5 for coronaries
-    magnify_radius = 1 # usually 1
-    number_chances = 2
-    min_radius = 0.4 # 0.4 for coronaries
-    run_time = False
-    use_buffer = True
-    forceful_sidebranch = False
-    forceful_sidebranch_magnify = 1.1
+    allowed_steps =                 global_config['NR_ALLOW_RETRACE_STEPS']
+    prevent_retracing =             global_config['PREVENT_RETRACE']
+    volume_size_ratio =             global_config['VOLUME_SIZE_RATIO']
+    magnify_radius =                global_config['MAGN_RADIUS']
+    number_chances =                global_config['NR_CHANCES']
+    min_radius =                    global_config['MIN_RADIUS']
+    run_time =                      global_config['TIME_ANALYSIS']
+    forceful_sidebranch =           global_config['FORCEFUL_SIDEBRANCH']
+    forceful_sidebranch_magnify =   global_config['FORCEFUL_SIDEBRANCH_MAGN_RADIUS']
 
     #Assembly params
-    N = 10
-    buffer = 10
+    use_buffer =                    global_config['USE_BUFFER']
+    N =                             global_config['ASSEMBLY_EVERY_N']
+    buffer =                        global_config['BUFFER_N']
 
     if seg_file:
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)

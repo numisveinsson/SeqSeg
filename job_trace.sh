@@ -38,7 +38,7 @@ export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -dataset Dataset005_SEQAORTANDFEMOMR \
+    -dataset  Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
     -outdir output_new/ \
@@ -48,4 +48,4 @@ python3 auto_centerline.py \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 
-#Dataset006_SEQAORTANDFEMOCT Dataset010_SEQCOROASOCACT \
+# Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT 

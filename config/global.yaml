@@ -7,4 +7,19 @@ WRITE_STEPS: True # if we want to write out each step
 WEIGHTED_ASSEMBLY: True # if assembly should be weighted
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
 RETRACE: False # retrace strategry
-TIME_ANALYSIS: False # if we want to write out how long each step takes
+TIME_ANALYSIS: False # if we want to write out how long each step take
+
+VOLUME_SIZE_RATIO: 5.5
+MAGN_RADIUS: 1
+MIN_RADIUS: 0.4 # mm
+
+NR_CHANCES: 2
+NR_ALLOW_RETRACE_STEPS: 10
+PREVENT_RETRACE: True
+
+ASSEMBLY_EVERY_N: 10 # add to assembly every N steps
+USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)
+BUFFER_N: 10 # add to assembly steps buff_N steps ago
+
+FORCEFUL_SIDEBRANCH: False
+FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1.1
