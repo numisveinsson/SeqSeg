@@ -242,13 +242,13 @@ if __name__=='__main__':
                                                                                                 fold,
                                                                                                 potential_branches,
                                                                                                 max_step_size,
+                                                                                                global_config,
                                                                                                 scale,
                                                                                                 dir_seg,
                                                                                                 write_samples,
                                                                                                 take_time,
                                                                                                 retrace_cent,
-                                                                                                weighted,
-                                                                                                global_config)
+                                                                                                weighted)
 
         print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
 

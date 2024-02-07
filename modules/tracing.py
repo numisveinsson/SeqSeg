@@ -19,11 +19,9 @@ from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 import pdb
 def trace_centerline(output_folder, image_file, case, model_folder, fold,
-                    potential_branches, max_step_size,
+                    potential_branches, max_step_size, global_config,
                     scale = 1, seg_file=None,    write_samples=True,
-                    take_time=False,    retrace_cent=False, weighted=False,
-                    global_config
-                    ):
+                    take_time=False,    retrace_cent=False, weighted=False):
     animation = True
 
     allowed_steps =                 global_config['NR_ALLOW_RETRACE_STEPS']
@@ -133,10 +131,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             if step_seg['radius'] > 3: mag = max_mag
             
             while perc > 0.33 and continue_enlarge:
-                if mag > 1 and mag <= max_mag:
+                if mag > 1 and mag < max_mag:
                     print(f"Enlarging bounding box because percentage vessel > 0.33")
                 if mag >= max_mag:
-                    print(f"Enlarging did not help, keeping original size")
+                    print(f"Keeping original size")
                     mag = 1
                     continue_enlarge = False
                 # Extract Volume

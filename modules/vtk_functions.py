@@ -933,7 +933,7 @@ def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,
         if i==0:
             continue
         p = vtk_marching_cube(seg_vtk, 0, i)
-        p = smooth_polydata(p, iteration=10)
+        # p = smooth_polydata(p, iteration=10)
         rate = max(0., 1. - float(target_node_num)/float(p.GetNumberOfPoints()))
         p = decimation(p, rate)
         # p = smooth_polydata(p, iteration=20)
@@ -958,7 +958,7 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothing
     """
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(poly)
-    smoother.SetPassBand(pow(10., -4. * smoothingFactor))
+    smoother.SetPassBand(pow(10., -3. * smoothingFactor))
     smoother.SetBoundarySmoothing(boundary)
     smoother.SetFeatureEdgeSmoothing(feature)
     smoother.SetNumberOfIterations(iteration)

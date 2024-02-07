@@ -1,5 +1,3 @@
-OUT_DIR: 'output_2000_steps/'
-
 MAX_STEPS: 1000
 
 WRITE_STEPS: True # if we want to write out each step
