@@ -65,9 +65,9 @@ def get_testing_samples(dataset):
     if dataset == 'Dataset005_SEQAORTANDFEMOMR':
         testing_samples = [
 
-            ['0006_0001',0,10,20,'mr'], # Aortofemoral MR
+            ['0006_0001',0,20,30,'mr'], # Aortofemoral MR
             ['0063_1001',0,10,20,'mr'], # Aortic MR
-            ['0090_0001',0,10,20,'mr'], # Aortic MR
+            ['0090_0001',0,0,5,'mr'], # Aortic MR
             ['0131_0000',0,10,20,'mr'], # Aortic MR
             ['0070_0001',0,10,20,'mr'], # Aortic MR
             ['KDR12_aorta',0,20,30,'mr'], # Aortic MR
@@ -78,19 +78,16 @@ def get_testing_samples(dataset):
     elif dataset == 'Dataset006_SEQAORTANDFEMOCT':
         directory = '/global/scratch/users/numi/vascular_data_3d/'
         dir_json = directory + 'test.json'
-        testing_samples = get_testing_samples_json(dir_json)
-        
-        # [
-
-            # ['0176_0000',0,10,20,'ct'], # Aorta CT
-            # ['0174_0000',0,10,20,'ct'], # Aorta CT
-            # ['0139_1001',0,10,20,'ct'], # Aortofemoral CT
-            # ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
-            # ['0146_1001',0,0,10,'ct'], # Aortofemoral CT
-            # ['0188_0001_aorta',5,-10,-20,'ct'], # Aorta CT
-            # ['O150323_2009_aorta',0,10,20,'ct'], # Aorta CT
-            # ['O344211000_2006_aorta',0,10,20,'ct'], # Aorta CT
-        # ]
+        testing_samples = [ #get_testing_samples_json(dir_json)
+            ['0176_0000',0,10,20,'ct'], # Aorta CT
+            ['0174_0000',0,0,5,'ct'], # Aorta CT
+            ['0139_1001',0,10,20,'ct'], # Aortofemoral CT
+            ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
+            ['0146_1001',0,0,10,'ct'], # Aortofemoral CT
+            ['0188_0001_aorta',5,-10,-20,'ct'], # Aorta CT
+            ['O150323_2009_aorta',0,10,20,'ct'], # Aorta CT
+            ['O344211000_2006_aorta',0,10,20,'ct'], # Aorta CT
+        ]
     
     elif dataset == 'Dataset007_SEQPULMONARYMR':
         testing_samples = [
@@ -213,12 +210,13 @@ if __name__=='__main__':
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
 
     testing_samples, directory_data = get_testing_samples(dataset)
-    print(f"Testing samples about to run: {testing_samples}")
+    print(f"Testing samples about to run:")
+    for sample in testing_samples: print(sample)
     ct_dice, mr_dice, ct_cent, mr_cent = [],[],[],[]
     
     for test_case in testing_samples[args.start : args.stop]:
 
-        print(test_case)
+        print(f'\n{test_case}\n')
 
         dir_output, dir_image, dir_seg, dir_cent, case, i, json_file_present = init.process_init(test_case, 
                                                                                         directory_data, 
@@ -232,7 +230,7 @@ if __name__=='__main__':
         potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, scale, write_samples)
         
         # print to .txt file all outputs
-        # sys.stdout = open(dir_output+"/out.txt", "w")
+        sys.stdout = open(dir_output+"/out.txt", "w")
         print(test_case)
         print(f"Initial points: {potential_branches}")
         # print(f"Time is: {time.time()}")

@@ -8,11 +8,13 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
     path = directory_data + 'test.json'
     json_file_present = os.path.isfile(path)
 
+    dir_seg = os.path.isdir(directory_data + 'truths')
+
     if json_file_present:
         ## Information
         i = 0
         case = test_case['name']
-        dir_image, dir_seg, dir_cent, dir_surf = get_directories(directory_data, case, img_format, dir_seg =False)
+        dir_image, dir_seg, dir_cent, dir_surf = get_directories(directory_data, case, img_format, dir_seg)
         dir_output = dir_output0 +test+'_'+case+'/'
 
     else:
@@ -24,8 +26,6 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
 
         dir_image, dir_seg, dir_cent, dir_surf = vmr_directories(directory_data, case, dir_seg)
         dir_output = dir_output0 +test+'_'+case+'_'+str(i)+'/'
-
-    dir_seg = os.path.isdir(directory_data + 'truths')
 
     return dir_output, dir_image, dir_seg, dir_cent, case, i, json_file_present
     

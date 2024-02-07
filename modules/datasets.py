@@ -1,4 +1,4 @@
-def vmr_directories(directory, model, dir_seg_exist, global_scale=None):
+def vmr_directories(directory, model, dir_seg_exist=True, global_scale=None):
     """
     Function to return the directories of
         Image Volume

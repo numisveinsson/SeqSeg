@@ -37,13 +37,15 @@ export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_prepro
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 python3 auto_centerline.py \
-    -data_dir global/scratch/users/numi/ASOCA_test/  \
     -test_name 3d_fullres \
-    -dataset Dataset010_SEQCOROASOCACT \
+    -dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
-    -img_ext .nrrd \
-    -outdir output_2000_steps/ \
+    -img_ext .mha \
+    -outdir output_new/ \
     -scale 1 \
-    -start 6 \
-    -stop 7 \
+    -start 2 \
+    -stop 3 \
 
+#     -data_dir global/scratch/users/numi/ASOCA_test/  \
+
+#Dataset006_SEQAORTANDFEMOCT Dataset010_SEQCOROASOCACT \

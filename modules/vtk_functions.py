@@ -748,26 +748,27 @@ def sort_centerline(centerline):
 def get_point_ids_post_proc(centerline_poly):
 
     cent = centerline_poly
-    num_points = cent.GetNumberOfPoints()               # number of points in centerline
+    num_points = cent.GetNumberOfPoints() # number of points in centerline
     cent_data = collect_arrays(cent.GetPointData())           # point locations as numpy array
     radii = cent_data['MaximumInscribedSphereRadius']   # Max Inscribed Sphere Radius as numpy array
 
-    cell_data = collect_arrays(cent.GetCellData())
-    points_in_cells = get_points_cells(cent)
+    # cell_data = collect_arrays(cent.GetCellData())
+    # points_in_cells = get_points_cells_pd(cent)
 
-    cent_id = cell_data['CenterlineIds']
-    num_cent = max(cent_id)+1 # number of centerlines (one is assembled of multiple)
-
+    cent_id = cent_data['CenterlineId']
+    # num_cent = max(cent_id)+1 # number of centerlines (one is assembled of multiple)
+    try:
+        num_cent = len(cent_id[0]) # number of centerlines (one is assembled of multiple)
+    except:
+        num_cent = 1 # in the case of only one centerline
+    
     point_ids_list = []
     for ip in range(num_cent):
-            
-            point_ids = []
-            cell_ids = [i for i in range(len(cent_id)) if cent_id[i]==ip]
-    
-            for i in cell_ids:
-                point_ids = point_ids + points_in_cells[1][i]
-            
-            point_ids_list.append(point_ids)
+        try:
+            ids = [i for i in range(num_points) if cent_id[i,ip]==1]    # ids of points belonging to centerline ip
+        except:
+            ids = [i for i in range(num_points)]
+        point_ids_list.append(ids)
 
     return point_ids_list
 
