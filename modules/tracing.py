@@ -20,7 +20,7 @@ import pdb
 def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     potential_branches, max_step_size, global_config,
                     scale = 1, seg_file=None,    write_samples=True,
-                    take_time=False,    retrace_cent=False, weighted=False):
+                    take_time=False,    retrace_cent=False):
 
     if global_config['UNIT'] == 'cm': scale_unit = 0.1
     else:                             scale_unit = 1
@@ -41,6 +41,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     use_buffer =                    global_config['USE_BUFFER']
     N =                             global_config['ASSEMBLY_EVERY_N']
     buffer =                        global_config['BUFFER_N']
+    # Assembly object
+    weighted =                      global_config['WEIGHTED_ASSEMBLY']
+    weight_type =                   global_config['WEIGHT_TYPE']
 
     if seg_file:
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
@@ -50,7 +53,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
-    assembly_segs = Segmentation(case, image_file, weighted)
+    assembly_segs = Segmentation(case, image_file, weighted, weight_type=weight_type)
 
     print('About to load predictor object')
     # instantiate the nnUNetPredictor

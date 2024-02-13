@@ -9,7 +9,7 @@ from datetime import datetime
 
 class Segmentation:
 
-    def __init__(self, case, image_file, weighted = False):
+    def __init__(self, case, image_file, weighted = False, weight_type = None):
         self.name = case
         self.image_reader = read_image(image_file)
 
@@ -24,6 +24,9 @@ class Segmentation:
             # also keep track of how many updates to pixels
             self.n_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
             #print("Creating weighted segmentation")
+            assert weight_type, "Please provide a weight type"
+            assert weight_type in ['radius', 'gaussian'], "Weight type not recognized"
+            self.weight_type = weight_type
 
     def add_segmentation(self, volume_seg, index_extract, size_extract, weight=None):
 
@@ -55,14 +58,36 @@ class Segmentation:
             self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
 
         else:
-            curr_sub_section[ind] = 1/(curr_n[ind]+weight)*( weight*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
-            # Add to update weight sum for these voxels
-            self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight
-            self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
+            if self.weight_type == 'radius':
+                curr_sub_section[ind] = 1/(curr_n[ind]+weight)*( weight*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+                # Add to update weight sum for these voxels
+                self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight
+                self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
+            elif self.weight_type == 'gaussian':
+                # now the weight varies with the distance to the center of the volume, and the distance to the border
+                weight_array = self.calc_weight_array_gaussian(size_extract)
+                # Update those values, calculating an average
+                curr_sub_section[ind] = 1/(curr_n[ind]+weight_array)*( weight_array*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+                # Add to update weight sum for these voxels
+                self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight_array
+                self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight_array
 
         # Update the global volume
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
         self.assembly = numpy_to_sitk(np_arr, self.image_reader)
+
+    def calc_weight_array_gaussian(size_extract):
+        "Function to calculate the weight array for a gaussian weighted segmentation"
+        # have std so the weight is 0.1 at the border of the volume
+        std = 0.1*np.array(size_extract)
+        # create a grid of distances to the center of the volume
+        x = np.linspace(-size_extract[0]/2, size_extract[0]/2, size_extract[0])
+        y = np.linspace(-size_extract[1]/2, size_extract[1]/2, size_extract[1])
+        z = np.linspace(-size_extract[2]/2, size_extract[2]/2, size_extract[2])
+        x, y, z = np.meshgrid(x, y, z)
+        # calculate the weight array
+        weight_array = np.exp(-0.5*(x**2/std[0]**2 + y**2/std[1]**2 + z**2/std[2]**2))
+        return weight_array
 
     def create_mask(self):
         "Function to create a global image mask of areas that were segmented"
@@ -93,7 +118,7 @@ class Segmentation:
         from .prediction import resample_spacing
         resampled, ref_im = resample_spacing(self.assembly, template_size=template_size)
         return resampled
-
+47
 class VesselTree:
 
     def __init__(self, case, image_file, init_step, pot_branches):

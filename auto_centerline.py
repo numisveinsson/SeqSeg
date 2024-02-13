@@ -194,7 +194,6 @@ if __name__=='__main__':
     write_samples  = global_config['WRITE_STEPS']
     retrace_cent   = global_config['RETRACE']
     take_time      = global_config['TIME_ANALYSIS']
-    weighted = global_config['WEIGHTED_ASSEMBLY']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
 
     # for test in tests:
@@ -247,8 +246,7 @@ if __name__=='__main__':
                                                                                                 dir_seg,
                                                                                                 write_samples,
                                                                                                 take_time,
-                                                                                                retrace_cent,
-                                                                                                weighted)
+                                                                                                retrace_cent)
 
         print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
 

@@ -6,7 +6,6 @@ WRITE_STEPS: True # if we want to write out each step
 ANIMATION: True # to write out animation files
 ANIMATION_STEPS: 10 # write out animation every x steps
 
-WEIGHTED_ASSEMBLY: True # if assembly should be weighted
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
 RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
@@ -22,6 +21,8 @@ PREVENT_RETRACE: True
 ASSEMBLY_EVERY_N: 10 # add to assembly every N steps
 USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)
 BUFFER_N: 10 # add to assembly steps buff_N steps ago
+WEIGHTED_ASSEMBLY: True # if assembly should be weighted
+WEIGHT_TYPE: radius # type of weighting for assembly
 
 FORCEFUL_SIDEBRANCH: False
 FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1.1
