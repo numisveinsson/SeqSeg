@@ -11,7 +11,7 @@ GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (t
 RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
 
-VOLUME_SIZE_RATIO: 5.5
+VOLUME_SIZE_RATIO: 5 #5.5
 MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
 

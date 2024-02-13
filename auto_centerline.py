@@ -65,7 +65,7 @@ def get_testing_samples(dataset):
     if dataset == 'Dataset005_SEQAORTANDFEMOMR':
         testing_samples = [
 
-            ['0006_0001',0,20,30,'mr'], # Aortofemoral MR
+            ['0006_0001',0,0,5,'mr'], # Aortofemoral MR
             ['0063_1001',0,10,20,'mr'], # Aortic MR
             ['0090_0001',0,0,5,'mr'], # Aortic MR
             ['0131_0000',0,10,20,'mr'], # Aortic MR
@@ -81,7 +81,7 @@ def get_testing_samples(dataset):
         testing_samples = [ #get_testing_samples_json(dir_json)
             ['0176_0000',0,10,20,'ct'], # Aorta CT
             ['0174_0000',0,0,5,'ct'], # Aorta CT
-            ['0139_1001',0,10,20,'ct'], # Aortofemoral CT
+            ['0139_1001',0,0,10,'ct'], # Aortofemoral CT
             ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
             ['0146_1001',0,0,10,'ct'], # Aortofemoral CT
             ['0188_0001_aorta',5,-10,-20,'ct'], # Aorta CT
