@@ -36,6 +36,8 @@ export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
+cd /global/scratch/users/numi/SeqSeg/
+
 python3 auto_centerline.py \
     -test_name 3d_fullres \
     -dataset  Dataset005_SEQAORTANDFEMOMR \
@@ -43,8 +45,8 @@ python3 auto_centerline.py \
     -img_ext .mha \
     -outdir output_bryan/ \
     -scale 1 \
-    -start 0 \
-    -stop 1 \
+    -start 1 \
+    -stop 2 \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 

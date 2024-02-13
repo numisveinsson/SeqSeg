@@ -67,16 +67,16 @@ class Segmentation:
                 # now the weight varies with the distance to the center of the volume, and the distance to the border
                 weight_array = self.calc_weight_array_gaussian(size_extract)
                 # Update those values, calculating an average
-                curr_sub_section[ind] = 1/(curr_n[ind]+weight_array)*( weight_array*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+                curr_sub_section[ind] = 1/(curr_n[ind]+weight_array[ind])*( weight_array[ind]*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
                 # Add to update weight sum for these voxels
                 self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight_array
-                self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight_array
+                self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
 
         # Update the global volume
         np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
         self.assembly = numpy_to_sitk(np_arr, self.image_reader)
 
-    def calc_weight_array_gaussian(size_extract):
+    def calc_weight_array_gaussian(self, size_extract):
         "Function to calculate the weight array for a gaussian weighted segmentation"
         # have std so the weight is 0.1 at the border of the volume
         std = 0.1*np.array(size_extract)
@@ -84,7 +84,7 @@ class Segmentation:
         x = np.linspace(-size_extract[0]/2, size_extract[0]/2, size_extract[0])
         y = np.linspace(-size_extract[1]/2, size_extract[1]/2, size_extract[1])
         z = np.linspace(-size_extract[2]/2, size_extract[2]/2, size_extract[2])
-        x, y, z = np.meshgrid(x, y, z)
+        x, y, z = np.meshgrid(z, y, x)
         # calculate the weight array
         weight_array = np.exp(-0.5*(x**2/std[0]**2 + y**2/std[1]**2 + z**2/std[2]**2))
         return weight_array
