@@ -14,7 +14,6 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
     Note: This function is dependent on only being used while tracing (not retracing)
     """
 
-    import pdb; pdb.set_trace()
     branch = len(vessel_tree.branches) - 1
     prev_n = vessel_tree.get_previous_n(branch, N_steps)
     # First we calculate the bounds for the N_steps previous steps
@@ -37,7 +36,25 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
     seg_reader = create_new(img_reader)
     subvolume_img = extract_volume(img_reader, index, size_extract)
     subvolume_seg = extract_volume(seg_reader, index, size_extract)
+    
+    # Convert to numpy arrays
+    # index = np.array([0,0,0])
+    # size_extract = np.array([10000,10000,10000])
 
+    # for n in prev_n:
+    #     step = vessel_tree.step[n]
+    #     bounds = np.array(get_bounds(step['img_index'], step['img_size']))
+    #     index = np.maximum(index, bounds[:, 0])
+    #     size_extract = np.minimum(size_extract, bounds[:, 1])
+
+    # size_extract -= index
+
+    # # Then we extract this subvolume from the global
+    # img_reader = read_image(vessel_tree.image)
+    # seg_reader = create_new(img_reader)
+    # subvolume_img = extract_volume(img_reader, index.tolist(), size_extract.tolist())
+    # subvolume_seg = extract_volume(seg_reader, index.tolist(), size_extract.tolist())
+    
     # Then we loop over previous subvolumes and average them together
     Assembly = Segmentation(    image = subvolume_seg, 
                                 weighted = False

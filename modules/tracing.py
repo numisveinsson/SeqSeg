@@ -25,8 +25,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     if global_config['UNIT'] == 'cm': scale_unit = 0.1
     else:                             scale_unit = 1
 
+    # Animation params
     animation =                     global_config['ANIMATION']
     animation_steps =               global_config['ANIMATION_STEPS']
+    
+    # Tracing params
     allowed_steps =                 global_config['NR_ALLOW_RETRACE_STEPS']
     prevent_retracing =             global_config['PREVENT_RETRACE']
     volume_size_ratio =             global_config['VOLUME_SIZE_RATIO']
@@ -41,7 +44,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     use_buffer =                    global_config['USE_BUFFER']
     N =                             global_config['ASSEMBLY_EVERY_N']
     buffer =                        global_config['BUFFER_N']
-    # Assembly object
     weighted =                      global_config['WEIGHTED_ASSEMBLY']
     weight_type =                   global_config['WEIGHT_TYPE']
 
@@ -61,10 +63,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
         tile_step_size=0.5,
         use_gaussian=True,
         use_mirroring=True,
-        perform_everything_on_gpu=True,
+        perform_everything_on_gpu=False,
         device=torch.device('cpu', 0),
-        verbose=False,
-        verbose_preprocessing=False,
+        verbose=True,
+        verbose_preprocessing=True,
         allow_tqdm=True
     )
     print('About to load model')
@@ -237,11 +239,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             # surface = evaluate_surface(predicted_vessel) # Marching cubes
             surface = convert_seg_to_surfs(predicted_vessel)
 
+            num_iterations = 0
             if step_seg['radius'] > 1 * scale_unit: num_iterations = 12
             elif step_seg['radius'] > 0.5 * scale_unit:
                 print("Small radius; less smoothing")
                 num_iterations = 6
-            else: num_iterations = 0
+
             surface_smooth = smooth_surface(surface, num_iterations) # Smooth marching cubes
 
             vtkimage = exportSitk2VTK(cropped_volume)
