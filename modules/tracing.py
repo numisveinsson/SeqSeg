@@ -84,7 +84,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
     # Track combos of all polydata
     list_centerlines, list_surfaces, list_points = [], [], []
-    dice_list, assd_list, haus_list = [], [], []
     surfaces_animation, cent_animation = [], []
 
     num_steps_direction = 0
@@ -115,8 +114,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                         polydata_point = points2polydata([step_seg['point'].tolist()])
                         pfn = output_folder + 'points/inside_point_'+case+'_'+str(i)+'.vtp'
                         write_geo(pfn, polydata_point)
-
+                    # cause failure
                     print(error)
+                    
                 elif is_point_in_image(assembly_segs.assembly, step_seg['point']): #+ step_seg['radius']*step_seg['tangent']):
                     inside_branch += 1
                 else:
@@ -383,12 +383,13 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     write_vtk_polydata(surface_accum, output_folder+'animation/animationsurf_'+str(i).zfill(3)+'.vtp')
                     write_vtk_polydata(cent_accum, output_folder+'animation/animationcent_'+str(i).zfill(3)+'.vtp')
 
-            point_tree, radius_tree, angle_change = get_next_points( centerline_poly,
+            point_tree, radius_tree, angle_change = get_next_points(    centerline_poly,
                                                                         step_seg['point'],
                                                                         step_seg['old point'],
                                                                         step_seg['old radius'],
                                                                         magn_radius = magnify_radius,
-                                                                        min_radius = min_radius)
+                                                                        min_radius = min_radius
+                                                                    )
 
             if take_time:
                 print("\n Calc next point: " + str(time.time() - start_time_loc) + " s\n")
@@ -406,7 +407,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                                 step_seg['radius'],
                                                 point_tree[0],
                                                 radius_tree[0],
-                                                angle_change[0])
+                                                angle_change[0]
+                                            )
+                
                 print("Next radius is: " + str(radius_tree[0]))
                 vessel_tree.add_step(i, next_step, branch)
 
@@ -540,5 +543,5 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                             (1/vessel_tree.steps[-check]['radius'])**2)
             vessel_tree.steps[-check]['prob_predicted_vessel'] = None
             check += 1
-    #
+
     return list_centerlines, list_surfaces, list_points, assembly_segs, vessel_tree, i

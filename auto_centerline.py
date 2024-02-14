@@ -7,24 +7,18 @@ faulthandler.enable()
 
 import time
 start_time = time.time()
-from datetime import datetime
 
 import os
 import sys
 sys.stdout.flush()
-import pickle
 import argparse
-import numpy as np
 import SimpleITK as sitk
 
 from modules import sitk_functions as sf
 from modules import vtk_functions as vf
-# from modules import vmtk_functions as vmtkfs
 from modules import initialization as init
 from modules.tracing import trace_centerline
 from modules.datasets import get_testing_samples_json
-from modules.assembly import create_step_dict
-from modules.evaluation import EvaluateTracing
 from modules.params import load_yaml
 
 def create_directories(output_folder, write_samples):
@@ -199,11 +193,11 @@ if __name__=='__main__':
     # for test in tests:
     # print('\n test is: \n', test)
 
-    dataset = args.dataset #test[1]
-    fold = args.fold #test[2]
-    img_format = args.img_ext #test[4]
-    scale = args.scale #test[5]
-    test_name = args.test_name #test[0]
+    dataset = args.dataset      #test[1]
+    fold = args.fold            #test[2]
+    img_format = args.img_ext   #test[4]
+    scale = args.scale          #test[5]
+    test_name = args.test_name  #test[0]
 
     ## Weight directory
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
