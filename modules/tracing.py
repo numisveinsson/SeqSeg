@@ -222,7 +222,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             if global_config['MEGA_SUBVOLUME']:
 
-                predicted_vessel = construct_subvolume(predicted_vessel, vessel_tree, global_config['NR_MEGA_SUB'], i)
+                predicted_vessel, subvolume_img = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i)
+                if write_samples:
+                    sitk.WriteImage(subvolume_img, volume_fn.replace('.mha', '_mega.mha'))
+                    sitk.WriteImage(predicted_vessel, pd_fn.replace('.mha', '_mega.mha'))
 
             # Surface
 

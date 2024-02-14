@@ -9,12 +9,22 @@ from datetime import datetime
 
 class Segmentation:
 
-    def __init__(self, case, image_file, weighted = False, weight_type = None):
-        self.name = case
-        self.image_reader = read_image(image_file)
+    def __init__(self, case = None, image_file = None, weighted = False, weight_type = None, image = None):
+        if case:
+            self.name = case
+        if image_file:
+            self.image_reader = read_image(image_file)
 
-        new_img = create_new(self.image_reader)
-        self.assembly = new_img
+            new_img = create_new(self.image_reader)
+            self.assembly = new_img
+
+        elif image:
+
+            self.image_reader = image
+            self.assembly = image
+        
+        else:
+            print("Please provide either an image file or an image object")
 
         self.number_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
 
@@ -156,7 +166,7 @@ class VesselTree:
     def sort_potential(self):
         self.potential_branches.sort(key=operator.itemgetter('radius'), reverse = True)
 
-    def get_previous_n(self, i, branch, n):
+    def get_previous_n(self, branch, n):
         branch0 = self.branches[branch]
         if len(branch0) > n:
             previous_n = branch0[-n:]
@@ -167,6 +177,7 @@ class VesselTree:
             for i in range(1,res):
                 previous_n.append(conn+i)
                 previous_n.append(conn-i)
+        return previous_n
 
     def get_previous_step(self,step_number):
 
