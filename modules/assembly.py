@@ -95,7 +95,7 @@ class Segmentation:
         x = np.linspace(-size_extract[0]/2, size_extract[0]/2, size_extract[0])
         y = np.linspace(-size_extract[1]/2, size_extract[1]/2, size_extract[1])
         z = np.linspace(-size_extract[2]/2, size_extract[2]/2, size_extract[2])
-        x, y, z = np.meshgrid(z, y, x)
+        x, y, z = np.meshgrid(z, y, x).transpose(1, 2, 0)
         # calculate the weight array
         weight_array = np.exp(-0.5*(x**2/std[0]**2 + y**2/std[1]**2 + z**2/std[2]**2))
         return weight_array
