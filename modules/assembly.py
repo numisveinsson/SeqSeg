@@ -66,6 +66,7 @@ class Segmentation:
             elif self.weight_type == 'gaussian':
                 # now the weight varies with the distance to the center of the volume, and the distance to the border
                 weight_array = self.calc_weight_array_gaussian(size_extract)
+                print(f"weight array size: {weight_array.shape}, ind size: {ind.shape}")
                 # Update those values, calculating an average
                 curr_sub_section[ind] = 1/(curr_n[ind]+weight_array[ind])*( weight_array[ind]*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
                 # Add to update weight sum for these voxels
