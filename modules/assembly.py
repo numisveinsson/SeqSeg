@@ -8,8 +8,19 @@ import time
 from datetime import datetime
 
 class Segmentation:
+    """
+    Class to keep track of a global segmentation, and update it with new segmentations
+    """
 
     def __init__(self, case = None, image_file = None, weighted = False, weight_type = None, image = None):
+        """
+        Args:
+            case: name of the case
+            image_file: image file to create the global segmentation in the same space
+            weighted: whether to use a weighted average for the segmentation
+            weight_type: type of weight to use for the weighted average
+            image: image object to create the global segmentation
+        """
         if case:
             self.name = case
         if image_file:
@@ -39,7 +50,14 @@ class Segmentation:
             self.weight_type = weight_type
 
     def add_segmentation(self, volume_seg, index_extract, size_extract, weight=None):
-
+        """
+        Function to add a new segmentation to the global assembly
+        Args:
+            volume_seg: the new segmentation to add
+            index_extract: index for sitk volume extraction
+            size_extract: number of voxels to extract in each dim
+            weight: weight for the weighted average
+        """
         # Load the volumes
         np_arr = sitk_to_numpy(self.assembly).astype(float)
         np_arr_add = sitk_to_numpy(volume_seg).astype(float)
