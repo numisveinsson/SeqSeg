@@ -171,16 +171,19 @@ class VesselTree:
         self.potential_branches.sort(key=operator.itemgetter('radius'), reverse = True)
 
     def get_previous_n(self, branch, n):
+
         branch0 = self.branches[branch]
         if len(branch0) > n:
             previous_n = branch0[-n:]
         else:
-            previous_n = branch0
-            res = n-len(branch0)+2
+            previous_n = [bra for bra in branch0] #branch0
+            
             conn = self.bifurcations[branch]
-            for i in range(1,res):
-                previous_n.append(conn+i)
-                previous_n.append(conn-i)
+            if conn != 0:
+                res = n-len(branch0)+2
+                for i in range(1,res):
+                    previous_n.append(conn+i)
+                    previous_n.append(conn-i)
         return previous_n
 
     def get_previous_step(self,step_number):

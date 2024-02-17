@@ -13,14 +13,13 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
     
     Note: This function is dependent on only being used while tracing (not retracing)
     """
-
     branch = len(vessel_tree.branches) - 1
     prev_n = vessel_tree.get_previous_n(branch, N_steps)
     # First we calculate the bounds for the N_steps previous steps
     index = [0,0,0]
     size_extract = [10000,10000,10000]
     for n in prev_n:
-        step = vessel_tree.step[n]
+        step = vessel_tree.steps[n]
         bounds = get_bounds(step['img_index'], step['img_size'])
         for i in range(3):
             if bounds[i][0] > index[i]:
@@ -33,10 +32,10 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
 
     # Then we extract this subvolume from the global
     img_reader = read_image(vessel_tree.image)
-    seg_reader = create_new(img_reader)
+    # seg_reader = create_new(img_reader)
     subvolume_img = extract_volume(img_reader, index, size_extract)
-    subvolume_seg = extract_volume(seg_reader, index, size_extract)
-    
+    subvolume_seg = create_new(subvolume_img, 1)
+
     # Convert to numpy arrays
     # index = np.array([0,0,0])
     # size_extract = np.array([10000,10000,10000])
@@ -61,10 +60,10 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
                             )
     # Add the current step
     Assembly.add_segmentation(step_seg['prob_predicted_vessel'], get_local_ind(index, step_seg['img_index']), step_seg['img_size'])
-
+    import pdb; pdb.set_trace()
     # Add the previous steps
     for n in prev_n:
-        step = vessel_tree.step[n]
+        step = vessel_tree.steps[n]
         local_index = get_local_ind(index, step['img_index'])
         local_size = step['img_size']
         

@@ -16,19 +16,27 @@ def read_image(file_dir_image):
     file_reader.ReadImageInformation()
     return file_reader
 
-def create_new(file_reader):
+def create_new(file_reader, PixelID = None):
     """
     Create new SITK image with same formating as another
     Args:
-        file_reader: reader from another image
+        file_reader: reader from another image, or image object
     Returns:
         SITK image
     """
-    result_img = sitk.Image(file_reader.GetSize(), file_reader.GetPixelID(),
+    if PixelID: pix_id = PixelID
+    else: pix_id = file_reader.GetPixelID()
+
+    # check if reader or image object
+    if type(file_reader) == sitk.ImageFileReader:
+        result_img = sitk.Image(file_reader.GetSize(), pix_id,
                             file_reader.GetNumberOfComponents())
+    else:
+        result_img = sitk.Image(file_reader.GetSize(), pix_id)
     result_img.SetSpacing(file_reader.GetSpacing())
     result_img.SetOrigin(file_reader.GetOrigin())
     result_img.SetDirection(file_reader.GetDirection())
+    
     return result_img
 
 def copy_settings(img, ref_img):
