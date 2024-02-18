@@ -176,8 +176,8 @@ class VesselTree:
         if len(branch0) > n:
             previous_n = branch0[-n:]
         else:
-            previous_n = branch0
-            # previous_n = [bra for bra in branch0] #branch0
+            # previous_n = branch0
+            previous_n = [bra for bra in branch0] #branch0
             # previous_n = previous_n[:]
             # conn = self.bifurcations[branch]
             # if conn != 0:
