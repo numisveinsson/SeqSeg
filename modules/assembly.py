@@ -55,7 +55,7 @@ class Segmentation:
         # Isolate current subvolume of interest
         curr_sub_section = np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]]
         np_arr_add = np_arr_add[cut:size_extract[2]-cut, cut:size_extract[1]-cut, cut:size_extract[0]-cut]
-
+        # import pdb; pdb.set_trace()
         # Find indexes where we need to average predictions
         ind = curr_n > 0
         # Where this is the first update, copy directly
@@ -176,14 +176,15 @@ class VesselTree:
         if len(branch0) > n:
             previous_n = branch0[-n:]
         else:
-            previous_n = [bra for bra in branch0] #branch0
-            
-            conn = self.bifurcations[branch]
-            if conn != 0:
-                res = n-len(branch0)+2
-                for i in range(1,res):
-                    previous_n.append(conn+i)
-                    previous_n.append(conn-i)
+            previous_n = branch0
+            # previous_n = [bra for bra in branch0] #branch0
+            # previous_n = previous_n[:]
+            # conn = self.bifurcations[branch]
+            # if conn != 0:
+            #     res = n-len(branch0)+2
+            #     for i in range(1,res):
+            #         previous_n.append(conn+i)
+            #         previous_n.append(conn-i)
         return previous_n
 
     def get_previous_step(self,step_number):

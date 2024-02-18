@@ -221,10 +221,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
-
+            if write_samples:
+                sitk.WriteImage(predicted_vessel, pd_fn)
             if global_config['MEGA_SUBVOLUME']:
-
-                predicted_vessel, subvolume_img = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'])
+                
+                # import pdb; pdb.set_trace()
+                predicted_vessel, subvolume_img = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i)
                 if write_samples:
                     sitk.WriteImage(subvolume_img, volume_fn.replace('.mha', '_mega.mha'))
                     sitk.WriteImage(predicted_vessel, pd_fn.replace('.mha', '_mega.mha'))
@@ -264,7 +266,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'.vtp'
             # cfn_un = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_unsmooth.vtp'
             if write_samples:
-                sitk.WriteImage(predicted_vessel, pd_fn)
                 write_vtk_polydata(surface_smooth, sfn)
                 write_vtk_polydata(surface, sfn_un)
             step_seg['seg_file'] = pd_fn

@@ -1,7 +1,8 @@
 from .sitk_functions import *
-from .assembly import * 
+from .assembly import *
+import SimpleITK as sitk
 
-def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
+def construct_subvolume(step_seg, vessel_tree, N_steps = 5, N_curr = None):
     """
     Function to create a 'mega' subvolume, assembled from a few
     Args:
@@ -15,16 +16,17 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
     """
     branch = len(vessel_tree.branches) - 1
     prev_n = vessel_tree.get_previous_n(branch, N_steps)
+    print(f"Prev n: {prev_n}")
     # First we calculate the bounds for the N_steps previous steps
-    index = [0,0,0]
-    size_extract = [10000,10000,10000]
+    size_extract = [0,0,0]
+    index = [10000,10000,10000]
     for n in prev_n:
         step = vessel_tree.steps[n]
         bounds = get_bounds(step['img_index'], step['img_size'])
         for i in range(3):
-            if bounds[i][0] > index[i]:
+            if bounds[i][0] < index[i]:
                 index[i] = bounds[i][0]
-            if bounds[i][1] < size_extract[i]:
+            if bounds[i][1] > size_extract[i]:
                 size_extract[i] = bounds[i][1]
     
     for i in range(3):
@@ -35,7 +37,8 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
     # seg_reader = create_new(img_reader)
     subvolume_img = extract_volume(img_reader, index, size_extract)
     subvolume_seg = create_new(subvolume_img, 1)
-
+    print(f"Global image size: {img_reader.GetSize()}")
+    print(f"Mega index: {index}, size: {size_extract}")
     # Convert to numpy arrays
     # index = np.array([0,0,0])
     # size_extract = np.array([10000,10000,10000])
@@ -59,20 +62,25 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5):
                                 weighted = False
                             )
     # Add the current step
+    # import pdb; pdb.set_trace()
     Assembly.add_segmentation(step_seg['prob_predicted_vessel'], get_local_ind(index, step_seg['img_index']), step_seg['img_size'])
-    import pdb; pdb.set_trace()
+    prev_n.remove(N_curr)
     # Add the previous steps
     for n in prev_n:
         step = vessel_tree.steps[n]
+        print(f"Global local index: {step['img_index']}, size: {step['img_size']}")
         local_index = get_local_ind(index, step['img_index'])
         local_size = step['img_size']
-        
+        print(f"Local index: {local_index}, size: {local_size}")
         Assembly.add_segmentation(      step['prob_predicted_vessel'], 
                                         local_index,
                                         local_size
         )
+    
+    # return a binary image
+    assembly_binary = sitk.BinaryThreshold(Assembly.assembly, lowerThreshold=0.5, upperThreshold=1)
 
-    return Assembly.assembly, subvolume_img
+    return assembly_binary, subvolume_img
 
 def get_bounds(index, size):
     """
