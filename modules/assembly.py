@@ -206,6 +206,10 @@ class VesselTree:
             #     for i in range(1,res):
             #         previous_n.append(conn+i)
             #         previous_n.append(conn-i)
+        # remove 0 from the list
+        if 0 in previous_n:
+            previous_n.remove(0)
+            
         return previous_n
 
     def get_previous_step(self,step_number):
