@@ -181,6 +181,9 @@ class VesselTree:
             # previous_n = previous_n[:]
             # conn = self.bifurcations[branch]
             # if conn != 0:
+            if len(previous_n) > 1:
+                previous_n = previous_n[1:]
+
             #     res = n-len(branch0)+2
             #     for i in range(1,res):
             #         previous_n.append(conn+i)
