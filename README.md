@@ -1,6 +1,18 @@
 # SeqSeg: Automatic Tracing and Segmentation of Blood Vessels
 Repository for Automatic Vascular Model Creation using localized 3D segmentation for tracing.
 
+## Set Up
+Main package dependencies:
+    nnU-Net
+    Pytorch
+    SITK
+    VTK
+    VMTK
+(see environment.yml file)
+
+## Running
+auto_centerline: Main file to run.
+
 Arguments:
 
 -data_dir: This argument specifies the name of the folder containing the testing data.
@@ -20,18 +32,6 @@ Arguments:
 -start: This argument specifies where to start in the list of testing samples. The default value is 0.
 
 -stop: This argument specifies where to stop in the list of testing samples. The default value is -1, which usually means to process all samples until the end of the list.
-
-## Set Up
-Main package dependencies:
-    nnU-Net
-    Pytorch
-    SITK
-    VTK
-    VMTK
-(see environment.yml file)
-
-## Running
-auto_centerline: Main file to run.
 
 Data directory: Assumes the following structure:
     - images
