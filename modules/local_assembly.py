@@ -16,7 +16,7 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5, N_curr = None):
     """
     branch = len(vessel_tree.branches) - 1
     prev_n = vessel_tree.get_previous_n(branch, N_steps)
-    print(f"Prev n: {prev_n}")
+    print(f"\nPrev n used for mega subvolume: {prev_n}")
     # First we calculate the bounds for the N_steps previous steps
     size_extract = [0,0,0]
     index = [10000,10000,10000]
@@ -37,26 +37,9 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5, N_curr = None):
     # seg_reader = create_new(img_reader)
     subvolume_img = extract_volume(img_reader, index, size_extract)
     subvolume_seg = create_new(subvolume_img, 1)
-    print(f"Global image size: {img_reader.GetSize()}")
-    print(f"Mega index: {index}, size: {size_extract}")
-    # Convert to numpy arrays
-    # index = np.array([0,0,0])
-    # size_extract = np.array([10000,10000,10000])
+    # print(f"Global image size: {img_reader.GetSize()}")
+    # print(f"Mega index: {index}, size: {size_extract}")
 
-    # for n in prev_n:
-    #     step = vessel_tree.step[n]
-    #     bounds = np.array(get_bounds(step['img_index'], step['img_size']))
-    #     index = np.maximum(index, bounds[:, 0])
-    #     size_extract = np.minimum(size_extract, bounds[:, 1])
-
-    # size_extract -= index
-
-    # # Then we extract this subvolume from the global
-    # img_reader = read_image(vessel_tree.image)
-    # seg_reader = create_new(img_reader)
-    # subvolume_img = extract_volume(img_reader, index.tolist(), size_extract.tolist())
-    # subvolume_seg = extract_volume(seg_reader, index.tolist(), size_extract.tolist())
-    
     # Then we loop over previous subvolumes and average them together
     Assembly = Segmentation(    image = subvolume_seg, 
                                 weighted = False
@@ -80,6 +63,7 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5, N_curr = None):
     # return a binary image
     assembly_binary = sitk.BinaryThreshold(Assembly.assembly, lowerThreshold=0.5, upperThreshold=1)
 
+    print(f"Mega subvolume constructed.")
     return assembly_binary, subvolume_img
 
 def get_bounds(index, size):

@@ -136,7 +136,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             max_mag = 1.3 # stops when reaches this
             add_mag = 0.2
             
-            if step_seg['radius'] > 3*scale_unit: mag = max_mag
+            if step_seg['radius'] > 3 *scale_unit: mag = max_mag # if above 3mm then dont change size
             
             while perc > 0.33 and continue_enlarge:
                 if mag > 1 and mag < max_mag:
@@ -223,9 +223,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 start_time_loc = time.time()
             if write_samples:
                 sitk.WriteImage(predicted_vessel, pd_fn)
-            if global_config['MEGA_SUBVOLUME']:
                 
-                # import pdb; pdb.set_trace()
+            if global_config['MEGA_SUBVOLUME']:
                 predicted_vessel, subvolume_img = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i)
                 if write_samples:
                     sitk.WriteImage(subvolume_img, volume_fn.replace('.mha', '_mega.mha'))
@@ -271,7 +270,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             step_seg['seg_file'] = pd_fn
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
-
 
             if i != 0:
                 prev_step = vessel_tree.get_previous_step(i)
