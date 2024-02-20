@@ -207,7 +207,7 @@ class VesselTree:
             #         previous_n.append(conn+i)
             #         previous_n.append(conn-i)
         # remove 0 from the list
-        if 0 in previous_n:
+        if 0 in previous_n and len(previous_n) > 1:
             previous_n.remove(0)
             
         return previous_n

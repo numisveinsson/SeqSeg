@@ -43,10 +43,20 @@ python3 auto_centerline.py \
     -dataset  Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
-    -outdir output_bryan/ \
+    -outdir output_v2/ \
     -scale 1 \
     -start 1 \
     -stop 2 \
+
+# python3 auto_centerline.py \
+#     -test_name 3d_fullres \
+#     -dataset  Dataset010_SEQCOROASOCACT \
+#     -fold all \
+#     -img_ext .nrrd \
+#     -outdir output_v2/ \
+#     -scale 1 \
+#     -start 0 \
+#     -stop -1 \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 

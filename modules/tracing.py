@@ -65,8 +65,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
         use_mirroring=True,
         perform_everything_on_gpu=False,
         device=torch.device('cpu', 0),
-        verbose=False,
-        verbose_preprocessing=False,
+        verbose=True,
+        verbose_preprocessing=True,
         allow_tqdm=True
     )
     print('About to load model')
@@ -293,17 +293,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             # write_geo(pfn, polydata_point)
 
             # Centerline
-            # centerline_poly_unsmooth = calc_centerline(  surface,
-            #                                     "profileidlist",
-            #                                     var_source=[source_id],
-            #                                     number = i)
             centerline_poly = calc_centerline(  surface_smooth,
                                                 "profileidlist",
                                                 var_source=[source_id],
                                                 number = i,
                                                 caps = caps,
                                                 point = step_seg['point'])
-            # write_centerline(centerline_poly_unsmooth, cfn_un)
             write_centerline(centerline_poly, cfn)
 
             centerline_poly = resample_centerline(centerline_poly)

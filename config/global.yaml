@@ -1,16 +1,16 @@
-MAX_STEPS: 1000
+MAX_STEPS: 2000
 
-UNIT: mm # important for different smoothing based on size
+UNIT: cm # important for different smoothing based on size
 
 WRITE_STEPS: True # if we want to write out each step
-ANIMATION: True # to write out animation files
+ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 10 # write out animation every x steps
 
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
 RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
 
-VOLUME_SIZE_RATIO: 5 #5.5
+VOLUME_SIZE_RATIO: 5.5 #5.5
 MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
 
