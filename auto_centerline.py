@@ -269,7 +269,7 @@ if __name__=='__main__':
         sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_'+ test_name +'_'+str(i)+'.mha')
         
         assembly_binary = sf.keep_component_seeds(assembly_binary, initial_seeds)
-        sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_rem_' + test_name +'_'+str(i)+'.mha')
+        sitk.WriteImage(assembly_binary, dir_output0+'/'+case+'_seg_rem_' + test_name +'_'+str(i)+'.mha')
 
         assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
         vf.write_vtk_polydata(assembly_surface, dir_output+'/final_assembly_'+name+'_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_'+'_surface.vtp')
