@@ -19,11 +19,13 @@ from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 import pdb
 def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     potential_branches, max_step_size, global_config,
-                    scale = 1, seg_file=None,    write_samples=True,
-                    take_time=False,    retrace_cent=False):
+                    scale = 1, seg_file=None, take_time=False,    retrace_cent=False):
 
     if global_config['UNIT'] == 'cm': scale_unit = 0.1
     else:                             scale_unit = 1
+
+    # Write out params
+    write_samples =                 global_config['WRITE_STEPS']
 
     # Animation params
     animation =                     global_config['ANIMATION']

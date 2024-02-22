@@ -239,7 +239,6 @@ if __name__=='__main__':
                                                                                                 global_config,
                                                                                                 scale,
                                                                                                 dir_seg,
-                                                                                                write_samples,
                                                                                                 take_time,
                                                                                                 retrace_cent)
 
