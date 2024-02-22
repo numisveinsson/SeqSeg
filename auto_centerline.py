@@ -165,6 +165,7 @@ if __name__=='__main__':
     parser.add_argument('-start',       '--start',     default= 0,              type=int,   help='In the list of testing samples, where to start')
     parser.add_argument('-stop',        '--stop',      default= -1,             type=int,   help='In the list of testing samples, where to stop')
     parser.add_argument('-max_n_steps', '--max_n_steps', default= 1000,         type=int,   help='Max number of steps to take')
+    parser.add_argument('-unit',        '--unit',        default= 'cm',         type=str,   help='Unit of medical image')
     args = parser.parse_args()
 
     print(args)
@@ -185,6 +186,7 @@ if __name__=='__main__':
 
     dir_output0 = args.outdir
 
+    unit = args.unit
     max_step_size  = args.max_n_steps
     write_samples  = global_config['WRITE_STEPS']
     take_time      = global_config['TIME_ANALYSIS']
@@ -236,6 +238,7 @@ if __name__=='__main__':
                                                                                                 potential_branches,
                                                                                                 max_step_size,
                                                                                                 global_config,
+                                                                                                unit,
                                                                                                 scale,
                                                                                                 dir_seg)
 

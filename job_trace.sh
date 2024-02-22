@@ -38,26 +38,29 @@ export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/
 
-python3 auto_centerline.py \
-    -test_name 3d_fullres \
-    -dataset  Dataset006_SEQAORTANDFEMOCT \
-    -fold all \
-    -img_ext .mha \
-    -outdir output_v2/ \
-    -scale 1 \
-    -start 7 \
-    -stop 8 \
-    -max_n_steps 1000 \
-
 # python3 auto_centerline.py \
 #     -test_name 3d_fullres \
-#     -dataset  Dataset010_SEQCOROASOCACT \
+#     -dataset  Dataset006_SEQAORTANDFEMOCT \
 #     -fold all \
-#     -img_ext .nrrd \
+#     -img_ext .mha \
 #     -outdir output_v2/ \
 #     -scale 1 \
-#     -start 19 \
-#     -stop 20 \
+#     -start 7 \
+#     -stop 8 \
+#     -max_n_steps 1000 \
+#     -unit cm \
+
+python3 auto_centerline.py \
+    -test_name 3d_fullres \
+    -dataset  Dataset010_SEQCOROASOCACT \
+    -fold all \
+    -img_ext .nrrd \
+    -outdir output_v2/ \
+    -scale 1 \
+    -start 16 \
+    -stop 17 \
+    -max_n_steps 950 \
+    -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 

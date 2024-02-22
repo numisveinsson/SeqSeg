@@ -19,9 +19,9 @@ from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 import pdb
 def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     potential_branches, max_step_size, global_config,
-                    scale = 1, seg_file=None):
+                    unit = 'cm', scale = 1, seg_file=None):
 
-    if global_config['UNIT'] == 'cm': scale_unit = 0.1
+    if unit == 'cm': scale_unit = 0.1
     else:                             scale_unit = 1
 
     # Write out params
