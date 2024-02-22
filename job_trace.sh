@@ -47,6 +47,7 @@ python3 auto_centerline.py \
     -scale 1 \
     -start 7 \
     -stop 8 \
+    -max_n_steps 1000 \
 
 # python3 auto_centerline.py \
 #     -test_name 3d_fullres \

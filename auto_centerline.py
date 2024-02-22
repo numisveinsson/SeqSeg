@@ -164,6 +164,7 @@ if __name__=='__main__':
     parser.add_argument('-scale',       '--scale',     default= 1,              type=int,   help='Whether to scale image data, needed if units for nnUNet model and testing data are different')
     parser.add_argument('-start',       '--start',     default= 0,              type=int,   help='In the list of testing samples, where to start')
     parser.add_argument('-stop',        '--stop',      default= -1,             type=int,   help='In the list of testing samples, where to stop')
+    parser.add_argument('-max_n_steps', '--max_n_steps', default= 1000,         type=int,   help='Max number of steps to take')
     args = parser.parse_args()
 
     print(args)
@@ -184,7 +185,7 @@ if __name__=='__main__':
 
     dir_output0 = args.outdir
 
-    max_step_size  = global_config['MAX_STEPS']
+    max_step_size  = args.max_n_steps
     write_samples  = global_config['WRITE_STEPS']
     retrace_cent   = global_config['RETRACE']
     take_time      = global_config['TIME_ANALYSIS']
