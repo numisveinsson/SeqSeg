@@ -187,7 +187,6 @@ if __name__=='__main__':
 
     max_step_size  = args.max_n_steps
     write_samples  = global_config['WRITE_STEPS']
-    retrace_cent   = global_config['RETRACE']
     take_time      = global_config['TIME_ANALYSIS']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
 
@@ -238,9 +237,7 @@ if __name__=='__main__':
                                                                                                 max_step_size,
                                                                                                 global_config,
                                                                                                 scale,
-                                                                                                dir_seg,
-                                                                                                take_time,
-                                                                                                retrace_cent)
+                                                                                                dir_seg)
 
         print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
 
