@@ -162,7 +162,6 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, pro
     min_resolution_any_dim = 5
     min_res = 0
 
-    print(f"Subvolume resolution: {size_extract}, Radius: {radius}")
     while min_res < min_resolution_any_dim:
         size_extract = np.ceil(size_volume*radius/spacing_im).astype(int)
         index_extract = np.rint((point-origin_im - (size_volume/2)*radius)/spacing_im).astype(int)
