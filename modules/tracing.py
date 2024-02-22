@@ -65,8 +65,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
         use_mirroring=True,
         perform_everything_on_gpu=False,
         device=torch.device('cpu', 0),
-        verbose=True,
-        verbose_preprocessing=True,
+        verbose=False,
+        verbose_preprocessing=False,
         allow_tqdm=True
     )
     print('About to load model')
