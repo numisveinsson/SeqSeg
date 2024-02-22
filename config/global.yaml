@@ -1,5 +1,3 @@
-UNIT: cm # important for different smoothing based on size
-
 WRITE_STEPS: True # if we want to write out each step
 ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 10 # write out animation every x steps
