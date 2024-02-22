@@ -51,10 +51,10 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5, N_curr = None):
     # Add the previous steps
     for n in prev_n:
         step = vessel_tree.steps[n]
-        print(f"Global local index: {step['img_index']}, size: {step['img_size']}")
+        # print(f"Global local index: {step['img_index']}, size: {step['img_size']}")
         local_index = get_local_ind(index, step['img_index'])
         local_size = step['img_size']
-        print(f"Local index: {local_index}, size: {local_size}")
+        # print(f"Local index: {local_index}, size: {local_size}")
         Assembly.add_segmentation(      step['prob_predicted_vessel'], 
                                         local_index,
                                         local_size
