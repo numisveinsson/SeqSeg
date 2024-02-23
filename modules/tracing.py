@@ -245,7 +245,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             # surface = evaluate_surface(predicted_vessel) # Marching cubes
             surface = convert_seg_to_surfs(predicted_vessel)
 
-            num_iterations = 0
+            num_iterations = 3
             if step_seg['radius'] > 1 * scale_unit: num_iterations = 12
             elif step_seg['radius'] > 0.5 * scale_unit:
                 print("Small radius; less smoothing")
@@ -529,7 +529,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             list_pot.append(points2polydata([pot['point'].tolist()]))
             #vessel_tree.caps = vessel_tree.caps + [pot['point']+ volume_size_ratio*pot['radius']*pot['tangent']]
         final_pot = appendPolyData(list_pot)
-        write_vtk_polydata(final_pot, output_folder+'/assembly/potentials_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
+        write_vtk_polydata(final_pot, output_folder+'/potentials_'+case+'_'+str(i)+'_points.vtp')
 
     if use_buffer:
         print("Adding rest of segs to global")
