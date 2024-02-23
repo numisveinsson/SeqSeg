@@ -230,10 +230,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 sitk.WriteImage(predicted_vessel, pd_fn)
                 
             if global_config['MEGA_SUBVOLUME']:
-                predicted_vessel, subvolume_img = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i)
+                predicted_vessel, cropped_volume = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i)
                 if write_samples:
-                    sitk.WriteImage(subvolume_img, volume_fn.replace('.mha', '_mega.mha'))
-                    sitk.WriteImage(predicted_vessel, pd_fn.replace('.mha', '_mega.mha'))
+                    sitk.WriteImage(cropped_volume, volume_fn.replace('.mha', '_mega'+str(time.time())+'.mha'))
+                    sitk.WriteImage(predicted_vessel, pd_fn.replace('.mha', '_mega'+str(time.time())+'.mha'))
 
             # Surface
 
@@ -243,6 +243,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             #         write_vtk_polydata(surface_smooth, seg_fn)
 
             # surface = evaluate_surface(predicted_vessel) # Marching cubes
+
+            if i == 82:
+                pdb.set_trace()
             surface = convert_seg_to_surfs(predicted_vessel)
 
             num_iterations = 3
@@ -444,7 +447,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
         except Exception as e:
             print(e)
 
-            if step_seg['seg_file']:
+            if step_seg['centerline']:
+                print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel, centerline_poly)
+            elif step_seg['seg_file']:
                 print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel)
             elif step_seg['img_file']:
                 print_error(output_folder, i, step_seg, cropped_volume)

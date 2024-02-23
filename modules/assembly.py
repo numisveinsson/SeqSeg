@@ -1,6 +1,6 @@
 import pdb
 from .sitk_functions import *
-from .vtk_functions import is_point_in_image, write_vtk_polydata
+from .vtk_functions import is_point_in_image, write_vtk_polydata, points2polydata
 import numpy as np
 import SimpleITK as sitk
 import operator
@@ -94,7 +94,7 @@ class Segmentation:
             elif self.weight_type == 'gaussian':
                 # now the weight varies with the distance to the center of the volume, and the distance to the border
                 weight_array = self.calc_weight_array_gaussian(size_extract)
-                print(f"weight array size: {weight_array.shape}, ind size: {ind.shape}")
+                # print(f"weight array size: {weight_array.shape}, ind size: {ind.shape}")
                 # Update those values, calculating an average
                 curr_sub_section[ind] = 1/(curr_n[ind]+weight_array[ind])*( weight_array[ind]*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
                 # Add to update weight sum for these voxels
@@ -356,11 +356,14 @@ class Branch:
         self.children.append(step)
 
 
-def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
+def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None, centerline_poly=None):
 
     now = datetime.now()
     dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
     directory = output_folder + 'errors/'+str(i) + '_error_'+dt_string
+
+    polydata_point = points2polydata([step_seg['point'].tolist()])
+    write_vtk_polydata(polydata_point, directory + 'point.vtp')
 
     if step_seg['img_file'] and not step_seg['is_inside']:
         sitk.WriteImage(image, directory + 'img.vtk')
@@ -370,6 +373,9 @@ def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
 
             if step_seg['surf_file']:
                 write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
+
+                if step_seg['centerline']:
+                    write_vtk_polydata(centerline_poly, directory + 'cent.vtp')
 
 
 def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=None):
