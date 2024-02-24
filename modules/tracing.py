@@ -5,8 +5,9 @@ import SimpleITK as sitk
 from .sitk_functions import *
 from .vtk_functions import *
 from .vmtk_functions import *
-from .assembly import Segmentation, VesselTree, print_error, create_step_dict
+from .assembly import Segmentation, VesselTree, print_error, create_step_dict, get_old_ref_point
 from .local_assembly import construct_subvolume
+from .tracing_functions import get_smoothing_params
 
 import sys
 sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
@@ -244,15 +245,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # surface = evaluate_surface(predicted_vessel) # Marching cubes
 
-            if i == 82:
-                pdb.set_trace()
-            surface = convert_seg_to_surfs(predicted_vessel)
+            surface = convert_seg_to_surfs(predicted_vessel, global_config['MEGA_SUBVOLUME'])
 
-            num_iterations = 3
-            if step_seg['radius'] > 1 * scale_unit: num_iterations = 12
-            elif step_seg['radius'] > 0.5 * scale_unit:
-                print("Small radius; less smoothing")
-                num_iterations = 6
+            num_iterations = get_smoothing_params(step_seg['radius'], scale_unit, global_config['MEGA_SUBVOLUME'])
 
             surface_smooth = smooth_surface(surface, num_iterations) # Smooth marching cubes
 
@@ -279,12 +274,13 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
 
-            if i != 0:
-                prev_step = vessel_tree.get_previous_step(i)
-                old_point_ref = prev_step['old point']
-            elif i == 0:
-                old_point_ref = step_seg['old point']
 
+            old_point_ref = get_old_ref_point(vessel_tree, step_seg, i, global_config['MEGA_SUBVOLUME'], global_config['NR_MEGA_SUB'])
+            if write_samples:
+                polydata_point = points2polydata([old_point_ref.tolist()])
+                pfn = output_folder + 'points/point_'+case+'_'+str(i)+'ref.vtp'
+                write_geo(pfn, polydata_point)
+                
             caps = calc_caps(surface_smooth)
 
             step_seg['caps'] = caps
@@ -390,7 +386,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                                                         step_seg['old point'],
                                                                         step_seg['old radius'],
                                                                         magn_radius = magnify_radius,
-                                                                        min_radius = min_radius
+                                                                        min_radius = min_radius,
+                                                                        mega_sub = global_config['MEGA_SUBVOLUME']
                                                                     )
 
             if take_time:

@@ -11,12 +11,12 @@ MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
 
 NR_CHANCES: 2
-NR_ALLOW_RETRACE_STEPS: 10
+NR_ALLOW_RETRACE_STEPS: 5
 PREVENT_RETRACE: True
 
-ASSEMBLY_EVERY_N: 10 # add to assembly every N steps
+ASSEMBLY_EVERY_N: 20 # add to assembly every N steps
 USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)
-BUFFER_N: 10 # add to assembly steps buff_N steps ago
+BUFFER_N: 20 # add to assembly steps buff_N steps ago
 WEIGHTED_ASSEMBLY: True # if assembly should be weighted
 WEIGHT_TYPE: gaussian # type of weighting for assembly
 

@@ -817,7 +817,7 @@ def get_point_ids(centerline_poly, post_proc = True):
 
 
 
-def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = False, magn_radius = 1, min_radius = 0):
+def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = False, magn_radius = 1, min_radius = 0, mega_sub = False):
     """
     Get the next point along the centerline
     Args:
@@ -829,6 +829,8 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
         next_point: next location
         next_radius: next radius
     """
+    if not mega_sub:    angle_allow = 135
+    else:               angle_allow = 165 # allow more for bigger
 
     point_ids_list = get_point_ids(centerline_poly, post_proc = post_proc)
 
@@ -853,8 +855,12 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
             print("ERROR: too few points for ip: " +str(ip))
             continue
 
-        id_along_cent = len(locs) -1 #*9//10 used to not want to use last point for vector
-        id_along_cent_save = len(locs)*3//4
+        if not mega_sub:
+            id_along_cent = len(locs) -1 #*9//10 used to not want to use last point for vector
+            id_along_cent_save = len(locs)*3//4
+        else:
+            id_along_cent = len(locs) -1 #*9//10 used to not want to use last point for vector
+            id_along_cent_save = len(locs) -1 # we have more trust in the end
 
         vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
 
@@ -867,7 +873,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
         angle = 360/(2*np.pi)*np.arccos(np.dot(old_vector, vector))
         #print("The angle is: " + str(angle))
 
-        if angle < 135:
+        if angle < angle_allow:
             point_to_check = locs[-1] + 3*rads[id_along_cent_save] * vector
             #pfn = '/Users/numisveinsson/Downloads/point.vtp'
             #polydata_point = points2polydata([point_to_check.tolist()])
@@ -1031,7 +1037,7 @@ def smooth_surface(polydata, smoothingIterations):
     if smoothingIterations == 0:
         return polydata
     
-    passBand = 0.001
+    passBand = 0.1 #0.001
     featureAngle = 120.0
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(polydata)
@@ -1098,7 +1104,7 @@ def is_point_in_surface(surface, point):
 
 def orient_caps(caps, old_point):
 
-    source_dist = 100
+    source_dist = 100000
     target = []
     poly = []
     for i in range(len(caps)):
@@ -1107,7 +1113,7 @@ def orient_caps(caps, old_point):
 
     for i in range(len(caps)):
         cap_dist = np.linalg.norm(caps[i] - old_point)
-        #print(cap_dist)
+        print(f"Cap dist {i}: {cap_dist}")
         if  cap_dist < source_dist:
             source_id = i
             source_dist = cap_dist

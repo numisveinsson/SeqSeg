@@ -57,9 +57,9 @@ python3 auto_centerline.py \
     -img_ext .nrrd \
     -outdir output_v2/ \
     -scale 1 \
-    -start 18 \
-    -stop 19 \
-    -max_n_steps 1000 \
+    -start 13 \
+    -stop 14 \
+    -max_n_steps 2000 \
     -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \

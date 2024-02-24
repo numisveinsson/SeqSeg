@@ -38,7 +38,7 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5, N_curr = None):
     subvolume_img = extract_volume(img_reader, index, size_extract)
     subvolume_seg = create_new(subvolume_img, 1)
     # print(f"Global image size: {img_reader.GetSize()}")
-    # print(f"Mega index: {index}, size: {size_extract}")
+    print(f"Mega index: {index}, size: {size_extract}")
 
     # Then we loop over previous subvolumes and average them together
     Assembly = Segmentation(    image = subvolume_seg, 

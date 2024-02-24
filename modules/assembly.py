@@ -402,3 +402,22 @@ def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=
         step_dict['angle change'] = angle_change
 
     return step_dict
+
+def get_old_ref_point(vessel_tree, step_seg, i, mega_sub = False, mega_sub_N = 0):
+
+    if not mega_sub:
+        # return the old point
+        if i != 0:
+            prev_step = vessel_tree.get_previous_step(i)
+            old_point_ref = prev_step['old point']
+        elif i == 0:
+            old_point_ref = step_seg['old point']
+    else:
+        # return the old of the oldest step used for mega subvolume
+        branch = len(vessel_tree.branches) - 1
+        prev_n = vessel_tree.get_previous_n(branch, mega_sub_N)
+
+        step = vessel_tree.steps[prev_n[0]]
+        old_point_ref = step['old point']
+
+    return old_point_ref

@@ -224,7 +224,7 @@ if __name__=='__main__':
         potential_branches, initial_seeds = init.initialization(json_file_present, test_case, dir_output, dir_cent, directory_data, scale, write_samples)
         
         # print to .txt file all outputs
-        sys.stdout = open(dir_output+"/out.txt", "w")
+        # sys.stdout = open(dir_output+"/out.txt", "w")
         print(test_case)
         print(f"Initial points: {potential_branches}")
         # print(f"Time is: {time.time()}")
