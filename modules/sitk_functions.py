@@ -142,7 +142,7 @@ def extract_volume(reader_im, index_extract, size_extract):
 
     return new_img
 
-def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, prop=1):
+def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min_resolution_any_dim = 5):
     """
     Function to map a point and radius to volume metrics
     Also checks if sub-volume is within global
@@ -153,13 +153,11 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, pro
             volume size
         origin_im: image origin
         spacing_im: image spacing
-        prop: proportion of image to be counted for caps contraint
     return:
         size_extract: number of voxels to extract in each dim
         index_extract: index for sitk volume extraction
         voi_min/max: boundaries of volume for caps constraint
     """
-    min_resolution_any_dim = 5
     min_res = 0
 
     while min_res < min_resolution_any_dim:

@@ -157,7 +157,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                                                 volume_size_ratio,
                                                                 origin_im,
                                                                 spacing_im,
-                                                                size_im)
+                                                                size_im,
+                                                                global_config['MIN_RES'])
                 step_seg['img_index'] = index_extract
                 step_seg['img_size'] = size_extract
                 cropped_volume = extract_volume(reader_im, index_extract, size_extract)
@@ -316,7 +317,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             if not centerline_poly or centerline_poly.GetNumberOfPoints() < 5:
                 print("\n Attempting with more smoothing \n")
                 surface_smooth1 = smooth_surface(surface, 15)
-                surface_smooth1 = bound_polydata_by_image(vtkimage[0], surface_smooth1, length*1/20)
+                surface_smooth1 = bound_polydata_by_image(vtkimage[0], surface_smooth1, length*1/40)
                 centerline_poly1 = calc_centerline(surface_smooth1, "profileidlist")
                 # centerline_poly1 = calc_branches(centerline_poly1)
                 if centerline_poly1.GetNumberOfPoints() > 5:

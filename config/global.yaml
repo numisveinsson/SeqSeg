@@ -9,6 +9,7 @@ TIME_ANALYSIS: False # if we want to write out how long each step take
 VOLUME_SIZE_RATIO: 5.5 #5.5
 MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
+MIN_RES: 6
 
 NR_CHANCES: 2
 NR_ALLOW_RETRACE_STEPS: 5
