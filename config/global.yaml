@@ -23,5 +23,5 @@ WEIGHT_TYPE: gaussian # type of weighting for assembly
 FORCEFUL_SIDEBRANCH: False
 FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1.1
 
-MEGA_SUBVOLUME: True # extract centerline from previous N steps, instead of just 1
+MEGA_SUBVOLUME: False # extract centerline from previous N steps, instead of just 1
 NR_MEGA_SUB: 5 # how many steps to assemble into mega subvolume

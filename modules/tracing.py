@@ -276,9 +276,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
 
             old_point_ref = get_old_ref_point(vessel_tree, step_seg, i, global_config['MEGA_SUBVOLUME'], global_config['NR_MEGA_SUB'])
+            step_seg['old_point_ref'] = old_point_ref
             if write_samples:
                 polydata_point = points2polydata([old_point_ref.tolist()])
-                pfn = output_folder + 'points/point_'+case+'_'+str(i)+'ref.vtp'
+                pfn = output_folder + 'points/point_'+case+'_'+str(i)+str(time.time())+'ref.vtp'
                 write_geo(pfn, polydata_point)
                 
             caps = calc_caps(surface_smooth)
@@ -445,7 +446,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             print(e)
 
             if step_seg['centerline']:
-                print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel, centerline_poly)
+                print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel, old_point_ref, centerline_poly)
+            elif step_seg['old_point_ref']:
+                print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel, old_point_ref)
             elif step_seg['seg_file']:
                 print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel)
             elif step_seg['img_file']:
