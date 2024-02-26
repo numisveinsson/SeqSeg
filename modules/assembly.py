@@ -374,12 +374,11 @@ def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None, o
             if step_seg['surf_file']:
                 write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
 
-                if step_seg['old_point_ref']:
+                if step_seg['centerline']:
                     polydata_point = points2polydata([step_seg['old_point_ref'].tolist()])
                     write_vtk_polydata(polydata_point, directory + 'old_point_ref.vtp')
-                    
-                    if step_seg['centerline']:
-                        write_vtk_polydata(centerline_poly, directory + 'cent.vtp')
+                
+                    write_vtk_polydata(centerline_poly, directory + 'cent.vtp')
 
 
 def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=None):
