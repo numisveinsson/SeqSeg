@@ -354,7 +354,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     if len(vessel_tree.steps) % (N*5) == 0 and write_samples:
                             #sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.mha')
                             assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=0.5, upperThreshold=1)
-                            assembly = remove_other_vessels(assembly, initial_seed)
+                            # assembly = remove_other_vessels(assembly, initial_seed)
                             surface_assembly = evaluate_surface(assembly, 1)
                             write_vtk_polydata(surface_assembly, output_folder +'assembly/assembly_surface_'+case+'_'+str(i)+'.vtp')
 
@@ -447,8 +447,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             if step_seg['centerline']:
                 print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel, old_point_ref, centerline_poly)
-            elif step_seg['old_point_ref']:
-                print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel, old_point_ref)
             elif step_seg['seg_file']:
                 print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel)
             elif step_seg['img_file']:
@@ -469,10 +467,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 vessel_tree.steps[i]['chances'] += 1
 
             else:
-
-                #print("\n*** Error for surface: \n" + str(i))
-                del vessel_tree.branches[branch][-1]
+                pdb.set_trace()
+                print("\n*** Error for surface: \n" + str(i))
                 print("\n Moving onto another branch")
+                
+                del vessel_tree.branches[branch][-1]
                 list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
                 for id in vessel_tree.branches[branch][1:]:
                     list_surf_branch.append(vessel_tree.steps[id]['surface'])
