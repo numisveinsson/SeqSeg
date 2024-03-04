@@ -36,12 +36,14 @@ Arguments:
 -`stop`: This argument specifies where to stop in the list of testing samples. The default value is -1, which usually means to process all samples until the end of the list.
 
 Data directory: Assumes the following structure:
+- Directory
     - images
     - centerlines (if applicable)
     - truths (if applicable)
+    - test_data.json (if applicable)
 
 SeqSeg requires a seed point for initialization. This can be given by either:
-    - test.json file: located in data directory (see sample under data)
-    - centerline: if centerlines are given, we initialize using the first points of the centerline
-    - cardiac mesh: then the aortic valve must be labeled as Region 8 and LV 7
+- test.json file: located in data directory (see sample under data)
+- centerline: if centerlines are given, we initialize using the first points of the centerline
+- cardiac mesh: then the aortic valve must be labeled as Region 8 and LV 7
 
