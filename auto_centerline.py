@@ -18,7 +18,7 @@ from modules import sitk_functions as sf
 from modules import vtk_functions as vf
 from modules import initialization as init
 from modules.tracing import trace_centerline
-from modules.datasets import get_testing_samples_json
+from modules.datasets import get_testing_samples_json, get_testing_samples
 from modules.params import load_yaml
 
 def create_directories(output_folder, write_samples):
@@ -51,105 +51,6 @@ def create_directories(output_folder, write_samples):
         try:
             os.mkdir(output_folder+'animation')
         except Exception as e: print(e)
-
-
-def get_testing_samples(dataset):
-
-    directory = '/global/scratch/users/numi/vascular_data_3d/'
-    if dataset == 'Dataset005_SEQAORTANDFEMOMR':
-        testing_samples = [
-
-            ['0006_0001',0,0,1,'mr'], # Aortofemoral MR
-            ['0063_1001',0,10,20,'mr'], # Aortic MR
-            ['0090_0001',0,0,5,'mr'], # Aortic MR
-            ['0131_0000',0,10,20,'mr'], # Aortic MR
-            ['0070_0001',0,10,20,'mr'], # Aortic MR
-            ['KDR12_aorta',0,20,30,'mr'], # Aortic MR
-            ['KDR33_aorta',3,-10,-20,'mr'], # Aortic MR
-
-        ]
-
-    elif dataset == 'Dataset006_SEQAORTANDFEMOCT':
-        directory = '/global/scratch/users/numi/vascular_data_3d/'
-        dir_json = directory + 'test.json'
-        testing_samples = [ #get_testing_samples_json(dir_json)
-            ['0176_0000',0,10,20,'ct'], # Aorta CT
-            ['0174_0000',0,0,5,'ct'], # Aorta CT
-            ['0139_1001',0,0,10,'ct'], # Aortofemoral CT
-            ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
-            ['0146_1001',0,0,10,'ct'], # Aortofemoral CT
-            ['0188_0001_aorta',5,-10,-20,'ct'], # Aorta CT
-            ['O150323_2009_aorta',0,10,20,'ct'], # Aorta CT
-            ['O344211000_2006_aorta',0,10,20,'ct'], # Aorta CT
-        ]
-    
-    elif dataset == 'Dataset007_SEQPULMONARYMR':
-        testing_samples = [
-
-            ['0085_1001',0,0,10,'mr'], # Pulmonary MR
-            # ['0085_1001',0,200,220,'mr'], # Pulmonary MR
-            # ['0085_1001',1,200,220,'mr'], # Pulmonary MR
-            ['0081_0001',0,20,30,'mr'], # Pulmonary MR
-            # ['0081_0001',1,200,220,'mr'], # Pulmonary MR
-            # ['0081_0001',1,2000,220,'mr'], # Pulmonary MR
-        ]
-    elif dataset == 'Dataset009_SEQAORTASMICCT':
-        
-        directory = '/global/scratch/users/numi/test_data/miccai_aortas/'
-        dir_json = directory + 'test.json'
-        testing_samples = get_testing_samples_json(dir_json)
-
-
-    elif dataset == 'Dataset010_SEQCOROASOCACT':
-
-        directory = '/global/scratch/users/numi/ASOCA_test/'
-        dir_asoca_json = directory + 'test.json'
-        testing_samples = get_testing_samples_json(dir_asoca_json)
-
-    else:
-        print('Dataset not found')
-        testing_samples =  None
-
-    #    ['0108_0001_aorta',4,-10,-20,'ct'],
-    #    ['0183_1002_aorta',3,-10,-20,'ct'],
-    #    ['0184_0001_aorta',3,-10,-20,'ct'],
-    #    ['0188_0001_aorta',5,-10,-20,'ct'],
-    #    ['0189_0001_aorta',4,-50,-60,'ct'],
-
-    #    ['O0171SC_aorta',0,10,20,'ct'],
-    #    ['O6397SC_aorta',0,10,20,'ct'],
-    #    ['O8693SC_aorta',0,10,20,'ct'],
-    #    ['O344211000_2006_aorta',0,10,20,'ct'],
-    #    ['O11908_aorta',0,10,20,'ct'],
-    #    ['O20719_2006_aorta',0,10,20,'ct'],
-    #   these are left:
-    #    ['O51001_2009_aorta',0,10,20,'ct'],
-    #    ['O128301_2008_aorta',0,10,20,'ct'],
-    #    ['O145207_aorta',0,10,20,'ct'],
-    #    ['O150323_2009_aorta',0,10,20,'ct'],
-    #    ['O227241_2006_aorta',0,10,20,'ct'],
-    #    ['O351095_aorta',0,10,20,'ct'],
-    #    ['O690801_2007_aorta',0,10,20,'ct'],
-
-    #    ['KDR08_aorta',0,10,20,'mr'],
-    #    ['KDR10_aorta',0,10,20,'mr'],
-    #    ['KDR12_aorta',0,10,20,'mr'],
-    #    ['KDR13_aorta',0,10,20,'mr'],
-    #    ['KDR32_aorta',0,10,20,'mr'],
-    #    ['KDR33_aorta',3,-10,-20,'mr'],
-    #    ['KDR34_aorta',0,10,20,'mr'],
-    #    ['KDR48_aorta',0,10,20,'mr'],
-    #    ['KDR57_aorta',4,-10,-20,'mr'],
-
-    #    ['0002_0001',0,150,170,'ct']  ,
-    #    ['0002_0001',1,150, 170,'ct'] ,
-    #    ['0001_0001',0,30,50,'ct'],
-    #    ['0001_0001',7,30,50,'ct'],
-    #    ['0001_0001',8,110,130,'ct'],
-    #    ['0005_1001',0,300,320,'ct']  ,
-    #    ['0005_1001',1,200,220,'ct']  ,
-
-    return testing_samples, directory
 
 if __name__=='__main__':
     """# Set up"""
