@@ -15,8 +15,7 @@ def construct_subvolume(step_seg, vessel_tree, N_steps = 5, N_curr = None, insid
     Note: This function is dependent on only being used while tracing (not retracing)
     """
     if N_steps > 1 and inside_branch > 0:
-        N_steps -= inside_branch
-    if N_steps < 1 : N_steps = 1
+        N_steps = 1
     
     branch = len(vessel_tree.branches) - 1
     prev_n = vessel_tree.get_previous_n(branch, N_steps)
