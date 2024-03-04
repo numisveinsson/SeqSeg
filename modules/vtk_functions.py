@@ -1051,7 +1051,7 @@ def smooth_surface(polydata, smoothingIterations):
     if smoothingIterations == 0:
         return polydata
     
-    passBand = 0.1 #0.001
+    passBand = 0.01 #0.001
     featureAngle = 120.0
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(polydata)
