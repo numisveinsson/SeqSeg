@@ -908,7 +908,11 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
     arr_rad = np.array(vessel_r)*magn_radius
     arr_pt = np.array(points)
     arr_angl = np.array(angles)
-    sort_index = np.flip(np.argsort(arr_rad)) ## Sort from largest to smallest
+
+    if not mega_sub:
+        sort_index = np.flip(np.argsort(arr_rad)) ## Sort from largest to smallest
+    else:
+        sort_index = np.argsort(arr_angl) ## Sort from smallest angle to largest
 
     return arr_pt[sort_index], arr_rad[sort_index], arr_angl[sort_index]
 

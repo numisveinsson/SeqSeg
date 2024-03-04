@@ -232,7 +232,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 sitk.WriteImage(predicted_vessel, pd_fn)
                 
             if global_config['MEGA_SUBVOLUME']:
-                predicted_vessel, cropped_volume = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i)
+                predicted_vessel, cropped_volume = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i, inside_branch)
                 if write_samples:
                     sitk.WriteImage(cropped_volume, volume_fn.replace('.mha', '_mega'+str(time.time())+'.mha'))
                     sitk.WriteImage(predicted_vessel, pd_fn.replace('.mha', '_mega'+str(time.time())+'.mha'))
@@ -418,7 +418,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     print('\n _ \n')
                     print("\n BIFURCATION BIFURCATION BIFURCATION\n")
                     print('\n _ \n')
-                    for j in range(1, len(radius_tree)):
+                    if global_config['MEGA_SUBVOLUME']:     start = 1   # add all bifurcation points
+                    else:                                   start = 1   # don't add this one
+                    for j in range(start, len(radius_tree)):
                         dict = create_step_dict(step_seg['point'],
                                                 step_seg['radius'],
                                                 point_tree[j],
@@ -468,7 +470,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 vessel_tree.steps[i]['chances'] += 1
 
             else:
-                pdb.set_trace()
+                # pdb.set_trace()
                 print("\n*** Error for surface: \n" + str(i))
                 print("\n Moving onto another branch")
                 
