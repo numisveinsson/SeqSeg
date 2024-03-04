@@ -246,7 +246,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # surface = evaluate_surface(predicted_vessel) # Marching cubes
 
-            surface = convert_seg_to_surfs(predicted_vessel, global_config['MEGA_SUBVOLUME'])
+            surface = convert_seg_to_surfs(predicted_vessel, mega_sub = global_config['MEGA_SUBVOLUME'], ref_min_dims = size_extract)
 
             num_iterations = get_smoothing_params(step_seg['radius'], scale_unit, global_config['MEGA_SUBVOLUME'])
 

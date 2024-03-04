@@ -916,7 +916,7 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
 
     return arr_pt[sort_index], arr_rad[sort_index], arr_angl[sort_index]
 
-def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,1.,1.]):
+def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,1.,1.], mega_sub = False, ref_min_dims = None):
     
     import SimpleITK as sitk
 
@@ -934,10 +934,20 @@ def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,
     # divide spacing if min dimension is less than 10 pixels
     spacing = np.array(seg.GetSpacing())
     dims = np.array(seg.GetSize())
-    if np.min(dims) < 10:
+
+    # if not mega_sub:    min_dim = 10
+    # # need larger res for mega
+    # else:               min_dim = 20
+
+    if not mega_sub:    ref_min_dim = np.min(dims)
+    # need to refer to current local sub if we doing mega
+    else:               ref_min_dim = np.min(ref_min_dims)
+
+    if ref_min_dim < 10:
+        print(f"Upsampling segmentation because low resolution may cause problems")
         new_spacing = (spacing/3.).tolist()
         seg_vtk = vtkImageResample(seg_vtk,new_spacing,'cubic')
-    
+
     poly_l = []
     for i, _ in enumerate(labels):
         if i==0:
