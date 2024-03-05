@@ -432,13 +432,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                             dict['radius'] = dict['radius']*forceful_sidebranch_magnify
 
                         vessel_tree.potential_branches.append(dict)
-                    list_points = []
+                    list_points_pot = []
                     for pot in point_tree:
-                        list_points.append(points2polydata([pot.tolist()]))
-                    final_pot = appendPolyData(list_points)
+                        list_points_pot.append(points2polydata([pot.tolist()]))
+                    final_pot = appendPolyData(list_points_pot)
                     if write_samples:
-                        write_vtk_polydata(  final_pot,
-                                                output_folder+'/points/bifurcation_'+case+'_'+str(branch)+'_'+str(i-1)+'_points.vtp')
+                        write_vtk_polydata(  final_pot, output_folder+'/points/bifurcation_'+case+'_'+str(branch)+'_'+str(i-1)+'_points.vtp')
             else:
                 print('point_tree.size is 0')
                 print(error)
