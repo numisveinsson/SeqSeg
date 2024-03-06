@@ -43,7 +43,7 @@ def network(filename_in, filename_out):
 
     return Network
 
-def calc_centerline(Surface, method, var_source = None, var_target = None, number = None, caps = None, point = None):
+def calc_centerline(Surface, method, var_source = None, var_target = None, number = None, caps = None, point = None, use_targets = False):
     """
     Calculate centerlines in surface model via vmtk
     Methods "pickpoint","openprofiles","carotidprofiles" don't require inputs

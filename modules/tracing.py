@@ -275,19 +275,18 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
 
-
             old_point_ref = get_old_ref_point(vessel_tree, step_seg, i, global_config['MEGA_SUBVOLUME'], global_config['NR_MEGA_SUB'])
             step_seg['old_point_ref'] = old_point_ref
             if write_samples:
                 polydata_point = points2polydata([old_point_ref.tolist()])
-                pfn = output_folder + 'points/point_'+case+'_'+str(i)+str(time.time())+'ref.vtp'
+                pfn = output_folder + 'points/point_'+case+'_'+str(i)+'_ref.vtp'
                 write_geo(pfn, polydata_point)
                 
             caps = calc_caps(surface_smooth)
 
             step_seg['caps'] = caps
-            _ , source_id = orient_caps(caps, old_point_ref)
-
+            sorted_targets , source_id = orient_caps(caps, step_seg['point'], old_point_ref, step_seg['tangent'])
+            print(f"Source id: {source_id}")
 
             print('Number of caps: ', len(caps))
             if len(caps) < 2 and i != 0 : print(error)
@@ -300,6 +299,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             centerline_poly = calc_centerline(  surface_smooth,
                                                 "profileidlist",
                                                 var_source=[source_id],
+                                                var_target = sorted_targets,
                                                 number = i,
                                                 caps = caps,
                                                 point = step_seg['point'])
