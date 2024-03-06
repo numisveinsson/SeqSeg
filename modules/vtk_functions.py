@@ -1130,10 +1130,10 @@ def orient_caps(caps, current_point, old_point, direction):
         target = target + caps[i].tolist()
         poly.append(caps[i].tolist())
         # calculate vector
-        vector = current_point-caps[i]
+        vector = caps[i] - current_point
         vector = vector/np.linalg.norm(vector)
         # angle between direction and vector to cap
-        angle = 180 - 360/(2*np.pi)*np.arccos(np.dot(direction, vector))
+        angle = 360/(2*np.pi)*np.arccos(np.dot(direction, vector))
         print(f"Angle to cap {i}: {angle}")
         angles.append(angle)
 
