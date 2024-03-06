@@ -14,3 +14,6 @@ def get_smoothing_params(radius, scale_unit, mega_sub = False):
             num_iterations = 5
 
     return num_iterations
+
+class SkipThisStepError(Exception):
+    pass

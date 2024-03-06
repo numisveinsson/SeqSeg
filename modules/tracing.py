@@ -7,7 +7,7 @@ from .vtk_functions import *
 from .vmtk_functions import *
 from .assembly import Segmentation, VesselTree, print_error, create_step_dict, get_old_ref_point
 from .local_assembly import construct_subvolume
-from .tracing_functions import get_smoothing_params
+from .tracing_functions import get_smoothing_params, SkipThisStepError
 
 import sys
 sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
@@ -23,13 +23,16 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     unit = 'cm', scale = 1, seg_file=None):
 
     if unit == 'cm': scale_unit = 0.1
-    else:                             scale_unit = 1
+    else:            scale_unit = 1
+
+    # Debugging
+    debug =                         global_config['DEBUG']
 
     # Write out params
     write_samples =                 global_config['WRITE_STEPS']
 
-    retrace_cent   = global_config['RETRACE']
-    take_time      = global_config['TIME_ANALYSIS']
+    retrace_cent   =                global_config['RETRACE']
+    take_time      =                global_config['TIME_ANALYSIS']
 
     # Animation params
     animation =                     global_config['ANIMATION']
@@ -45,6 +48,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     run_time =                      global_config['TIME_ANALYSIS']
     forceful_sidebranch =           global_config['FORCEFUL_SIDEBRANCH']
     forceful_sidebranch_magnify =   global_config['FORCEFUL_SIDEBRANCH_MAGN_RADIUS']
+    stop_pre =                      global_config['STOP_PRE']
+    stop_radius =                   global_config['STOP_RADIUS'] * scale_unit
 
     #Assembly params
     use_buffer =                    global_config['USE_BUFFER']
@@ -107,6 +112,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             # Take next step
             step_seg = vessel_tree.steps[i]
 
+            # Check if end prematurely
+            if stop_pre:
+                if step_seg['radius'] < stop_radius:
+                    raise SkipThisStepError(
+                        "Radius estimate lower than allowed, stop here"
+                    )
+
+            # Check if retracing previously traced area
             if prevent_retracing:
                 if inside_branch == allowed_steps:
                     step_seg['is_inside'] = True
@@ -469,9 +482,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 vessel_tree.steps[i]['chances'] += 1
 
             else:
-                # pdb.set_trace()
+
                 print("\n*** Error for surface: \n" + str(i))
                 print("\n Moving onto another branch")
+
+                if debug:
+                    pdb.set_trace()
                 
                 del vessel_tree.branches[branch][-1]
                 list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
