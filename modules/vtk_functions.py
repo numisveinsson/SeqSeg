@@ -943,7 +943,7 @@ def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,
     # need to refer to current local sub if we doing mega
     else:               ref_min_dim = np.min(ref_min_dims)
 
-    if ref_min_dim < 10:
+    if ref_min_dim < 20:
         print(f"Upsampling segmentation because low resolution may cause problems")
         new_spacing = (spacing/3.).tolist()
         seg_vtk = vtkImageResample(seg_vtk,new_spacing,'cubic')
@@ -1116,14 +1116,26 @@ def is_point_in_surface(surface, point):
         print("Error, output from VTK enclosed surface")
         return 0
 
-def orient_caps(caps, old_point):
-
+def orient_caps(caps, current_point, old_point, direction):
+    """
+    Note: direction is local, old_point can be from previous subvolume
+    Return a sorted list of cap ids based on angle compared to direction
+    """
+    
     source_dist = 100000
     target = []
     poly = []
+    angles = []
     for i in range(len(caps)):
         target = target + caps[i].tolist()
         poly.append(caps[i].tolist())
+        # calculate vector
+        vector = current_point-caps[i]
+        vector = vector/np.linalg.norm(vector)
+        # angle between direction and vector to cap
+        angle = 180 - 360/(2*np.pi)*np.arccos(np.dot(direction, vector))
+        print(f"Angle to cap {i}: {angle}")
+        angles.append(angle)
 
     for i in range(len(caps)):
         cap_dist = np.linalg.norm(caps[i] - old_point)
@@ -1134,11 +1146,16 @@ def orient_caps(caps, old_point):
             sourcee = caps[i].tolist()
     target[source_id*3:source_id*3+3] = []
 
+    s = np.array(angles)
+    sort_index = np.argsort(s).tolist()
+    sort_index.remove(source_id)
+    print(f"Sorted cap ids: {sort_index}")
+
     #polydata_point = points2polydata(poly)
     #pfn = '/Users/numisveinsson/Downloads/points.vtp'
     #write_geo(pfn, polydata_point)
 
-    return [sourcee, target], source_id
+    return sort_index, source_id
 
 def process_cardiac_mesh(mesh_file, scale = 1):
 
