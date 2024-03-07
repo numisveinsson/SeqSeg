@@ -78,7 +78,7 @@ if __name__ == "__main__":
         meshes_directory = main_dir + dir_list[i] + '/postprocessed/'
 
         # Specify the output folder for screenshots
-        output_folder = meshes_directory+'/imgs_keeplarg/'
+        output_folder = meshes_directory+'/imgs/'
 
         # Ensure the output folder exists, create it if necessary
         os.makedirs(output_folder, exist_ok=True)
