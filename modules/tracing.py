@@ -27,6 +27,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
     # Debugging
     debug =                         global_config['DEBUG']
+    debug_step =                    global_config['DEBUG_STEP']
 
     # Write out params
     write_samples =                 global_config['WRITE_STEPS']
@@ -105,6 +106,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
         if i in range(0, max_step_size, max_step_size*0 +1):
             print(f"\n*** Step number {i} ***")
 
+        if debug and i >= debug_step: pdb.set_trace()
+
         try:
 
             start_time_loc = time.time()
@@ -115,6 +118,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             # Check if end prematurely
             if stop_pre:
                 if step_seg['radius'] < stop_radius:
+                    vessel_tree.steps[i]['chances'] = number_chances
                     raise SkipThisStepError(
                         "Radius estimate lower than allowed, stop here"
                     )

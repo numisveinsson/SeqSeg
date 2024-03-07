@@ -1,14 +1,16 @@
 
 def get_smoothing_params(radius, scale_unit, mega_sub = False):
-    num_iterations = 3
+    
     if not mega_sub:
-        if radius > 1 * scale_unit: num_iterations = 12
+        num_iterations = 6
+        if radius > 1 * scale_unit: num_iterations = 16
         elif radius > 0.5 * scale_unit:
             print("Small radius; less smoothing")
-            num_iterations = 6
+            num_iterations = 12
     else:
+        num_iterations = 3
         # less smoothing for bigger volumes
-        if radius > 1 * scale_unit: num_iterations = 6
+        if radius > 1 * scale_unit: num_iterations = 7
         elif radius > 0.5 * scale_unit:
             print("Small radius; less smoothing")
             num_iterations = 5

@@ -55,11 +55,11 @@ python3 auto_centerline.py \
     -dataset  Dataset010_SEQCOROASOCACT \
     -fold all \
     -img_ext .nrrd \
-    -outdir output_v1/ \
+    -outdir output_v1_500_stopmin/ \
     -scale 1 \
-    -start 2 \
-    -stop 3 \
-    -max_n_steps 1000 \
+    -start 10 \
+    -stop 20 \
+    -max_n_steps 500 \
     -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \

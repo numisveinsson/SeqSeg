@@ -1,6 +1,9 @@
-WRITE_STEPS: True # if we want to write out each step
-ANIMATION: True # to write out animation files
-ANIMATION_STEPS: 2 # write out animation every x steps
+DEBUG: False
+DEBUG_STEP: 103
+
+WRITE_STEPS: False # if we want to write out each step
+ANIMATION: False # to write out animation files
+ANIMATION_STEPS: 5 # write out animation every x steps
 
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
 RETRACE: False # retrace strategry
@@ -9,7 +12,7 @@ TIME_ANALYSIS: False # if we want to write out how long each step take
 VOLUME_SIZE_RATIO: 5.5 #5.5
 MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
-MIN_RES: 5 # 6
+MIN_RES: 6
 
 NR_CHANCES: 2
 NR_ALLOW_RETRACE_STEPS: 5
@@ -26,3 +29,6 @@ FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1.1
 
 MEGA_SUBVOLUME: False # extract centerline from previous N steps, instead of just 1
 NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
+
+STOP_PRE: True # whether to stop tracing prematurely, if True then options below will be used
+STOP_RADIUS: 0.41 # mm if radius goes below, stop tracing
