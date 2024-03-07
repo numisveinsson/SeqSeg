@@ -318,7 +318,56 @@ class VesselTree:
 
         nx.draw(G, pos, edge_color=colors, width=list(weights))
 
-        plt.show()
+        # plt.show()
+    
+    def create_tree_graph(self):
+        """
+        Function to create a graph of the tree
+        Each step is a node, all nodes in a branch are connected
+        Branches are connected by 'connection' attribute
+        The size of the node is proportional to the radius
+        """
+        import networkx as nx
+        import matplotlib.pyplot as plt
+
+        G = nx.DiGraph()
+        for i, step in enumerate(self.steps):
+            G.add_node(i, radius=step['radius'])
+        for branch in self.branches:
+            for i in range(len(branch)-1):
+                G.add_edge(branch[i], branch[i+1])
+
+        pos = nx.spring_layout(G)
+        nx.draw(G, pos, with_labels=True, node_size=3000, node_color='lightblue', font_weight='bold', font_size=10, edge_color='grey')
+
+        # save the graph
+        plt.savefig('tree_graph.png')
+
+        # plt.show()
+
+    def plot_radius_distribution(self):
+        """
+        Function to plot the radius distribution of the tree
+        """
+        import matplotlib.pyplot as plt
+        radii = [step['radius'] for step in self.steps]
+        n_step = len(radii)
+        plt.hist(radii, bins=20)
+        # plt.show()
+        # save the graph
+        plt.savefig('radius_distribution.png')
+        # plot the radius across steps
+        plt.plot(range(n_step), radii)
+        # add red vertical line for bifurcations
+        for bif in self.bifurcations:
+            plt.axvline(x=bif, color='r', linestyle='--')
+        # add blue horizontal line for end of branches
+        for branch in self.branches:
+            plt.axhline(y=branch[-1], color='b', linestyle='--')
+
+        # plt.show()
+        # save the graph
+        plt.savefig('radius_evolution.png')
 
 
 class VesselTreeParallel:

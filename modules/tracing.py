@@ -105,6 +105,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
         if i in range(0, max_step_size, max_step_size*0 +1):
             print(f"\n*** Step number {i} ***")
+            # print real time
+            print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
         if debug and i >= debug_step: pdb.set_trace()
 

@@ -161,6 +161,10 @@ if __name__=='__main__':
             in_target = []
             for target in in_target_lists:
                 in_target += target
+        
+        # Plot tree info
+        vessel_tree.create_tree_graph()
+        vessel_tree.plot_radius_distribution()
 
         ## Assembly work
         assembly_org = assembly_obj.assembly
