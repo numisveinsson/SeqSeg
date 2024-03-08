@@ -377,7 +377,9 @@ class VesselTree:
         # add blue horizontal line for end of branches
         for branch in self.branches:
             plt.axvline(x=branch[-1], color='b', linestyle='--')
-
+        plt.xticks(np.arange(min(range(n_step)), max(range(n_step))+1, max(range(n_step))//20))
+        plt.tick_params(axis='x', which='major', labelsize=30)
+        # plt.tick_params(axis='x', which='major', labelsize=3)
         # plt.show()
         # save the graph
         plt.savefig(dir_output + '/radius_evolution.png')

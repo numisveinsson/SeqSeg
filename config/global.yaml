@@ -33,3 +33,4 @@ NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
 
 STOP_PRE: True # whether to stop tracing prematurely, if True then options below will be used
 STOP_RADIUS: 0.43 # mm if radius goes below, stop tracing
+MAX_STEPS_BRANCH: 50 # max num of steps per branch, stop when reached
