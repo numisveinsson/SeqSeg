@@ -141,14 +141,16 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     #vessel_tree.remove_branch(branch)
                     #branch -= 1
                     #i = i - allowed_steps
-                    print('\n \n Inside already segmented vessel!! \n \n')
+                    # print('\n \n Inside already segmented vessel!! \n \n')
 
                     if write_samples:
                         polydata_point = points2polydata([step_seg['point'].tolist()])
                         pfn = output_folder + 'points/inside_point_'+case+'_'+str(i)+'.vtp'
                         write_geo(pfn, polydata_point)
                     # cause failure
-                    print(error)
+                    raise SkipThisStepError(
+                        "Inside already segmented vessel, stop here"
+                    )
                     
                 elif is_point_in_image(assembly_segs.assembly, step_seg['point']): #+ step_seg['radius']*step_seg['tangent']):
                     inside_branch += 1
@@ -316,7 +318,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             print(f"Source id: {source_id}")
 
             print('Number of caps: ', len(caps))
-            if len(caps) < 2 and i != 0 : print(error)
+            if len(caps) < 2 and i != 0 : 
+                raise SkipThisStepError(
+                    "Less than 2 caps, stop here"
+                )
 
             # polydata_point = points2polydata([step_seg['caps'][0]])
             # pfn = '/Users/numisveinsson/Downloads/point.vtp'
@@ -470,7 +475,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                         write_vtk_polydata(  final_pot, output_folder+'/points/bifurcation_'+case+'_'+str(branch)+'_'+str(i-1)+'_points.vtp')
             else:
                 print('point_tree.size is 0')
-                print(error)
+                raise SkipThisStepError(
+                    "No next points, stop here"
+                )
             # print("\n This location done: " + str(time.time() - start_time_loc) + " s\n")
 
 
