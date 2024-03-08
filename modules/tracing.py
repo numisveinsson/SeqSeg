@@ -322,12 +322,15 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                                 number = i,
                                                 caps = caps,
                                                 point = step_seg['point'])
-            write_centerline(centerline_poly, cfn)
+            if write_samples:
+                write_centerline(centerline_poly, cfn)
 
             centerline_poly = resample_centerline(centerline_poly)
-            write_centerline(centerline_poly, cfn.replace('.vtp', 'resampled.vtp'))
+            if write_samples:
+                write_centerline(centerline_poly, cfn.replace('.vtp', 'resampled.vtp'))
             centerline_poly = smooth_centerline(centerline_poly)
-            write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
+            if write_samples:
+                write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
             # centerline_poly = get_largest_connected_polydata(centerline_poly)
             # write_centerline(centerline_poly, cfn.replace('.vtp', 'largest.vtp'))
             # centerline_poly = calc_branches(centerline_poly)

@@ -163,8 +163,9 @@ if __name__=='__main__':
                 in_target += target
         
         # Plot tree info
-        vessel_tree.create_tree_graph()
-        vessel_tree.plot_radius_distribution()
+        if global_config['TREE_ANALYSIS']:
+            vessel_tree.create_tree_graph(dir_output)
+            vessel_tree.plot_radius_distribution(dir_output)
 
         ## Assembly work
         assembly_org = assembly_obj.assembly

@@ -320,7 +320,7 @@ class VesselTree:
 
         # plt.show()
     
-    def create_tree_graph(self):
+    def create_tree_graph(self, dir_output):
         """
         Function to create a graph of the tree
         Each step is a node, all nodes in a branch are connected
@@ -336,26 +336,35 @@ class VesselTree:
         for branch in self.branches:
             for i in range(len(branch)-1):
                 G.add_edge(branch[i], branch[i+1])
-
-        pos = nx.spring_layout(G)
-        nx.draw(G, pos, with_labels=True, node_size=3000, node_color='lightblue', font_weight='bold', font_size=10, edge_color='grey')
+        # pos = nx.spring_layout(G)
+        pos = nx.planar_layout(G)
+        # pos = nx.kamada_kawai_layout(G)
+        # pos = nx.spectral_layout(G)
+        # pos = nx.multipartite_layout(G)
+        # pos = nx.nx_agraph.graphviz_layout(G, prog="dot")
+        
+        # nx.draw(G, pos, with_labels=True, node_size=100, node_color='lightblue', font_weight='bold', font_size=1, edge_color='grey')
+        nx.draw(G, pos, with_labels=True, node_color='lightblue', font_weight='bold')
 
         # save the graph
-        plt.savefig('tree_graph.png')
+        plt.savefig(dir_output+'/tree_graph.png')
+        plt.close()
 
         # plt.show()
 
-    def plot_radius_distribution(self):
+    def plot_radius_distribution(self, dir_output):
         """
         Function to plot the radius distribution of the tree
         """
         import matplotlib.pyplot as plt
         radii = [step['radius'] for step in self.steps]
         n_step = len(radii)
-        plt.hist(radii, bins=20)
+        plt.hist(radii, bins=40)
         # plt.show()
         # save the graph
-        plt.savefig('radius_distribution.png')
+        plt.savefig(dir_output + '/radius_distribution.png')
+        plt.close()
+
         # plot the radius across steps
         plt.plot(range(n_step), radii)
         # add red vertical line for bifurcations
@@ -363,11 +372,12 @@ class VesselTree:
             plt.axvline(x=bif, color='r', linestyle='--')
         # add blue horizontal line for end of branches
         for branch in self.branches:
-            plt.axhline(y=branch[-1], color='b', linestyle='--')
+            plt.axvline(x=branch[-1], color='b', linestyle='--')
 
         # plt.show()
         # save the graph
-        plt.savefig('radius_evolution.png')
+        plt.savefig(dir_output + '/radius_evolution.png')
+        plt.close()
 
 
 class VesselTreeParallel:
