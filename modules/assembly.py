@@ -365,8 +365,12 @@ class VesselTree:
         plt.savefig(dir_output + '/radius_distribution.png')
         plt.close()
 
-        # plot the radius across steps
+        # plot the radius across steps and have space betwwen steps on x axis
         plt.plot(range(n_step), radii)
+        plt.xlabel('Step')
+        plt.ylabel('Radius')
+        plt.title('Radius evolution')
+
         # add red vertical line for bifurcations
         for bif in self.bifurcations:
             plt.axvline(x=bif, color='r', linestyle='--')
