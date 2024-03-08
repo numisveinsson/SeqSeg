@@ -51,6 +51,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     forceful_sidebranch_magnify =   global_config['FORCEFUL_SIDEBRANCH_MAGN_RADIUS']
     stop_pre =                      global_config['STOP_PRE']
     stop_radius =                   global_config['STOP_RADIUS'] * scale_unit
+    max_step_branch =               global_config['MAX_STEPS_BRANCH']
 
     #Assembly params
     use_buffer =                    global_config['USE_BUFFER']
@@ -119,10 +120,17 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # Check if end prematurely
             if stop_pre:
+                # Check if radius is too small
                 if step_seg['radius'] < stop_radius:
                     vessel_tree.steps[i]['chances'] = number_chances
                     raise SkipThisStepError(
                         "Radius estimate lower than allowed, stop here"
+                    )
+                # Check if too many steps in current branch
+                if num_steps_direction > max_step_branch:
+                    vessel_tree.steps[i]['chances'] = number_chances
+                    raise SkipThisStepError(
+                        "Too many steps in current branch, stop here"
                     )
 
             # Check if retracing previously traced area
