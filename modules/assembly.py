@@ -359,17 +359,18 @@ class VesselTree:
         import matplotlib.pyplot as plt
         radii = [step['radius'] for step in self.steps]
         n_step = len(radii)
-        plt.hist(radii, bins=40)
+        plt.hist(radii, bins=20)
         # plt.show()
         # save the graph
         plt.savefig(dir_output + '/radius_distribution.png')
         plt.close()
 
         # plot the radius across steps and have space betwwen steps on x axis
+        plt.figure(figsize=(25,5))
         plt.plot(range(n_step), radii)
         plt.xlabel('Step')
         plt.ylabel('Radius')
-        plt.title('Radius evolution')
+        plt.title('Radius Change')
 
         # add red vertical line for bifurcations
         for bif in self.bifurcations:
@@ -377,8 +378,7 @@ class VesselTree:
         # add blue horizontal line for end of branches
         for branch in self.branches:
             plt.axvline(x=branch[-1], color='b', linestyle='--')
-        plt.xticks(np.arange(min(range(n_step)), max(range(n_step))+1, max(range(n_step))//20))
-        plt.tick_params(axis='x', which='major', labelsize=30)
+        # plt.xticks(np.arange(min(range(n_step)), max(range(n_step))+1, max(range(n_step))//20))
         # plt.tick_params(axis='x', which='major', labelsize=3)
         # plt.show()
         # save the graph

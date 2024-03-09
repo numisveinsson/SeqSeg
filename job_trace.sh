@@ -43,25 +43,12 @@ python3 auto_centerline.py \
     -dataset  Dataset010_SEQCOROASOCACT \
     -fold all \
     -img_ext .nrrd \
-    -outdir output_debug/ \
+    -outdir output_v1_2000_stopmost/ \
     -scale 1 \
-    -start 1 \
-    -stop 2 \
-    -max_n_steps 20 \
+    -start 9 \
+    -stop 10 \
+    -max_n_steps 2000 \
     -unit mm \
-
-
-# python3 auto_centerline.py \
-#     -test_name 3d_fullres \
-#     -dataset  Dataset006_SEQAORTANDFEMOCT \
-#     -fold all \
-#     -img_ext .mha \
-#     -outdir output_v2/ \
-#     -scale 1 \
-#     -start 7 \
-#     -stop 8 \
-#     -max_n_steps 1000 \
-#     -unit cm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 
