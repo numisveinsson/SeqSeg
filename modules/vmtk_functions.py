@@ -56,30 +56,37 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
     Returns:
         poly: VTK PolyData of centerline
     """
-    
+
+    centerline_calc = vmtkscripts.vmtkCenterlines()
+    centerline_calc.Surface = Surface
+
     if number == 0 and len(caps) == 1:
         method = "pointlist"
         var_target = caps[0].tolist()
         var_source = point.tolist()
-
-
-    centerline_calc = vmtkscripts.vmtkCenterlines()
-    centerline_calc.Surface = Surface
-    centerline_calc.SeedSelectorName = method
-
-    if method == "profileidlist":
-
-        centerline_calc.AppendEndPoints = 1
-        if var_source == None:
-            var_source = [0]
-        centerline_calc.SourceIds = var_source
-        centerline_calc.TargetIds = var_target
-
-    elif method == "pointlist":
-
         centerline_calc.SourcePoints = var_source
         centerline_calc.TargetPoints = var_target
+    else:
+        # import pdb; pdb.set_trace()
+        if method == "profileidlist":
 
+            centerline_calc.AppendEndPoints = 0
+            if var_source == None:
+                var_source = [0]
+            centerline_calc.SourceIds = var_source
+            centerline_calc.TargetIds = var_target
+        
+        # use current point and match to caps
+        elif method == "pointlist":
+            # create a list of coords
+            target = []
+            for i in range(len(caps)):
+                #if i == var_source: continue # skip source cap
+                target = target + caps[i].tolist()
+            centerline_calc.SourcePoints = point.tolist() # var_source
+            centerline_calc.TargetPoints = target # var_target
+
+    centerline_calc.SeedSelectorName = method
     centerline_calc.Execute()
     print("Centerline Calc Executed")
     #print(centerline_calc.Centerlines)

@@ -43,10 +43,10 @@ python3 auto_centerline.py \
     -dataset  Dataset010_SEQCOROASOCACT \
     -fold all \
     -img_ext .nrrd \
-    -outdir output_v1_2000_stopmost/ \
+    -outdir output_v1_no_append_allow_smaller/ \
     -scale 1 \
-    -start 9 \
-    -stop 10 \
+    -start 0 \
+    -stop 5 \
     -max_n_steps 2000 \
     -unit mm \
 

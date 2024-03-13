@@ -1,9 +1,9 @@
 DEBUG: False
 DEBUG_STEP: 203
 
-WRITE_STEPS: True # if we want to write out each step
+WRITE_STEPS: False # if we want to write out each step
 ANIMATION: False # to write out animation files
-ANIMATION_STEPS: 5 # write out animation every x steps
+ANIMATION_STEPS: 3 # write out animation every x steps
 
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
 RETRACE: False # retrace strategry
@@ -14,9 +14,10 @@ VOLUME_SIZE_RATIO: 5.5 #5.5
 MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
 MIN_RES: 6
+TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 2
-NR_ALLOW_RETRACE_STEPS: 5
+NR_ALLOW_RETRACE_STEPS: 3
 PREVENT_RETRACE: True
 
 ASSEMBLY_EVERY_N: 20 # add to assembly every N steps
@@ -32,5 +33,5 @@ MEGA_SUBVOLUME: False # extract centerline from previous N steps, instead of jus
 NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
 
 STOP_PRE: True # whether to stop tracing prematurely, if True then options below will be used
-STOP_RADIUS: 0.5 # (mm) if radius goes below, stop tracing
-MAX_STEPS_BRANCH: 100 # max num of steps per branch, stop when reached
+STOP_RADIUS: 0.48 # (mm) if radius goes below, stop tracing
+MAX_STEPS_BRANCH: 150 # max num of steps per branch, stop when reached
