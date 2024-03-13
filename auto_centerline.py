@@ -136,7 +136,7 @@ if __name__=='__main__':
         # print(f"Time is: {time.time()}")
 
         ## Trace centerline
-        centerlines, surfaces, points, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
+        centerlines, surfaces, points, inside_pts, assembly_obj, vessel_tree, n_steps_taken = trace_centerline( dir_output,
                                                                                                 dir_image,
                                                                                                 case,
                                                                                                 dir_model_weights,
@@ -198,9 +198,14 @@ if __name__=='__main__':
         final_surface = vf.appendPolyData(surfaces)
         final_centerline = vf.appendPolyData(centerlines)
         final_points = vf.appendPolyData(points)
+        
         vf.write_vtk_polydata(final_surface,    dir_output+'/final_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_surfaces.vtp')
         vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_centerlines.vtp')
         vf.write_vtk_polydata(final_points,     dir_output+'/final_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_points.vtp')
+        
+        if global_config['PREVENT_RETRACE']:
+            final_inside_pts = vf.appendPolyData(inside_pts)
+            vf.write_vtk_polydata(final_inside_pts, dir_output+'/final_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_inside_points.vtp')
 
         #print('Number of outlets: ' + str(len(final_caps[1])))
 

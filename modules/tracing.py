@@ -96,7 +96,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     branch = 0
 
     # Track combos of all polydata
-    list_centerlines, list_surfaces, list_points = [], [], []
+    list_centerlines, list_surfaces, list_points, list_inside_pts = [], [], [], []
     surfaces_animation, cent_animation = [], []
 
     num_steps_direction = 0
@@ -141,8 +141,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     #vessel_tree.remove_branch(branch)
                     #branch -= 1
                     #i = i - allowed_steps
-                    # print('\n \n Inside already segmented vessel!! \n \n')
-
+                    print('\n \n Inside already segmented vessel!! \n \n')
+                    list_inside_pts.append(points2polydata([step_seg['point'].tolist()]))
                     if write_samples:
                         polydata_point = points2polydata([step_seg['point'].tolist()])
                         pfn = output_folder + 'points/inside_point_'+case+'_'+str(i)+'.vtp'
@@ -329,7 +329,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # Centerline
             centerline_poly = calc_centerline(  surface_smooth,
-                                                "profileidlist",
+                                                global_config['TYPE_CENT'],
                                                 var_source=[source_id],
                                                 var_target = sorted_targets,
                                                 number = i,
@@ -589,4 +589,4 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             vessel_tree.steps[-check]['prob_predicted_vessel'] = None
             check += 1
 
-    return list_centerlines, list_surfaces, list_points, assembly_segs, vessel_tree, i
+    return list_centerlines, list_surfaces, list_points, list_inside_pts, assembly_segs, vessel_tree, i
