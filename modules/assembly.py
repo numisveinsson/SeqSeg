@@ -371,18 +371,19 @@ class VesselTree:
         plt.xlabel('Step')
         plt.ylabel('Radius')
         plt.title('Radius Change')
-
-        # add red vertical line for bifurcations
-        for bif in self.bifurcations:
-            plt.axvline(x=bif, color='r', linestyle='--')
-        # add blue horizontal line for end of branches
-        for branch in self.branches:
-            plt.axvline(x=branch[-1], color='b', linestyle='--')
         # plt.xticks(np.arange(min(range(n_step)), max(range(n_step))+1, max(range(n_step))//20))
         # plt.tick_params(axis='x', which='major', labelsize=3)
         # plt.show()
         # save the graph
         plt.savefig(dir_output + '/radius_evolution.png')
+        # add red vertical line for bifurcations
+        # add blue horizontal line for end of branches
+        for branch in self.branches:
+            plt.axvline(x=branch[-1], color='b', linestyle='--')
+        plt.savefig(dir_output + '/radius_evolution_branches.png')
+        for bif in self.bifurcations:
+            plt.axvline(x=bif, color='r', linestyle='--')
+        plt.savefig(dir_output + '/radius_evolution_branches_bif.png')
         plt.close()
 
 
