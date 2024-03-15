@@ -45,8 +45,8 @@ python3 auto_centerline.py \
     -img_ext .nrrd \
     -outdir output_v1_no_append_allow_smaller/ \
     -scale 1 \
-    -start 0 \
-    -stop 5 \
+    -start 18 \
+    -stop 19 \
     -max_n_steps 2000 \
     -unit mm \
 
