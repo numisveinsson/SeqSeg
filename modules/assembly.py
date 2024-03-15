@@ -336,6 +336,7 @@ class VesselTree:
         for branch in self.branches:
             for i in range(len(branch)-1):
                 G.add_edge(branch[i], branch[i+1])
+
         # pos = nx.spring_layout(G)
         pos = nx.planar_layout(G)
         # pos = nx.kamada_kawai_layout(G)
@@ -351,6 +352,53 @@ class VesselTree:
         plt.close()
 
         # plt.show()
+
+    def create_tree_graph_smaller(self, dir_output):
+        """
+        Function to create a graph of the tree
+        Now only keep start and end of branches and bifurcations
+        Bifurcations are connected by 'connection' attribute
+        Bifurcations are between start and end of branches
+
+        Args:
+            dir_output: directory to save the graph
+        """
+        import networkx as nx
+        import matplotlib.pyplot as plt
+
+        G = nx.DiGraph()
+
+        # add all the nodes
+        for i, step in enumerate(self.steps):
+            G.add_node(i, radius=step['radius'])
+        # add all the edges
+        for branch in self.branches:
+            for i in range(len(branch)-1):
+                G.add_edge(branch[i], branch[i+1])
+
+        # now remove nodes with one parent and one child and connect them
+        for i, step in enumerate(self.steps):
+            # if i is node
+            if i in G.nodes:
+                if len(list(G.successors(i))) == 1 and len(list(G.predecessors(i))) == 1:
+                    pred = list(G.predecessors(i))[0]
+                    succ = list(G.successors(i))[0]
+                    G.add_edge(pred, succ)
+                    G.remove_node(i)
+
+        pos = nx.planar_layout(G)
+        # pos = nx.kamada_kawai_layout(G)
+        # pos = nx.spectral_layout(G)
+        # pos = nx.multipartite_layout(G)
+        # pos = nx.nx_agraph.graphviz_layout(G, prog="dot")
+
+        # nx.draw(G, pos, with_labels=True, node_size=100, node_color='lightblue', font_weight='bold', font_size=1, edge_color='grey')
+        nx.draw(G, pos, with_labels=True, node_color='lightblue', font_weight='bold')
+
+        # save the graph
+        plt.savefig(dir_output+'/tree_graph_smaller.png')
+        plt.close()
+
 
     def plot_radius_distribution(self, dir_output):
         """
