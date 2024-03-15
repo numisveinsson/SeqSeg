@@ -7,7 +7,7 @@ from .vtk_functions import *
 from .vmtk_functions import *
 from .assembly import Segmentation, VesselTree, print_error, create_step_dict, get_old_ref_point
 from .local_assembly import construct_subvolume
-from .tracing_functions import get_smoothing_params, SkipThisStepError
+from .tracing_functions import *
 
 import sys
 sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
