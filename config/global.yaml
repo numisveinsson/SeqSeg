@@ -1,3 +1,7 @@
+# if we are tracing a segmentation or predicting a segmentation as we go
+# True if we have a segmentation, False if we are predicting
+SEGMENTATION: True
+
 DEBUG: False
 DEBUG_STEP: 203
 

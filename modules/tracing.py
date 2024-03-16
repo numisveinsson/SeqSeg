@@ -18,12 +18,16 @@ from batchgenerators.utilities.file_and_folder_operations import join
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 import pdb
+
 def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     potential_branches, max_step_size, global_config,
                     unit = 'cm', scale = 1, seg_file=None):
 
     if unit == 'cm': scale_unit = 0.1
     else:            scale_unit = 1
+
+    # If tracing a an already segmented vasculature
+    trace_seg =                     global_config['SEGMENTATION']
 
     # Debugging
     debug =                         global_config['DEBUG']
@@ -60,8 +64,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     weighted =                      global_config['WEIGHTED_ASSEMBLY']
     weight_type =                   global_config['WEIGHT_TYPE']
 
-    if seg_file:
+    if seg_file and trace_seg:
+        print(f"We are tracing a segmented vasculature! No need for prediction.")
+        print(f"Reading in seg file: {seg_file}")
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
+        print(f"Seg data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
+
     print(f"Reading in image file: {image_file}, scale: {scale}")
     reader_im, origin_im, size_im, spacing_im = import_image(image_file)
     print(f"Image data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
@@ -138,9 +146,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 if inside_branch == allowed_steps:
                     step_seg['is_inside'] = True
                     inside_branch = 0
-                    #vessel_tree.remove_branch(branch)
-                    #branch -= 1
-                    #i = i - allowed_steps
                     print('\n \n Inside already segmented vessel!! \n \n')
                     list_inside_pts.append(points2polydata([step_seg['point'].tolist()]))
                     if write_samples:
@@ -193,12 +198,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 cropped_volume = extract_volume(reader_im, index_extract, size_extract)
                 volume_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'.mha'
 
-                if seg_file:
-                    seg_volume = extract_volume(reader_seg, index_extract, size_extract)
-                    seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
-                else:
-                    seg_volume=None
-
                 step_seg['img_file'] = volume_fn
                 if write_samples:
                     sitk.WriteImage(cropped_volume, volume_fn)
@@ -211,40 +210,54 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     step_seg['time'].append(time.time()-start_time_loc)
                     start_time_loc = time.time()
 
-                # Prediction
-                spacing = (spacing_im* scale).tolist()
-                spacing = spacing[::-1]
-                props={}
-                props['spacing'] = spacing
-                img_np = sitk.GetArrayFromImage(cropped_volume)
-                img_np = img_np[None]
-                img_np = img_np.astype('float32')
-                # prediction0 = predictor.predict_from_files([[volume_fn]],
-                #                      None,
-                #                      save_probabilities=False, overwrite=False,
-                #                      num_processes_preprocessing=1, num_processes_segmentation_export=1,
-                #                      folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
+                if not seg_file and trace_seg:
+                    # Prediction
+                    spacing = (spacing_im* scale).tolist()
+                    spacing = spacing[::-1]
+                    props={}
+                    props['spacing'] = spacing
+                    img_np = sitk.GetArrayFromImage(cropped_volume)
+                    img_np = img_np[None]
+                    img_np = img_np.astype('float32')
+                    # prediction0 = predictor.predict_from_files([[volume_fn]],
+                    #                      None,
+                    #                      save_probabilities=False, overwrite=False,
+                    #                      num_processes_preprocessing=1, num_processes_segmentation_export=1,
+                    #                      folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
 
-                # prediction1 = predictor.predict_from_list_of_npy_arrays([img_np],
-                #                                         None,
-                #                                         [props],
-                #                                         None, 1, save_probabilities=False,
-                #                                         num_processes_segmentation_export=2)
+                    # prediction1 = predictor.predict_from_list_of_npy_arrays([img_np],
+                    #                                         None,
+                    #                                         [props],
+                    #                                         None, 1, save_probabilities=False,
+                    #                                         num_processes_segmentation_export=2)
+                    
+                    prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
+                    
+                    # Create probability prediction
+                    prob_prediction = sitk.GetImageFromArray(prediction[1][1])
+                    
+                    # Create segmentation prediction (binary)
+                    predicted_vessel = prediction[0]
+                    pred_img = sitk.GetImageFromArray(predicted_vessel)
+                    pred_img = copy_settings(pred_img, cropped_volume)
                 
-                prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
+                else:
+                    # Use the given segmentation
+                    pred_img = extract_volume(reader_seg, index_extract, size_extract)
+                    predicted_vessel = sitk.GetArrayFromImage(pred_img)
 
-                predicted_vessel = prediction[0]
-                pred_img = sitk.GetImageFromArray(predicted_vessel)
-                pred_img = copy_settings(pred_img, cropped_volume)
-                
+                    # in this case, the probability is the same as the segmentation
+                    prob_prediction = pred_img
+                    # seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
+                    
                 perc = predicted_vessel.mean()
                 print(f"Perc as 1: {perc:.3f}, mag: {mag}")
                 mag += add_mag
 
-            prob_prediction = sitk.GetImageFromArray(prediction[1][1])
+            # Probabilities prediction
             prob_prediction = copy_settings(prob_prediction, cropped_volume)
-
             step_seg['prob_predicted_vessel'] = prob_prediction
+
             seed = np.rint(np.array(size_extract)/2).astype(int).tolist()
             
             predicted_vessel = remove_other_vessels(pred_img, seed)
@@ -506,50 +519,57 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 vessel_tree.steps[i]['chances'] += 1
 
             else:
-
-                print("\n*** Error for surface: \n" + str(i))
-                print("\n Moving onto another branch")
-
-                if debug:
-                    pdb.set_trace()
                 
-                del vessel_tree.branches[branch][-1]
-                list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
-                for id in vessel_tree.branches[branch][1:]:
-                    list_surf_branch.append(vessel_tree.steps[id]['surface'])
-                    list_cent_branch.append(vessel_tree.steps[id]['centerline'])
-                    list_pts_branch.append(vessel_tree.steps[id]['point_pd'])
-                    del vessel_tree.steps[id]['surface']
-                    del vessel_tree.steps[id]['centerline']
-                    del vessel_tree.steps[id]['point_pd']
-                list_centerlines.extend(list_cent_branch)
-                list_surfaces.extend(list_surf_branch)
-                list_points.extend(list_pts_branch)
+                if step_seg['is_inside']:
+                                        # If inside, then move on to next branch and remove allowed_steps
+                    i -= allowed_steps
+                    print(f"Redoing this branch, i is now {i}")
+                    vessel_tree.restart_branch(branch)
+                else:
+                    print("\n*** Error for surface: \n" + str(i))
+                    print("\n Moving onto another branch")
 
-                #print('Printing potentials')
-                list_pot = []
-                for pot in vessel_tree.potential_branches:
-                    list_pot.append(points2polydata([pot['point'].tolist()]))
-                final_pot = appendPolyData(list_pot)
+                    if debug:
+                        pdb.set_trace()
+                    
+                    del vessel_tree.branches[branch][-1]
+                    list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
+                    for id in vessel_tree.branches[branch][1:]:
+                        list_surf_branch.append(vessel_tree.steps[id]['surface'])
+                        list_cent_branch.append(vessel_tree.steps[id]['centerline'])
+                        list_pts_branch.append(vessel_tree.steps[id]['point_pd'])
+                        del vessel_tree.steps[id]['surface']
+                        del vessel_tree.steps[id]['centerline']
+                        del vessel_tree.steps[id]['point_pd']
+                    list_centerlines.extend(list_cent_branch)
+                    list_surfaces.extend(list_surf_branch)
+                    list_points.extend(list_pts_branch)
 
-                if take_time:
-                    print("Branches are: ", vessel_tree.branches)
-                if write_samples:
-                    final_surface    = appendPolyData(list_surf_branch)
-                    final_centerline = appendPolyData(list_cent_branch)
-                    final_points     = appendPolyData(list_pts_branch)
-                    write_vtk_polydata(final_pot, output_folder+'/assembly/potentials_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
-                    write_vtk_polydata(final_surface, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_surfaces.vtp')
-                    write_vtk_polydata(final_centerline, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_centerlines.vtp')
-                    write_vtk_polydata(final_points, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
+                    #print('Printing potentials')
+                    list_pot = []
+                    for pot in vessel_tree.potential_branches:
+                        list_pot.append(points2polydata([pot['point'].tolist()]))
+                    final_pot = appendPolyData(list_pot)
 
-                vessel_tree.caps = vessel_tree.caps + [step_seg['point'] + volume_size_ratio*step_seg['radius']*step_seg['tangent']]
+                    if take_time:
+                        print("Branches are: ", vessel_tree.branches)
+                    if write_samples:
+                        final_surface    = appendPolyData(list_surf_branch)
+                        final_centerline = appendPolyData(list_cent_branch)
+                        final_points     = appendPolyData(list_pts_branch)
+                        write_vtk_polydata(final_pot, output_folder+'/assembly/potentials_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
+                        write_vtk_polydata(final_surface, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_surfaces.vtp')
+                        write_vtk_polydata(final_centerline, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_centerlines.vtp')
+                        write_vtk_polydata(final_points, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
 
-                if retrace_cent:
-                    ind = vessel_tree.branches[branch][1] # second step on this branch
-                    step_to_add = vessel_tree.steps[ind]
-                    step_to_add['connection'] = [-branch+1, ind] # add connection that says retrace
-                    vessel_tree.potential_branches.append(step_to_add)
+                    vessel_tree.caps = vessel_tree.caps + [step_seg['point'] + volume_size_ratio*step_seg['radius']*step_seg['tangent']]
+
+                    if retrace_cent:
+                        ind = vessel_tree.branches[branch][1] # second step on this branch
+                        step_to_add = vessel_tree.steps[ind]
+                        step_to_add['connection'] = [-branch+1, ind] # add connection that says retrace
+                        vessel_tree.potential_branches.append(step_to_add)
+                
                 # Sort the potentials by radius
                 vessel_tree.sort_potential()
 
@@ -568,6 +588,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     print("Number of steps are: ", len(vessel_tree.steps))
                     print("Connections of branches are: ", vessel_tree.bifurcations)
                     print("Number of potentials left are: ", len(vessel_tree.potential_branches))
+
     if len(vessel_tree.potential_branches) > 0:
         print('Printing potentials')
         list_pot = []

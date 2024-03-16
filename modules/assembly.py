@@ -183,7 +183,7 @@ class VesselTree:
         end = self.branches[branch][-1]
         del self.steps[start:end]
         self.branches[branch] = []
-        del self.bifurcations[branch]
+        del self.bifurcations[-1]
 
     def sort_potential(self):
         self.potential_branches.sort(key=operator.itemgetter('radius'), reverse = True)
@@ -222,6 +222,20 @@ class VesselTree:
                 ind_prev = self.branches[ind[0]][ind[1]-1]
         return self.steps[ind_prev]
 
+    def restart_branch(self, branch):
+        "Function to restart a branch from beginning"
+        start = self.branches[branch][1]
+        end = self.branches[branch][-1]
+        del self.steps[start:end]
+        self.branches[branch] = []
+        del self.bifurcations[-1]
+        # remove potential branches that are in the branch
+        for i, pot_branch in enumerate(self.potential_branches):
+            if pot_branch['connection'][0] == branch:
+                del self.potential_branches[i]
+
+        print(f"Restarted branch {branch}")
+    
     def calc_ave_dice(self):
         total_dice, count = 0,0
         for step in self.steps[1:]:
