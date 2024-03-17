@@ -78,26 +78,29 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
     assembly_segs = Segmentation(case, image_file, weighted, weight_type=weight_type)
 
-    print('About to load predictor object')
-    # instantiate the nnUNetPredictor
-    predictor = nnUNetPredictor(
-        tile_step_size=0.5,
-        use_gaussian=True,
-        use_mirroring=True,
-        perform_everything_on_gpu=False,
-        device=torch.device('cpu', 0),
-        verbose=False,
-        verbose_preprocessing=False,
-        allow_tqdm=True
-    )
-    print('About to load model')
-    # initializes the network architecture, loads the checkpoint
-    predictor.initialize_from_trained_model_folder(
-        join(nnUNet_results, model_folder),
-        use_folds=(fold,),
-        checkpoint_name='checkpoint_best.pth',
-    )
-    print('Done loading model, ready to predict')
+    if not seg_file and trace_seg:
+        print('About to load predictor object')
+        # instantiate the nnUNetPredictor
+        predictor = nnUNetPredictor(
+            tile_step_size=0.5,
+            use_gaussian=True,
+            use_mirroring=True,
+            perform_everything_on_gpu=False,
+            device=torch.device('cpu', 0),
+            verbose=False,
+            verbose_preprocessing=False,
+            allow_tqdm=True
+        )
+        print('About to load model')
+        # initializes the network architecture, loads the checkpoint
+        predictor.initialize_from_trained_model_folder(
+            join(nnUNet_results, model_folder),
+            use_folds=(fold,),
+            checkpoint_name='checkpoint_best.pth',
+        )
+        print('Done loading model, ready to predict')
+    else:
+        print('No need to load model, we are using a given segmentation')
 
     ## Note: make initial seed within loop
     initial_seed = assembly_segs.assembly.TransformPhysicalPointToIndex(vessel_tree.steps[0]['point'].tolist())
