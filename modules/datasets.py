@@ -121,6 +121,11 @@ def get_testing_samples(dataset):
         dir_asoca_json = directory + 'test.json'
         testing_samples = get_testing_samples_json(dir_asoca_json)
 
+    elif dataset == 'Dataset016_SEQPULMPARSECT':
+        directory = '/global/scratch/users/numi/PARSE_dataset/'
+        dir_asoca_json = directory + 'test.json'
+        testing_samples = get_testing_samples_json(dir_asoca_json)
+
     else:
         print('Dataset not found')
         testing_samples =  None

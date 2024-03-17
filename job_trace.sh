@@ -40,14 +40,14 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -dataset  Dataset010_SEQCOROASOCACT \
+    -dataset  Dataset016_SEQPULMPARSECT \
     -fold all \
-    -img_ext .nrrd \
-    -outdir output_v1_no_append_allow_smaller/ \
+    -img_ext .nii.gz \
+    -outdir output_debug/ \
     -scale 1 \
-    -start 18 \
-    -stop 19 \
-    -max_n_steps 2000 \
+    -start 0 \
+    -stop 1 \
+    -max_n_steps 20 \
     -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
