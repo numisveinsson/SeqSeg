@@ -6,6 +6,8 @@ import SimpleITK as sitk
 import operator
 import time
 from datetime import datetime
+import sys
+sys.stdout.flush()
 
 class Segmentation:
     """
@@ -229,9 +231,11 @@ class VesselTree:
         "Function to restart a branch from beginning"
         start = self.branches[branch][1]
         end = self.branches[branch][-1]
-        del self.steps[start:end]
+        print(f"Removing steps {start+1} - {end}")
+        del self.steps[start+1:]
         self.branches[branch] = []
         del self.bifurcations[-1]
+
         # remove potential branches that are in the branch
         for i, pot_branch in enumerate(self.potential_branches):
             if pot_branch['connection'][0] == branch:

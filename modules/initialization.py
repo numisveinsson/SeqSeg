@@ -69,6 +69,7 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, scale, write_samp
     else:
         for seed in test_case['seeds']:
             step  = create_step_dict(np.array(seed[0]), seed[2], np.array(seed[1]), seed[2], 0)
+            step['connection'] = [0, 0]
             potential_branches.append(step)
             initial_seeds.append(np.array(seed[1]))
             if write_samples:
