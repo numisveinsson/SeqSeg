@@ -2,10 +2,10 @@
 # True if we have a segmentation, False if we are predicting
 SEGMENTATION: True # usually False
 
-DEBUG: True
-DEBUG_STEP: 0
+DEBUG: False
+DEBUG_STEP: 100
 
-WRITE_STEPS: True # if we want to write out each step
+WRITE_STEPS: False # if we want to write out each step
 ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 3 # write out animation every x steps
 
@@ -14,7 +14,7 @@ RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
 TREE_ANALYSIS: True
 
-VOLUME_SIZE_RATIO: 5.5 #5.5
+VOLUME_SIZE_RATIO: 5 #5.5
 MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
 MIN_RES: 6
