@@ -413,6 +413,40 @@ class VesselTree:
         plt.savefig(dir_output+'/tree_graph_smaller.png')
         plt.close()
 
+    def create_tree_polydata(self, dir_output):
+        """
+        Function to create a polydata of the tree
+        Each step is a node, all nodes in a branch are connected via a line
+        Branches are connected by 'connection' attribute
+
+        Args:
+            dir_output: directory to save the graph
+        """
+        import vtk
+
+        # Create the polydata
+        points = vtk.vtkPoints()
+        lines = vtk.vtkCellArray()
+        
+        # add all the nodes in branches
+        for branch in self.branches:
+            steps_in_branch = [self.steps[i]['point'] for i in branch]
+            for i in range(len(steps_in_branch)-1):
+                lines.InsertNextCell(2)
+                lines.InsertCellPoint(i)
+                lines.InsertCellPoint(i+1)
+                points.InsertNextPoint(steps_in_branch[i])
+                points.InsertNextPoint(steps_in_branch[i+1])
+
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(points)
+        polydata.SetLines(lines)
+
+        # write the polydata
+        writer = vtk.vtkXMLPolyDataWriter()
+        writer.SetFileName(dir_output + '/tree_polydata.vtp')
+        writer.SetInputData(polydata)
+        writer.Write()
 
     def plot_radius_distribution(self, dir_output):
         """
