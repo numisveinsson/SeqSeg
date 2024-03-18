@@ -1,17 +1,25 @@
-
+import sys
+sys.stdout.flush()
 import numpy as np
 from .vtk_functions import collect_arrays, get_points_cells, exportSitk2VTK, vtkImageResample, vtk_marching_cube, appendPolyData, bound_polydata_by_image, read_geo
 from vtk.util.numpy_support import numpy_to_vtk as n2v
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 
-def get_smoothing_params(radius, scale_unit, mega_sub = False):
+def get_smoothing_params(radius, scale_unit, mega_sub = False, already_seg = False):
     
     if not mega_sub:
-        num_iterations = 6
-        if radius > 1 * scale_unit: num_iterations = 36
-        elif radius > 0.5 * scale_unit:
-            print("Small radius; less smoothing")
-            num_iterations = 24
+        if not already_seg:
+            num_iterations = 6
+            if radius > 1 * scale_unit: num_iterations = 36
+            elif radius > 0.5 * scale_unit:
+                print("Small radius; less smoothing")
+                num_iterations = 24
+        else:
+            num_iterations = 8
+            if radius > 1 * scale_unit: num_iterations = 8
+            elif radius > 0.5 * scale_unit:
+                print("Small radius; less smoothing")
+                num_iterations = 8
     else:
         num_iterations = 3
         # less smoothing for bigger volumes

@@ -153,7 +153,6 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 if inside_branch == allowed_steps:
                     step_seg['is_inside'] = True
                     inside_branch = 0
-                    print('\n \n Inside already segmented vessel!! \n \n')
                     list_inside_pts.append(points2polydata([step_seg['point'].tolist()]))
                     if write_samples:
                         polydata_point = points2polydata([step_seg['point'].tolist()])
@@ -297,7 +296,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             surface = convert_seg_to_surfs(predicted_vessel, mega_sub = global_config['MEGA_SUBVOLUME'], ref_min_dims = size_extract)
 
-            num_iterations = get_smoothing_params(step_seg['radius'], scale_unit, global_config['MEGA_SUBVOLUME'])
+            num_iterations = get_smoothing_params(step_seg['radius'], scale_unit, mega_sub = global_config['MEGA_SUBVOLUME'], already_seg = trace_seg)
 
             surface_smooth = smooth_surface(surface, num_iterations) # Smooth marching cubes
 
@@ -528,10 +527,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             else:
                 
                 if step_seg['is_inside']:
-                                        # If inside, then move on to next branch and remove allowed_steps
-                    i -= allowed_steps
+                    # If inside, then move on to next branch and remove allowed_steps
+                    # i -= allowed_steps
                     print(f"Redoing this branch, i is now {i}")
-                    vessel_tree.restart_branch(branch)
+                    # vessel_tree.restart_branch(branch)
                 else:
                     print("\n*** Error for surface: \n" + str(i))
                     print("\n Moving onto another branch")
