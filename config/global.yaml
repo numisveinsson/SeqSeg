@@ -3,7 +3,7 @@
 SEGMENTATION: True # usually False
 
 DEBUG: False
-DEBUG_STEP: 100
+DEBUG_STEP: 1000
 
 WRITE_STEPS: False # if we want to write out each step
 ANIMATION: False # to write out animation files

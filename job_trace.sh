@@ -47,7 +47,7 @@ python3 auto_centerline.py \
     -scale 1 \
     -start 1 \
     -stop 2 \
-    -max_n_steps 2000 \
+    -max_n_steps 200 \
     -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \

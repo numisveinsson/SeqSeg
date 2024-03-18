@@ -166,6 +166,7 @@ if __name__=='__main__':
         if global_config['TREE_ANALYSIS']:
             # vessel_tree.create_tree_graph(dir_output)
             # vessel_tree.create_tree_graph_smaller(dir_output)
+            vessel_tree.create_tree_polydata(dir_output)
             vessel_tree.plot_radius_distribution(dir_output)
 
         ## Assembly work

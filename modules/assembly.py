@@ -438,7 +438,12 @@ class VesselTree:
         """
         import vtk
 
-        # create the polydata
+        print(f"\nCreating polydata of tree")
+        print(f"Branches are:")
+        for branch in self.branches:
+            print(branch)
+            
+        # Create the polydata
         polydata = vtk.vtkPolyData()
         points = vtk.vtkPoints()
         lines = vtk.vtkCellArray()
