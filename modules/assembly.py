@@ -415,34 +415,43 @@ class VesselTree:
 
     def create_tree_polydata(self, dir_output):
         """
-        Function to create a polydata of the tree
-        Each step is a node, all nodes in a branch are connected via a line
-        Branches are connected by 'connection' attribute
+        Function to create a polydata of the steps in the tree
+        The function uses self.branches to know the connections between steps
+        The actual points are in self.steps
+        An example of a branch is [0, 1, 2, 3] where 0 is the start of the branch
+        The next branch is [1, 4, 5, 6] where 1 is where the branch connects to another (previous) branch
+        4, 5, 6 are the steps in the branch
+        We use vtk.lines to connect the points in the branches so that:
+            0 - 1 - 2 - 3 are connected
+            1 - 4 - 5 - 6 are connected
+        Such that 1 is connected to 0, 2 and 4
 
         Args:
             dir_output: directory to save the graph
         """
         import vtk
+        from vtk.util import numpy_support
 
-        # Create the polydata
+        # create the polydata
+        polydata = vtk.vtkPolyData()
         points = vtk.vtkPoints()
         lines = vtk.vtkCellArray()
-        
-        # add all the nodes in branches
-        for branch in self.branches:
-            steps_in_branch = [self.steps[i]['point'] for i in branch]
-            for i in range(len(steps_in_branch)-1):
-                lines.InsertNextCell(2)
-                lines.InsertCellPoint(i)
-                lines.InsertCellPoint(i+1)
-                points.InsertNextPoint(steps_in_branch[i])
-                points.InsertNextPoint(steps_in_branch[i+1])
 
-        polydata = vtk.vtkPolyData()
+        # add the points
+        for step in self.steps:
+            points.InsertNextPoint(step['point'])
         polydata.SetPoints(points)
+
+        # add the lines
+        for branch in self.branches:
+            line = vtk.vtkLine()
+            for i in range(len(branch)-1):
+                line.GetPointIds().SetId(0, branch[i])
+                line.GetPointIds().SetId(1, branch[i+1])
+                lines.InsertNextCell(line)
         polydata.SetLines(lines)
 
-        # write the polydata
+        # save the polydata
         writer = vtk.vtkXMLPolyDataWriter()
         writer.SetFileName(dir_output + '/tree_polydata.vtp')
         writer.SetInputData(polydata)
