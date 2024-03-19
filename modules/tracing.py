@@ -46,6 +46,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     # Tracing params
     allowed_steps =                 global_config['NR_ALLOW_RETRACE_STEPS']
     prevent_retracing =             global_config['PREVENT_RETRACE']
+    sort_potentials =               global_config['SORT_NEXT']
+
     volume_size_ratio =             global_config['VOLUME_SIZE_RATIO']
     magnify_radius =                global_config['MAGN_RADIUS']
     number_chances =                global_config['NR_CHANCES']
@@ -574,7 +576,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                         vessel_tree.potential_branches.append(step_to_add)
                 
                 # Sort the potentials by radius
-                vessel_tree.sort_potential()
+                if sort_potentials:
+                    vessel_tree.sort_potential()
 
                 if len(vessel_tree.potential_branches) == 1:
                     break
