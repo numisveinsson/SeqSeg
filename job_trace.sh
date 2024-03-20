@@ -45,9 +45,9 @@ python3 auto_centerline.py \
     -img_ext .nii.gz \
     -outdir output_debug/ \
     -scale 1 \
-    -start 1 \
-    -stop 2 \
-    -max_n_steps 200 \
+    -start 0 \
+    -stop 1 \
+    -max_n_steps 300 \
     -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
