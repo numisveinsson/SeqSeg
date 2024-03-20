@@ -413,7 +413,7 @@ class VesselTree:
         plt.savefig(dir_output+'/tree_graph_smaller.png')
         plt.close()
 
-    def create_tree_polydata(self, dir_output):
+    def create_tree_polydata_v1(self, dir_output):
         """
         Function to create a polydata of the steps in the tree
         The function uses self.branches to know the connections between steps
@@ -430,7 +430,6 @@ class VesselTree:
             dir_output: directory to save the graph
         """
         import vtk
-        from vtk.util import numpy_support
 
         # create the polydata
         polydata = vtk.vtkPolyData()
@@ -449,6 +448,68 @@ class VesselTree:
                 line.GetPointIds().SetId(0, branch[i])
                 line.GetPointIds().SetId(1, branch[i+1])
                 lines.InsertNextCell(line)
+        polydata.SetLines(lines)
+
+        # save the polydata
+        writer = vtk.vtkXMLPolyDataWriter()
+        writer.SetFileName(dir_output + '/tree_polydata.vtp')
+        writer.SetInputData(polydata)
+        writer.Write()
+
+    def create_tree_polydata_v2(self, dir_output):
+        """
+        Function to create a polydata of the steps in the tree
+        The function uses self.branches to know the connections between steps
+        The actual points are in self.steps
+        An example of a branch is [0, 1, 2, 3] where 0 is the start of the branch
+        The next branch is [1, 4, 5, 6] where 1 is where the branch connects to another (previous) branch
+        4, 5, 6 are the steps in the branch
+        We use vtk.lines to connect the points in the branches so that:
+            0 - 1 - 2 - 3 are connected
+            1 - 4 - 5 - 6 are connected
+        Such that 1 is connected to 0, 2 and 4
+
+        Args:
+            dir_output: directory to save the graph
+        """
+        import vtk
+
+        # first create point array
+        points = []
+        for step in self.steps:
+            points.append(step['point'])
+        points = np.array(points)
+
+        # create the connection array
+        connections = np.zeros((len(self.steps), len(self.steps)))
+        # add connection within branches
+        for branch in self.branches:
+            for i in range(len(branch)-1):
+                connections[branch[i], branch[i+1]] = 1
+        # add connection between branches
+        for branch in self.branches:
+            step_in_other_branch = branch[0]
+            first_step_this_branch = branch[1]
+            connections[step_in_other_branch, first_step_this_branch] = 1
+
+        # create the polydata of the mesh
+        polydata = vtk.vtkPolyData()
+        points_vtk = vtk.vtkPoints()
+        lines = vtk.vtkCellArray()
+
+        # add the points
+        for point in points:
+            points_vtk.InsertNextPoint(point)
+        polydata.SetPoints(points_vtk)
+
+        # add the lines
+        for i in range(len(connections)):
+            for j in range(len(connections)):
+                if connections[i,j] == 1:
+                    line = vtk.vtkLine()
+                    line.GetPointIds().SetId(0, i)
+                    line.GetPointIds().SetId(1, j)
+                    lines.InsertNextCell(line)
         polydata.SetLines(lines)
 
         # save the polydata
