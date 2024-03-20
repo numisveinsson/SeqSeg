@@ -296,9 +296,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             surface = convert_seg_to_surfs(predicted_vessel, mega_sub = global_config['MEGA_SUBVOLUME'], ref_min_dims = size_extract)
 
-            num_iterations = get_smoothing_params(step_seg['radius'], scale_unit, mega_sub = global_config['MEGA_SUBVOLUME'], already_seg = trace_seg)
+            num_iterations = 25 #get_smoothing_params(step_seg['radius'], scale_unit, mega_sub = global_config['MEGA_SUBVOLUME'], already_seg = trace_seg)
 
-            surface_smooth = smooth_surface(surface, num_iterations) # Smooth marching cubes
+            surface_smooth = smooth_surface(surface, smoothingIterations = num_iterations) # Smooth marching cubes
 
             vtkimage = exportSitk2VTK(cropped_volume)
             length = predicted_vessel.GetSize()[0]*predicted_vessel.GetSpacing()[0]
