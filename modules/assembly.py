@@ -699,7 +699,8 @@ def get_old_ref_point(vessel_tree, step_seg, i, mega_sub = False, mega_sub_N = 0
         if i != 0:
             # return the old of two steps before
             branch = len(vessel_tree.branches) - 1
-            prev_n = vessel_tree.get_previous_n(branch, 2)
+            prev_n = vessel_tree.get_previous_n(branch, 3)
+            print(f"Prev n: {prev_n}")
             step = vessel_tree.steps[prev_n[0]]
             old_point_ref = step['old point']
             # prev_step = vessel_tree.get_previous_step(i)
