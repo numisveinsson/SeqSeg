@@ -69,12 +69,11 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
     else:
         # import pdb; pdb.set_trace()
         if method == "profileidlist":
-
             centerline_calc.AppendEndPoints = 0
             if var_source == None:
                 var_source = [0]
             centerline_calc.SourceIds = var_source
-            centerline_calc.TargetIds = var_target
+            # centerline_calc.TargetIds = None #var_target
         
         # use current point and match to caps
         elif method == "pointlist":
@@ -86,6 +85,7 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
             centerline_calc.SourcePoints = point.tolist() # var_source
             centerline_calc.TargetPoints = target # var_target
 
+    print(f"Method is {method}")
     centerline_calc.SeedSelectorName = method
     centerline_calc.Execute()
     print("Centerline Calc Executed")
