@@ -10,12 +10,6 @@ from .local_assembly import construct_subvolume
 from .tracing_functions import *
 
 import sys
-sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
-
-from nnunetv2.paths import nnUNet_results, nnUNet_raw
-import torch
-from batchgenerators.utilities.file_and_folder_operations import join
-from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 import pdb
 
@@ -81,6 +75,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     assembly_segs = Segmentation(case, image_file, weighted, weight_type=weight_type)
 
     if not seg_file and trace_seg:
+        
+        sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
+
+        from nnunetv2.paths import nnUNet_results
+        import torch
+        from batchgenerators.utilities.file_and_folder_operations import join
+        from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
+
         print('About to load predictor object')
         # instantiate the nnUNetPredictor
         predictor = nnUNetPredictor(
