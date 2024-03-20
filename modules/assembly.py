@@ -502,34 +502,30 @@ class VesselTree:
             points_vtk.InsertNextPoint(point)
         polydata.SetPoints(points_vtk)
 
-        # add attributes to the points
+        # add multiple attributes to the points
         # radius
         radius = np.array([step['radius'] for step in self.steps])
-        polydata.GetPointData().SetScalars(vtk.vtkFloatArray())
-        polydata.GetPointData().GetScalars().SetNumberOfComponents(1)
-        polydata.GetPointData().GetScalars().SetName('Radius')
-        for i in range(len(self.steps)):
-            polydata.GetPointData().GetScalars().InsertTuple1(i, radius[i])
-        polydata.GetPointData().SetScalars(polydata.GetPointData().GetScalars())
         # ids
         ids = np.arange(len(self.steps))
-        polydata.GetPointData().SetScalars(vtk.vtkFloatArray())
-        polydata.GetPointData().GetScalars().SetNumberOfComponents(1)
-        polydata.GetPointData().GetScalars().SetName('ID')
-        for i in range(len(self.steps)):
-            polydata.GetPointData().GetScalars().InsertTuple1(i, ids[i])
-        polydata.GetPointData().SetScalars(polydata.GetPointData().GetScalars())
         # branch number
         branch_number = np.zeros(len(self.steps))
         for i, branch in enumerate(self.branches):
             for step in branch:
                 branch_number[step] = i
-        polydata.GetPointData().SetScalars(vtk.vtkFloatArray())
-        polydata.GetPointData().GetScalars().SetNumberOfComponents(1)
-        polydata.GetPointData().GetScalars().SetName('Branch_ID')
-        for i in range(len(self.steps)):
-            polydata.GetPointData().GetScalars().InsertTuple1(i, branch_number[i])
-        polydata.GetPointData().SetScalars(polydata.GetPointData().GetScalars())
+        # bifurcation
+        bifurcation = np.zeros(len(self.steps))
+        for bif in self.bifurcations:
+            bifurcation[bif] = 1
+        # add the attributes to the points
+        polydata.GetPointData().AddArray(vtk.vtkDoubleArrayFromArray(radius))
+        polydata.GetPointData().AddArray(vtk.vtkIntArrayFromArray(ids))
+        polydata.GetPointData().AddArray(vtk.vtkIntArrayFromArray(branch_number))
+        polydata.GetPointData().AddArray(vtk.vtkIntArrayFromArray(bifurcation))
+        # add the names of the arrays
+        polydata.GetPointData().GetArray(0).SetName('Radius')
+        polydata.GetPointData().GetArray(1).SetName('ID')
+        polydata.GetPointData().GetArray(2).SetName('BranchID')
+        polydata.GetPointData().GetArray(3).SetName('BifLabel')
 
         # add the lines
         for i in range(len(connections)):
