@@ -516,11 +516,26 @@ class VesselTree:
         bifurcation = np.zeros(len(self.steps))
         for bif in self.bifurcations:
             bifurcation[bif] = 1
-        # add the attributes to the points
-        polydata.GetPointData().AddArray(vtk.vtkDoubleArrayFromArray(radius))
-        polydata.GetPointData().AddArray(vtk.vtkIntArrayFromArray(ids))
-        polydata.GetPointData().AddArray(vtk.vtkIntArrayFromArray(branch_number))
-        polydata.GetPointData().AddArray(vtk.vtkIntArrayFromArray(bifurcation))
+            
+        # create the arrays
+        radius_vtk = vtk.vtkDoubleArray()
+        ids_vtk = vtk.vtkIntArray()
+        branch_number_vtk = vtk.vtkIntArray()
+        bifurcation_vtk = vtk.vtkIntArray()
+
+        # add the values
+        for i in range(len(self.steps)):
+            radius_vtk.InsertNextValue(radius[i])
+            ids_vtk.InsertNextValue(ids[i])
+            branch_number_vtk.InsertNextValue(branch_number[i])
+            bifurcation_vtk.InsertNextValue(bifurcation[i])
+
+        # add the arrays to the polydata
+        polydata.GetPointData().AddArray(radius_vtk)
+        polydata.GetPointData().AddArray(ids_vtk)
+        polydata.GetPointData().AddArray(branch_number_vtk)
+        polydata.GetPointData().AddArray(bifurcation_vtk)
+
         # add the names of the arrays
         polydata.GetPointData().GetArray(0).SetName('Radius')
         polydata.GetPointData().GetArray(1).SetName('ID')
