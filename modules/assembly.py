@@ -225,6 +225,7 @@ class VesselTree:
             if ind[1] == 0: continue
             else:
                 ind_prev = self.branches[ind[0]][ind[1]-1]
+                
         return self.steps[ind_prev]
 
     def restart_branch(self, branch):

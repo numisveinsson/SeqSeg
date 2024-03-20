@@ -36,7 +36,7 @@ export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
-cd /global/scratch/users/numi/SeqSeg/
+cd /global/scratch/users/numi/SeqSe g/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
