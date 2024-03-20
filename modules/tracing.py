@@ -372,7 +372,13 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 print("\n Attempting with more smoothing \n")
                 surface_smooth1 = smooth_surface(surface, 15)
                 surface_smooth1 = bound_polydata_by_image(vtkimage[0], surface_smooth1, length*1/40)
-                centerline_poly1 = calc_centerline(surface_smooth1, "profileidlist")
+                centerline_poly1 = calc_centerline(surface_smooth1,
+                                                    global_config['TYPE_CENT'],
+                                                    var_source=[source_id],
+                                                    var_target = sorted_targets,
+                                                    number = i,
+                                                    caps = caps,
+                                                    point = step_seg['point'])
                 # centerline_poly1 = calc_branches(centerline_poly1)
                 if centerline_poly1.GetNumberOfPoints() > 5:
                     sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_1.vtp'
