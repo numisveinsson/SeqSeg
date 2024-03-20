@@ -673,7 +673,7 @@ def points2polydata(xyz):
 
     return polydata
 
-def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=.1):
+def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=0.): #.1
     """
     This function smooths a vtk polydata
     Args:
@@ -684,7 +684,7 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothing
     """
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(poly)
-    smoother.SetPassBand(pow(10., -3. * smoothingFactor))
+    smoother.SetPassBand(pow(10., -4. * smoothingFactor)) # -3
     smoother.SetBoundarySmoothing(boundary)
     smoother.SetFeatureEdgeSmoothing(feature)
     smoother.SetNumberOfIterations(iteration)
@@ -758,13 +758,13 @@ def smooth_surface(polydata, smoothingIterations):
         return polydata
     
     passBand = 0.01 #0.001
-    featureAngle = 120.0
+    # featureAngle = 120.0
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(polydata)
     smoother.SetNumberOfIterations(smoothingIterations)
     smoother.BoundarySmoothingOff()
     smoother.FeatureEdgeSmoothingOff()
-    smoother.SetFeatureAngle(featureAngle)
+    # smoother.SetFeatureAngle(featureAngle)
     smoother.SetPassBand(passBand)
     smoother.NonManifoldSmoothingOn()
     smoother.NormalizeCoordinatesOn()
