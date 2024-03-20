@@ -502,6 +502,35 @@ class VesselTree:
             points_vtk.InsertNextPoint(point)
         polydata.SetPoints(points_vtk)
 
+        # add attributes to the points
+        # radius
+        radius = np.array([step['radius'] for step in self.steps])
+        polydata.GetPointData().SetScalars(vtk.vtkFloatArray())
+        polydata.GetPointData().GetScalars().SetNumberOfComponents(1)
+        polydata.GetPointData().GetScalars().SetName('Radius')
+        for i in range(len(self.steps)):
+            polydata.GetPointData().GetScalars().InsertTuple1(i, radius[i])
+        polydata.GetPointData().SetScalars(polydata.GetPointData().GetScalars())
+        # ids
+        ids = np.arange(len(self.steps))
+        polydata.GetPointData().SetScalars(vtk.vtkFloatArray())
+        polydata.GetPointData().GetScalars().SetNumberOfComponents(1)
+        polydata.GetPointData().GetScalars().SetName('ID')
+        for i in range(len(self.steps)):
+            polydata.GetPointData().GetScalars().InsertTuple1(i, ids[i])
+        polydata.GetPointData().SetScalars(polydata.GetPointData().GetScalars())
+        # branch number
+        branch_number = np.zeros(len(self.steps))
+        for i, branch in enumerate(self.branches):
+            for step in branch:
+                branch_number[step] = i
+        polydata.GetPointData().SetScalars(vtk.vtkFloatArray())
+        polydata.GetPointData().GetScalars().SetNumberOfComponents(1)
+        polydata.GetPointData().GetScalars().SetName('Branch_ID')
+        for i in range(len(self.steps)):
+            polydata.GetPointData().GetScalars().InsertTuple1(i, branch_number[i])
+        polydata.GetPointData().SetScalars(polydata.GetPointData().GetScalars())
+
         # add the lines
         for i in range(len(connections)):
             for j in range(len(connections)):
