@@ -464,7 +464,7 @@ class VesselTree:
 
         # save the polydata
         writer = vtk.vtkXMLPolyDataWriter()
-        writer.SetFileName(dir_output + '/tree_polydata.vtp')
+        writer.SetFileName(dir_output + '/tree_polydata_v1.vtp')
         writer.SetInputData(polydata)
         writer.Write()
 
@@ -567,7 +567,7 @@ class VesselTree:
 
         # save the polydata
         writer = vtk.vtkXMLPolyDataWriter()
-        writer.SetFileName(dir_output + '/tree_polydata.vtp')
+        writer.SetFileName(dir_output + '/tree_polydata_v2.vtp')
         writer.SetInputData(polydata)
         writer.Write()
 

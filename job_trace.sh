@@ -43,11 +43,11 @@ python3 auto_centerline.py \
     -dataset  Dataset016_SEQPULMPARSECT \
     -fold all \
     -img_ext .nii.gz \
-    -outdir output_pulm_segs_changesize/ \
+    -outdir output_debug/ \
     -scale 1 \
     -start 1 \
     -stop 2 \
-    -max_n_steps 5000 \
+    -max_n_steps 200 \
     -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
