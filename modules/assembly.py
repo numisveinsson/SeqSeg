@@ -185,8 +185,11 @@ class VesselTree:
         self.branches[branch] = []
         del self.bifurcations[-1]
 
-    def sort_potential(self):
+    def sort_potential_radius(self):
         self.potential_branches.sort(key=operator.itemgetter('radius'), reverse = True)
+
+    def shuffle_potential(self):
+        self.potential_branches = np.random.shuffle(self.potential_branches)
 
     def get_previous_n(self, branch, n):
 

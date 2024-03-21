@@ -75,7 +75,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     assembly_segs = Segmentation(case, image_file, weighted, weight_type=weight_type)
 
     if not seg_file and trace_seg:
-        
+
         sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
 
         from nnunetv2.paths import nnUNet_results
@@ -579,7 +579,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 
                 # Sort the potentials by radius
                 if sort_potentials:
-                    vessel_tree.sort_potential()
+                    vessel_tree.sort_potential_radius()
+                else:
+                    vessel_tree.shuffle_potential()
 
                 if len(vessel_tree.potential_branches) == 1:
                     break
