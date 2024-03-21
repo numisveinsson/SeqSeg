@@ -488,9 +488,10 @@ class VesselTree:
                 connections[branch[i], branch[i+1]] = 1
         # add connection between branches
         for branch in self.branches:
-            step_in_other_branch = branch[0]
-            first_step_this_branch = branch[1]
-            connections[step_in_other_branch, first_step_this_branch] = 1
+            if len(branch) > 1:
+                step_in_other_branch = branch[0]
+                first_step_this_branch = branch[1]
+                connections[step_in_other_branch, first_step_this_branch] = 1
 
         # create the polydata of the mesh
         polydata = vtk.vtkPolyData()
