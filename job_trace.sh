@@ -36,7 +36,7 @@ export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
-cd /global/scratch/users/numi/SeqSe g/
+cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
@@ -46,8 +46,8 @@ python3 auto_centerline.py \
     -outdir output_debug/ \
     -scale 1 \
     -start 0 \
-    -stop 1 \
-    -max_n_steps 300 \
+    -stop 2 \
+    -max_n_steps 10000 \
     -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \

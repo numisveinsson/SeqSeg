@@ -3,9 +3,9 @@
 SEGMENTATION: True # usually False
 
 DEBUG: False
-DEBUG_STEP: 1000
+DEBUG_STEP: 200
 
-WRITE_STEPS: True # if we want to write out each step
+WRITE_STEPS: False # if we want to write out each step
 ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 3 # write out animation every x steps
 
@@ -14,7 +14,7 @@ RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
 TREE_ANALYSIS: True
 
-VOLUME_SIZE_RATIO: 4 # default 5, 5.5 for coronaries, 4 for segs
+VOLUME_SIZE_RATIO: 5 # default 5, 5.5 for coronaries, 4 for segs
 MAGN_RADIUS: 1
 MIN_RADIUS: 0.4 # mm (keep in mm)
 MIN_RES: 6

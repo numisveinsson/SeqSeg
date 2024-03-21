@@ -525,12 +525,13 @@ class VesselTree:
         branch_number = np.zeros(len(self.steps))
         for i, branch in enumerate(self.branches):
             for step in branch:
-                branch_number[step] = i
+                branch_number[step] = int(i)
+        branch_number = branch_number.astype(int)
         # bifurcation
         bifurcation = np.zeros(len(self.steps))
         for bif in self.bifurcations:
             bifurcation[bif] = 1
-            
+        bifurcation = bifurcation.astype(int)
         # create the arrays
         radius_vtk = vtk.vtkDoubleArray()
         ids_vtk = vtk.vtkIntArray()
