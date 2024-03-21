@@ -43,9 +43,9 @@ python3 auto_centerline.py \
     -dataset  Dataset016_SEQPULMPARSECT \
     -fold all \
     -img_ext .nii.gz \
-    -outdir output_debug/ \
+    -outdir output_pul_segs_randomnext/ \
     -scale 1 \
-    -start 0 \
+    -start 1 \
     -stop 2 \
     -max_n_steps 10000 \
     -unit mm \

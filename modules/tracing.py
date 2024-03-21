@@ -587,7 +587,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     vessel_tree.sort_potential_radius()
                 else:
                     vessel_tree.shuffle_potential()
-
+                
                 if len(vessel_tree.potential_branches) == 1:
                     break
                 next_step = vessel_tree.potential_branches.pop(1)
