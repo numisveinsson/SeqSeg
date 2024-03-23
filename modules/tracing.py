@@ -582,6 +582,9 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                         step_to_add['connection'] = [-branch+1, ind] # add connection that says retrace
                         vessel_tree.potential_branches.append(step_to_add)
                 
+                # Merge potentials
+                vessel_tree.merge_pots_radius()
+
                 # Sort the potentials by radius
                 if sort_potentials:
                     vessel_tree.sort_potential_radius()

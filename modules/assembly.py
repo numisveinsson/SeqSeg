@@ -193,6 +193,23 @@ class VesselTree:
     def shuffle_potential(self):
         np.random.shuffle(self.potential_branches)
 
+    def merge_pots_radius(self):
+        """
+        Function to loop over potential branches 
+        and remove ones within 1 radius of each other
+        """
+        print(f"Number of pots before merge: {len(self.potential_branches)}")
+        i = 0
+        while i < len(self.potential_branches):
+            j = i + 1
+            while j < len(self.potential_branches):
+                if np.linalg.norm(np.array(self.potential_branches[i]['point']) - np.array(self.potential_branches[j]['point'])) < self.potential_branches[i]['radius']:
+                    del self.potential_branches[j]
+                else:
+                    j += 1
+            i += 1
+        print(f"Number of pots after merge: {len(self.potential_branches)}")
+
     def get_previous_n(self, branch, n):
 
         branch0 = self.branches[branch]
