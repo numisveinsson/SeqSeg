@@ -1,9 +1,9 @@
 # if we are tracing a segmentation or predicting a segmentation as we go
 # True if we have a segmentation, False if we are predicting
-SEGMENTATION: True # usually False
+SEGMENTATION: False # usually False
 
 DEBUG: False
-DEBUG_STEP: 200
+DEBUG_STEP: 100
 
 WRITE_STEPS: False # if we want to write out each step
 ANIMATION: False # to write out animation files
@@ -39,4 +39,4 @@ NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
 
 STOP_PRE: False # whether to stop tracing prematurely, if True then options below will be used
 STOP_RADIUS: 0.48 # (mm) if radius goes below, stop tracing
-MAX_STEPS_BRANCH: 200 # max num of steps per branch, stop when reached
+MAX_STEPS_BRANCH: 1000 # max num of steps per branch, stop when reached
