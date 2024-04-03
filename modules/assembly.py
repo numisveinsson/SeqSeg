@@ -203,7 +203,7 @@ class VesselTree:
         while i < len(self.potential_branches):
             j = i + 1
             while j < len(self.potential_branches):
-                if np.linalg.norm(np.array(self.potential_branches[i]['point']) - np.array(self.potential_branches[j]['point'])) < self.potential_branches[i]['radius']:
+                if np.linalg.norm(np.array(self.potential_branches[i]['point']) - np.array(self.potential_branches[j]['point'])) < 2* self.potential_branches[i]['radius']:
                     del self.potential_branches[j]
                 else:
                     j += 1
