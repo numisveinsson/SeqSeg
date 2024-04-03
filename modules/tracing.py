@@ -69,14 +69,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     print(f"Reading in image file: {image_file}, scale: {scale}")
     reader_im, origin_im, size_im, spacing_im = import_image(image_file)
     print(f"Image data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
-
+    
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
     assembly_segs = Segmentation(case, image_file, weighted, weight_type=weight_type)
 
-    if not seg_file and trace_seg:
+    if not (seg_file and trace_seg):
 
-        sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
+        # sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
 
         from nnunetv2.paths import nnUNet_results
         import torch
@@ -216,7 +216,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     step_seg['time'].append(time.time()-start_time_loc)
                     start_time_loc = time.time()
 
-                if not seg_file and trace_seg:
+                if not (seg_file and trace_seg):
                     # Prediction
                     spacing = (spacing_im* scale).tolist()
                     spacing = spacing[::-1]
