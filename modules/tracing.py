@@ -296,7 +296,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             surface = convert_seg_to_surfs(predicted_vessel, mega_sub = global_config['MEGA_SUBVOLUME'], ref_min_dims = size_extract)
 
-            num_iterations = 25 #get_smoothing_params(step_seg['radius'], scale_unit, mega_sub = global_config['MEGA_SUBVOLUME'], already_seg = trace_seg)
+            num_iterations = get_smoothing_params(step_seg['radius'], scale_unit, mega_sub = global_config['MEGA_SUBVOLUME'], already_seg = trace_seg)
 
             surface_smooth = smooth_surface(surface, smoothingIterations = num_iterations) # Smooth marching cubes
 
@@ -583,7 +583,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                         vessel_tree.potential_branches.append(step_to_add)
                 
                 # Merge potentials
-                vessel_tree.merge_pots_radius()
+                # vessel_tree.merge_pots_radius()
 
                 # Sort the potentials by radius
                 if sort_potentials:

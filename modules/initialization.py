@@ -1,4 +1,5 @@
 from .vtk_functions import *
+from .tracing_functions import get_seed
 from .assembly import create_step_dict
 from .datasets import get_directories, vmr_directories
 import os

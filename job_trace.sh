@@ -40,16 +40,16 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -dataset  Dataset016_SEQPULMPARSECT \
+    -dataset  Dataset005_SEQAORTANDFEMOMR \
     -fold all \
-    -img_ext .nii.gz \
-    -outdir output_pul_segs_randomnext/ \
+    -img_ext .mha \
+    -outdir output_bryan/ \
     -scale 1 \
-    -start 1 \
-    -stop 2 \
-    -max_n_steps 10000 \
-    -unit mm \
+    -start 0 \
+    -stop -1 \
+    -max_n_steps 1000 \
+    -unit cm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 
-# Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR
+# Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT

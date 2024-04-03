@@ -22,8 +22,8 @@ TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 2
 NR_ALLOW_RETRACE_STEPS: 10
-PREVENT_RETRACE: False
-SORT_NEXT: False
+PREVENT_RETRACE: True
+SORT_NEXT: True
 
 ASSEMBLY_EVERY_N: 20 # add to assembly every N steps
 USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)
@@ -39,4 +39,4 @@ NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
 
 STOP_PRE: False # whether to stop tracing prematurely, if True then options below will be used
 STOP_RADIUS: 0.48 # (mm) if radius goes below, stop tracing
-MAX_STEPS_BRANCH: 1000 # max num of steps per branch, stop when reached
+MAX_STEPS_BRANCH: 100 # max num of steps per branch, stop when reached
