@@ -186,7 +186,7 @@ if __name__=='__main__':
         sitk.WriteImage(assembly_binary, dir_output0+'/'+case+'_seg_rem_' + test_name +'_'+str(i)+'.mha')
 
         assembly_surface    = vf.evaluate_surface(assembly_binary, 1)
-        vf.write_vtk_polydata(assembly_surface, dir_output0+'/'+case+'_surface_' + test_name +'_'+str(i)+'.vtp')
+        vf.write_vtk_polydata(assembly_surface, dir_output0+'/'+case+'_surface_' + test_name +'_'+str(n_steps_taken)+'.vtp')
         for level in [10,40]:#range(10,50,10):
             surface_smooth      = vf.smooth_surface(assembly_surface, level)
             vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'+name+'_'+case+'_'+test_name +'_'+str(i)+'_'+str(n_steps_taken)+'_'+str(level)+'_surface_smooth.vtp')
