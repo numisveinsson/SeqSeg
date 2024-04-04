@@ -60,7 +60,7 @@ def calc_centerline(Surface, method, var_source = None, var_target = None, numbe
     centerline_calc = vmtkscripts.vmtkCenterlines()
     centerline_calc.Surface = Surface
 
-    if number == 0 and len(caps) == 1:
+    if number <= 1 and len(caps) == 1:
         method = "pointlist"
         var_target = caps[0].tolist()
         var_source = point.tolist()
