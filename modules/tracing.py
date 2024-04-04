@@ -60,7 +60,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     weighted =                      global_config['WEIGHTED_ASSEMBLY']
     weight_type =                   global_config['WEIGHT_TYPE']
 
-    if seg_file and trace_seg:
+    if (seg_file and trace_seg):
         print(f"We are tracing a segmented vasculature! No need for prediction.")
         print(f"Reading in seg file: {seg_file}")
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
