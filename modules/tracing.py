@@ -43,6 +43,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     sort_potentials =               global_config['SORT_NEXT']
 
     volume_size_ratio =             global_config['VOLUME_SIZE_RATIO']
+    perc_enlarge =                  global_config['MAX_PERC_ENLARGE']
     magnify_radius =                global_config['MAGN_RADIUS']
     number_chances =                global_config['NR_CHANCES']
     min_radius =                    global_config['MIN_RADIUS'] * scale_unit
@@ -184,7 +185,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             
             if step_seg['radius'] > 3 *scale_unit: mag = max_mag # if above 3mm then dont change size
             
-            while perc > 0.33 and continue_enlarge:
+            while perc > perc_enlarge and continue_enlarge:
                 if mag > 1 and mag < max_mag:
                     print(f"Enlarging bounding box because percentage vessel > 0.33")
                 if mag >= max_mag:

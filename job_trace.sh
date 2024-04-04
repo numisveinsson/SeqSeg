@@ -21,7 +21,7 @@
 #SBATCH --cpus-per-task=2
 #
 # Wall clock limit:
-#SBATCH --time=24:00:00
+#SBATCH --time=72:00:00
 #
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=numi@berkeley.edu
@@ -43,11 +43,11 @@ python3 auto_centerline.py \
     -dataset  Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
-    -outdir output_bryan/ \
+    -outdir output_bryan_1500/ \
     -scale 1 \
-    -start 0 \
-    -stop -1 \
-    -max_n_steps 1000 \
+    -start 2 \
+    -stop 3 \
+    -max_n_steps 1500 \
     -unit cm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
