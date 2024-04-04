@@ -338,7 +338,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             print(f"Source id: {source_id}")
 
             print('Number of caps: ', len(caps))
-            if len(caps) < 2 and i != 0 : 
+            if len(caps) < 2 and i > 1 : 
                 raise SkipThisStepError(
                     "Less than 2 caps, stop here"
                 )
