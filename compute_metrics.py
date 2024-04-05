@@ -177,7 +177,7 @@ def from_prob_to_binary(pred):
 
     return pred_binary
 
-def keep_largest_label(pred_binary):
+def keep_largest_label(pred_binary, num_labels=1):
 
     # get connected components
     ccimage = sitk.ConnectedComponent(pred_binary)
@@ -193,11 +193,19 @@ def keep_largest_label(pred_binary):
     labels = [x for _,x in sorted(zip(label_sizes,labels), reverse=True)]
     # print(f"Sorted labels: {labels}")
     # keep only largest label
-    label = labels[0]
+    if num_labels == 1:
+        label = labels[0]
+    else:
+        label = labels[:num_labels]
     # print(f"Keeping label {label}")
-    labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=label, upperThreshold=label)
-
-    return labelImage
+    if num_labels == 1:
+        labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=label, upperThreshold=label)
+        return labelImage
+    else:
+        labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=label[0], upperThreshold=label[0])
+        for l in label[1:]:
+            labelImage += sitk.BinaryThreshold(ccimage, lowerThreshold=l, upperThreshold=l)
+        return labelImage
 
 def pre_process(pred, write_postprocessed):
     
