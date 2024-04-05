@@ -477,11 +477,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
                 if len(radius_tree) > 1:
                     print('\n _ \n')
-                    print("\n BIFURCATION BIFURCATION BIFURCATION\n")
+                    print(f"\n BIFURCATION BIFURCATION BIFURCATION - {len(radius_tree)} BRANCHES \n")
                     print('\n _ \n')
-                    if global_config['MEGA_SUBVOLUME']:     start = 1   # add all bifurcation points
-                    else:                                   start = 1   # don't add this one
-                    for j in range(start, len(radius_tree)):
+                    
+                    for j in range(1, len(radius_tree)):
                         dict = create_step_dict(step_seg['point'],
                                                 step_seg['radius'],
                                                 point_tree[j],
