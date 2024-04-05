@@ -76,9 +76,9 @@ def get_testing_samples(dataset):
 
             ['0006_0001',0,0,1,'mr'], # Aortofemoral MR
             ['0063_1001',0,10,20,'mr'], # Aortic MR
+            ['0070_0001',0,10,20,'mr'], # Aortic MR
             ['0090_0001',0,0,5,'mr'], # Aortic MR
             ['0131_0000',0,10,20,'mr'], # Aortic MR
-            ['0070_0001',0,10,20,'mr'], # Aortic MR
             ['KDR12_aorta',0,20,30,'mr'], # Aortic MR
             ['KDR33_aorta',3,-10,-20,'mr'], # Aortic MR
 
@@ -88,11 +88,12 @@ def get_testing_samples(dataset):
         directory = '/global/scratch/users/numi/vascular_data_3d/'
         dir_json = directory + 'test.json'
         testing_samples = [ #get_testing_samples_json(dir_json)
-            ['0176_0000',0,10,20,'ct'], # Aorta CT
-            ['0174_0000',0,0,5,'ct'], # Aorta CT
+        
             ['0139_1001',0,0,10,'ct'], # Aortofemoral CT
             ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
             ['0146_1001',0,0,10,'ct'], # Aortofemoral CT
+            ['0174_0000',0,0,5,'ct'], # Aorta CT
+            ['0176_0000',0,10,20,'ct'], # Aorta CT
             ['0188_0001_aorta',5,-10,-20,'ct'], # Aorta CT
             ['O150323_2009_aorta',0,10,20,'ct'], # Aorta CT
             ['O344211000_2006_aorta',0,10,20,'ct'], # Aorta CT

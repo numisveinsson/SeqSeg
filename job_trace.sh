@@ -40,13 +40,13 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -dataset  Dataset005_SEQAORTANDFEMOMR \
+    -dataset  Dataset006_SEQAORTANDFEMOCT \
     -fold all \
     -img_ext .mha \
     -outdir output_bryan_1500/ \
     -scale 1 \
-    -start 2 \
-    -stop 3 \
+    -start 6 \
+    -stop 8 \
     -max_n_steps 1500 \
     -unit cm \
 
