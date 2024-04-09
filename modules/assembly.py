@@ -203,7 +203,13 @@ class VesselTree:
         while i < len(self.potential_branches):
             j = i + 1
             while j < len(self.potential_branches):
-                if np.linalg.norm(np.array(self.potential_branches[i]['point']) - np.array(self.potential_branches[j]['point'])) < 2* self.potential_branches[i]['radius']:
+                mult_r = 2 # within 2 radii
+                location_close =  np.linalg.norm(np.array(self.potential_branches[i]['point']) - np.array(self.potential_branches[j]['point'])) < mult_r* self.potential_branches[i]['radius']
+                angle_range = 0.5 # 30 degrees
+                tangent_i = self.potential_branches[i]['tangent']
+                tangent_j = self.potential_branches[j]['tangent']
+                angle_close = np.arccos(np.dot(tangent_i, tangent_j))/(np.linalg.norm(tangent_i)*np.linalg.norm(tangent_j)) < angle_range
+                if location_close and angle_close:
                     del self.potential_branches[j]
                 else:
                     j += 1
