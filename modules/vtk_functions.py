@@ -14,7 +14,17 @@ from vtk.util.numpy_support import vtk_to_numpy as v2n
 from vtk.util.numpy_support import get_vtk_array_type
 
 def calc_caps(polyData):
-    # import pdb; pdb.set_trace()
+    """
+    Calculate the center of mass of the caps of a surface mesh
+    Parameters
+    ----------
+    polyData : vtkPolyData
+        Surface mesh to calculate the caps from.
+    Returns
+    -------
+    caps_locs : list of tuples
+        List of tuples with the coordinates of the caps of the surface mesh.
+    """
     # Now extract feature edges
     boundaryEdges = vtk.vtkFeatureEdges()
     boundaryEdges.SetInputData(polyData)

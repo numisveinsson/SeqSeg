@@ -219,3 +219,16 @@ def numpy_to_sitk(numpy, file_reader = None):
         Image.SetDirection(file_reader.GetDirection())
 
     return Image
+
+def distance_map_from_seg(sitk_img):
+    """
+    Function to calculate distance map
+    Inside is negative, outside is positive
+
+    args:
+        sitk_img: sitk image
+    return:
+        distance_map: sitk image
+    """
+    distance_map = sitk.SignedMaurerDistanceMap(sitk_img, squaredDistance=False, useImageSpacing=True)
+    return distance_map
