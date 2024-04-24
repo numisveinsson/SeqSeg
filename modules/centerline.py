@@ -1072,7 +1072,7 @@ def move_if_outside(target_index, distance_map_surf_np):
 
     return target_index
 
-def calc_centerline_ffm(segmentation, seed = None, targets = None, min_res = 300):
+def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1219,7 +1219,7 @@ def create_centerline_polydata(points_list, distance_map_surf):
     points = vtk.vtkPoints()
     lines = vtk.vtkCellArray()
     radii = vtk.vtkDoubleArray()
-    radii.SetName('MaximumInscribedSphereRadius')
+    radii.SetName("MaximumInscribedSphereRadius")
     # Iterate over all points
     for points_path in points_list:
         line = vtk.vtkPolyLine()
@@ -1641,7 +1641,7 @@ def test_centerline_fmm(directory, out_dir):
         caps = calc_caps(surface)
         print(f"  # Caps: {len(caps)}")
         # Calculate centerline
-        centerline = calc_centerline_ffm(segmentation, caps[0], [cap for i, cap in enumerate(caps) if i != 0])
+        centerline = calc_centerline_fmm(segmentation, caps[0], [cap for i, cap in enumerate(caps) if i != 0])
         # Write centerline
         name = file.split('.')[0]
         pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
@@ -1703,7 +1703,7 @@ if __name__=='__main__':
     # Calculate centerline using FMM
     time_start = time.time()
     source = 0
-    centerline = calc_centerline_ffm(segmentation, caps[source], [cap for i, cap in enumerate(caps) if i != source], min_res=30)
+    centerline = calc_centerline_fmm(segmentation, caps[source], [cap for i, cap in enumerate(caps) if i != source], min_res=30)
     print(f"Time in seconds: {time.time() - time_start}")
     pfn = os.path.join(out_dir, 'centerline_fm_'+name+'_'+str(source)+'.vtp')
     write_geo(pfn, centerline)
@@ -1716,7 +1716,7 @@ if __name__=='__main__':
     # segmentation = sitk.ReadImage(seg_file)
     # sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation_cluster.mha'))
     # time_start = time.time()
-    # centerline = calc_centerline_ffm(segmentation)
+    # centerline = calc_centerline_fmm(segmentation)
     # print(f"Time in seconds: {time.time() - time_start:0.3f}")
     # name = seg_file.split('/')[-1].split('.')[0]
     # pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
