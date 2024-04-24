@@ -206,6 +206,15 @@ def orient_caps(caps, current_point, old_point, direction):
     """
     Note: direction is local, old_point can be from previous subvolume
     Return a sorted list of cap ids based on angle compared to direction
+
+    Args:
+        caps: list of cap points
+        current_point: current location
+        old_point: previous location
+        direction: direction of exploration
+    Returns:
+        sort_index: sorted list of cap ids
+        source_id: id of source cap
     """
     
     source_dist = 100000
