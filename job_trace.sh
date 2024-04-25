@@ -43,11 +43,11 @@ python3 auto_centerline.py \
     -dataset  Dataset006_SEQAORTANDFEMOCT \
     -fold all \
     -img_ext .mha \
-    -outdir output_bryan_1500/ \
+    -outdir output_debug/ \
     -scale 1 \
     -start 6 \
     -stop 8 \
-    -max_n_steps 1500 \
+    -max_n_steps 300 \
     -unit cm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
