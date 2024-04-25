@@ -1222,6 +1222,8 @@ def create_centerline_polydata(points_list, distance_map_surf):
     radii.SetName("MaximumInscribedSphereRadius")
     # Iterate over all points
     for points_path in points_list:
+        # flip the list so that the seed is the first point
+        points_path = points_path[::-1]
         line = vtk.vtkPolyLine()
         line.GetPointIds().SetNumberOfIds(len(points_path))
         for i, point in enumerate(points_path):
