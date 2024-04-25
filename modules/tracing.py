@@ -351,9 +351,20 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # Centerline
             if not global_config['CENTERLINE_EXTRACTION_VMTK']:
-                source = source_id
-                centerline_poly = calc_centerline_fmm(predicted_vessel, caps[source], [cap for i, cap in enumerate(caps) if i != source], min_res=30)
+                print(f"Calculating centerline using FMM + Gradient Stepping")
+                # if first steps and only one cap, use point as source
+                if i <= 1 and len(caps) == 1:
+                    seed = step_seg['point']
+                    targets = caps
+                # else use info from orientation
+                else:
+                    source = source_id
+                    seed = caps[source]
+                    targets = [cap for i, cap in enumerate(caps) if i != source]
+                # calculate centerline
+                centerline_poly = calc_centerline_fmm(predicted_vessel, seed, targets, min_res=30)
             else:
+                print(f"Calculating centerline using VMTK")
                 centerline_poly = calc_centerline(  surface_smooth,
                                                     global_config['TYPE_CENT'],
                                                     var_source=[source_id],
