@@ -19,6 +19,7 @@ MAGN_RADIUS: 1
 MAX_PERC_ENLARGE: 0.33 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
 MIN_RADIUS: 0.4 # mm (keep in mm)
 MIN_RES: 6
+CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
 TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 2
