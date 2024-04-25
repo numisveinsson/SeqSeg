@@ -1113,7 +1113,7 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
     # Switch sign of distance map
     distance_map_surf = distance_map_surf * -1
     distance_map_surf_np = sitk.GetArrayFromImage(distance_map_surf).transpose(2, 1, 0)
-    sitk.WriteImage(distance_map_surf, '/Users/numisveins/Downloads/debug_centerline/distance_map_surf.mha')
+    # sitk.WriteImage(distance_map_surf, '/Users/numisveins/Downloads/debug_centerline/distance_map_surf.mha')
 
     # If seed and targets are not defined, use create using cluster map
     if seed is None and targets is None:
@@ -1165,10 +1165,10 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
         print(f"Finished fast marching method")
 
     print(f"Max of output: {sitk.GetArrayFromImage(output).max()}, Min: {sitk.GetArrayFromImage(output).min()}")
-    sitk.WriteImage(output, '/Users/numisveins/Downloads/debug_centerline/output.mha')
+    # sitk.WriteImage(output, '/Users/numisveins/Downloads/debug_centerline/output.mha')
     output_mask = sitk.Mask(output, segmentation)
     print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}, Min: {sitk.GetArrayFromImage(output_mask).min()}")
-    sitk.WriteImage(output_mask, '/Users/numisveins/Downloads/debug_centerline/output_mask.mha')
+    # sitk.WriteImage(output_mask, '/Users/numisveins/Downloads/debug_centerline/output_mask.mha')
     # Get gradient of distance map
     gradient = gradient_matrix(sitk.GetArrayFromImage(output).transpose(2, 1, 0))
     print(f"Gradient calculated")
@@ -1448,19 +1448,19 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     divide = 1
     if divide != 1:
         segmentation = sitk.Resample(segmentation, [int(x/divide) for x in segmentation.GetSize()], sitk.Transform(), sitk.sitkNearestNeighbor, segmentation.GetOrigin(), [x*divide for x in segmentation.GetSpacing()], segmentation.GetDirection(), 0, segmentation.GetPixelID())
-        sitk.WriteImage(segmentation, '/Users/numisveins/Downloads/debug_centerline/segmentation_resampled.mha')
+        # sitk.WriteImage(segmentation, '/Users/numisveins/Downloads/debug_centerline/segmentation_resampled.mha')
     # Create distance map
     distance_map = distance_map_from_seg(segmentation)
     # Invert distance map
     distance_map = distance_map * -1
     # sitk.WriteImage(distance_map, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map.mha')
     distance_map_masked = sitk.Mask(distance_map, segmentation)
-    sitk.WriteImage(distance_map_masked, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_masked.mha')
+    # sitk.WriteImage(distance_map_masked, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_masked.mha')
     # Shift distance map by 0.5
     distance_map = distance_map + 1
     # sitk.WriteImage(distance_map, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_shifted.mha')
     distance_map_masked = sitk.Mask(distance_map, segmentation)
-    sitk.WriteImage(distance_map_masked, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_masked_shifted.mha')
+    # sitk.WriteImage(distance_map_masked, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_masked_shifted.mha')
     # Find maximum value
     dist_map_np = sitk.GetArrayFromImage(distance_map).transpose(2, 1, 0)
     max_value = np.max(dist_map_np)
@@ -1479,7 +1479,7 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     # And raise all values to the power of 0.5
     speed_image = sitk.Pow(speed_image, 0.5)
     print(f"Done preprocessing speed image")
-    sitk.WriteImage(speed_image, '/Users/numisveins/Downloads/debug_centerline/speed_image_cluster.mha')
+    # sitk.WriteImage(speed_image, '/Users/numisveins/Downloads/debug_centerline/speed_image_cluster.mha')
     # Calculate wave distance map
     wave_distance_map_output = fast_marching.Execute(speed_image)
     print(f"Done fast marching")
@@ -1487,7 +1487,7 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     wave_distance_map = sitk.Mask(wave_distance_map_output, segmentation)
     # Convert wave distance map to integers
     wave_distance_map = sitk.Cast(wave_distance_map, sitk.sitkInt32)
-    sitk.WriteImage(wave_distance_map, '/Users/numisveins/Downloads/debug_centerline/wave_distance_map.mha')
+    # sitk.WriteImage(wave_distance_map, '/Users/numisveins/Downloads/debug_centerline/wave_distance_map.mha')
 
     # Get unique values in wave distance map
     unique_values = np.unique(sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0))
@@ -1538,7 +1538,7 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
 
     # Write image
-    sitk.WriteImage(cluster_map_img, '/Users/numisveins/Downloads/debug_centerline/cluster_map_img.mha')
+    # sitk.WriteImage(cluster_map_img, '/Users/numisveins/Downloads/debug_centerline/cluster_map_img.mha')
 
     time_start = time.time()
     end_clusters = find_end_clusters(cluster_map_img)
@@ -1662,7 +1662,7 @@ if __name__=='__main__':
     name = path_seg.split('/')[-1].split('.')[0]
     # Load segmentation
     segmentation = sitk.ReadImage(path_seg)
-    sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation.mha'))
+    # sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation.mha'))
 
     # # Frangi filter
     # frangi = frangi_filter(segmentation)
