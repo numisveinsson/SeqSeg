@@ -80,7 +80,8 @@ def get_next_points(centerline_poly, current_point, old_point, old_radius, post_
 
         vector = (locs[id_along_cent]-current_point)/np.linalg.norm(locs[id_along_cent]-current_point)
 
-        # if np.dot(old_vector, vector) < 0:
+        if np.dot(old_vector, vector) < 0:
+            print(f"dot product between vectors is negative")
         #     print("Flipping for ip: " +str(ip))
         #     locs = np.flip(locs, 0)
         #     rads = np.flip(rads)
