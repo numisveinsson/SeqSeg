@@ -321,7 +321,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             # cfn_un = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_unsmooth.vtp'
             if write_samples:
                 write_vtk_polydata(surface_smooth, sfn)
-                write_vtk_polydata(surface, sfn_un)
+                # write_vtk_polydata(surface, sfn_un)
             step_seg['seg_file'] = pd_fn
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
@@ -355,14 +355,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 # if first steps and only one cap, use point as source
                 if i <= 1 and len(caps) == 1:
                     seed = step_seg['point']
-                    targets = caps
+                    targets = caps #[cap for ind, cap in enumerate(caps) if ind != source_id] #caps
                 # else use info from orientation
                 else:
                     source = source_id
                     seed = caps[source]
-                    targets = [cap for i, cap in enumerate(caps) if i != source]
+                    targets = [cap for ind, cap in enumerate(caps) if ind != source]
                 # calculate centerline
-                centerline_poly = calc_centerline_fmm(predicted_vessel, seed, targets, min_res=30)
+                centerline_poly = calc_centerline_fmm(predicted_vessel, seed, targets, min_res=40)
             else:
                 print(f"Calculating centerline using VMTK")
                 centerline_poly = calc_centerline(  surface_smooth,
@@ -547,15 +547,16 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 vessel_tree.steps[i]['chances'] += 1
 
             else:
-                
-                if step_seg['is_inside']:
+
+                print("\n*** Error for surface: \n" + str(i))
+                print("\n Moving onto another branch")
+
+                if step_seg['is_inside'] and global_config['RESTART_BRANCH']:
                     # If inside, then move on to next branch and remove allowed_steps
                     # i -= allowed_steps
                     print(f"Redoing this branch, i is now {i}")
                     # vessel_tree.restart_branch(branch)
                 else:
-                    print("\n*** Error for surface: \n" + str(i))
-                    print("\n Moving onto another branch")
 
                     if debug:
                         pdb.set_trace()

@@ -40,15 +40,15 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -dataset  Dataset006_SEQAORTANDFEMOCT \
+    -dataset Dataset010_SEQCOROASOCACT \
     -fold all \
     -img_ext .mha \
-    -outdir output_debug/ \
+    -outdir output_karthik_coroyml/ \
     -scale 1 \
-    -start 6 \
-    -stop 8 \
-    -max_n_steps 300 \
-    -unit cm \
+    -start 0 \
+    -stop 1 \
+    -max_n_steps 1000 \
+    -unit mm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 
