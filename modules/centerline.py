@@ -1072,7 +1072,7 @@ def move_if_outside(target_index, distance_map_surf_np):
 
     return target_index
 
-def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300):
+def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300, homogeneous = False):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1501,8 +1501,10 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     time_start = time.time()
     # For each unique value, create a cluster
     # Group every N values
-    if np.max(unique_values) > 50:
+    if np.max(unique_values) > 100:
         N = 10
+    elif np.max(unique_values) > 50:
+        N = 5
     elif np.max(unique_values) > 20:   
         N = 3
     elif np.max(unique_values) > 10:
@@ -1514,7 +1516,7 @@ def cluster_map(segmentation, return_wave_distance_map=False):
         if value == 0:
             continue
         # Create mask for value
-        mask = sitk.BinaryThreshold(wave_distance_map, lowerThreshold=value, upperThreshold=value+N-1)
+        mask = sitk.BinaryThreshold(wave_distance_map, lowerThreshold=value, upperThreshold=(value+N-1))
         print(f"Values: {value} to {value+N-1}")
         # Connected components
         connected = sitk.ConnectedComponentImageFilter()
@@ -1535,7 +1537,7 @@ def cluster_map(segmentation, return_wave_distance_map=False):
             cluster_count += 1
             cluster_map_img = cluster_map_img + mask
             # Write image
-            # sitk.WriteImage(cluster_map_img, '/Users/numisveins/Downloads/debug_centerline/cluster_map_img_'+str(i)+'.mha')
+            sitk.WriteImage(cluster_map_img, '/Users/numisveins/Downloads/debug_centerline/cluster_map_img_'+str(i)+'.mha')
     print(f"Cluster count: {cluster_count}")
     print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
 
@@ -1666,25 +1668,25 @@ if __name__=='__main__':
     segmentation = sitk.ReadImage(path_seg)
     # sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation.mha'))
 
-    # # Frangi filter
-    # frangi = frangi_filter(segmentation)
-    # sitk.WriteImage(frangi, os.path.join(out_dir, 'frangi.mha'))
+    # # # Frangi filter
+    # # frangi = frangi_filter(segmentation)
+    # # sitk.WriteImage(frangi, os.path.join(out_dir, 'frangi.mha'))
 
-    # Create surface mesh
-    surface = evaluate_surface(segmentation)
-    pfn = os.path.join(out_dir, 'surface.vtp')
-    write_geo(pfn, surface)
+    # # Create surface mesh
+    # surface = evaluate_surface(segmentation)
+    # pfn = os.path.join(out_dir, 'surface.vtp')
+    # write_geo(pfn, surface)
 
-    # # Calculate centerline using gradient descent
-    # centerline = calculate_centerline_gradient(segmentation)
-    # pfn = os.path.join(out_dir, 'centerline.vtp')
-    # write_geo(pfn, centerline)
+    # # # Calculate centerline using gradient descent
+    # # centerline = calculate_centerline_gradient(segmentation)
+    # # pfn = os.path.join(out_dir, 'centerline.vtp')
+    # # write_geo(pfn, centerline)
 
-    # Calculate caps
-    caps = calc_caps(surface)
-    polydata_point = points2polydata(caps)
-    pfn = os.path.join(out_dir, 'caps.vtp')
-    write_geo(pfn, polydata_point)
+    # # Calculate caps
+    # caps = calc_caps(surface)
+    # polydata_point = points2polydata(caps)
+    # pfn = os.path.join(out_dir, 'caps.vtp')
+    # write_geo(pfn, polydata_point)
 
     # # Calculate distance map
     # distance = distance_map_from_seg(segmentation)
@@ -1703,26 +1705,27 @@ if __name__=='__main__':
     # test_centerline_fmm(directory, out_dir)
 
     # Calculate centerline using FMM
-    time_start = time.time()
-    source = 0
-    centerline = calc_centerline_fmm(segmentation, caps[source], [cap for i, cap in enumerate(caps) if i != source], min_res=30)
-    print(f"Time in seconds: {time.time() - time_start}")
-    pfn = os.path.join(out_dir, 'centerline_fm_'+name+'_'+str(source)+'.vtp')
-    write_geo(pfn, centerline)
+    # time_start = time.time()
+    # source = 0
+    # centerline = calc_centerline_fmm(segmentation, caps[source], [cap for i, cap in enumerate(caps) if i != source], min_res=30)
+    # print(f"Time in seconds: {time.time() - time_start}")
+    # pfn = os.path.join(out_dir, 'centerline_fm_'+name+'_'+str(source)+'.vtp')
+    # write_geo(pfn, centerline)
 
     # Calculate cluster map
     # seg_file = '/Users/numisveins/Documents/PARSE_dataset/ct_train_masks/PA000005.nii.gz'
-    # seg_file = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_new_aortas/pred_seqseg_ct/postprocessed/0176_0000.mha'
+    seg_file = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_new_aortas/pred_seqseg_ct/postprocessed/0176_0000.mha'
+    seg_file = '/Users/numisveins/Downloads/output_asoca_fmm/00_seg_rem_3d_fullres_0.mha'
     # seg_file = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_5_all_surfaces/ct_train_masks/0188_0001_16_2.nii.gz'
 
-    # segmentation = sitk.ReadImage(seg_file)
-    # sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation_cluster.mha'))
-    # time_start = time.time()
-    # centerline = calc_centerline_fmm(segmentation)
-    # print(f"Time in seconds: {time.time() - time_start:0.3f}")
-    # name = seg_file.split('/')[-1].split('.')[0]
-    # pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
-    # write_geo(pfn, centerline)
+    segmentation = sitk.ReadImage(seg_file)
+    sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation_cluster.mha'))
+    time_start = time.time()
+    centerline = calc_centerline_fmm(segmentation)
+    print(f"Time in seconds: {time.time() - time_start:0.3f}")
+    name = seg_file.split('/')[-1].split('.')[0]
+    pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
+    write_geo(pfn, centerline)
 
     # # Use colliding fronts to calculate path
     # path = colliding_fronts(segmentation, caps[0], caps[1])
