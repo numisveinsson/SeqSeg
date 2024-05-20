@@ -4,7 +4,7 @@ import numpy as np
 from modules import vtk_functions as vf
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind, ttest_rel
 
 def dice(pred, truth):
 
@@ -237,6 +237,7 @@ def pre_process(pred, write_postprocessed):
 def get_case_names(folder, pred_folder):
     
     segs = os.listdir(pred_folder+folder)
+    print(f"Segs: {segs}")
     #only keep segmentation files and ignore hidden files
     segs = [seg for seg in segs if '.' not in seg[0]]
     # only keep files not folders
@@ -313,7 +314,7 @@ if __name__=='__main__':
     print_case_names = True
 
     #input folder of segmentation results
-    pred_folder = '/Users/numisveins/Downloads/preds_new_aortas/'
+    pred_folder = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_new_aortas/'
     pred_folders = os.listdir(pred_folder)
     #only keep folders and ignore hidden files
     pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder and 'gt' not in folder]
@@ -321,14 +322,12 @@ if __name__=='__main__':
     print(f"Prediction folders: {pred_folders}")
     # pred_folders = [folder for folder in pred_folders if '3d' not in folder]
 
-    import pdb; pdb.set_trace()
-
     truth_folder = '/Users/numisveins/Documents/vascular_data_3d/truths/'
     cent_folder = '/Users/numisveins/Documents/vascular_data_3d/centerlines/'
     mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
 
     # output folder for plots
-    output_folder = 'plots/'
+    output_folder = ''
 
     # modalities
     modalities = ['mr', 'ct']
@@ -345,7 +344,7 @@ if __name__=='__main__':
 
             folders_mod = [folder for folder in pred_folders if modality in folder]
             case_names = get_case_names([fo for fo in folders_mod if 'seqseg' in fo][0], pred_folder)
-
+            print(f"Case names: {case_names}")
             for folder in folders_mod:
                 
                 print(f"\n{folder}:")
@@ -406,8 +405,12 @@ if __name__=='__main__':
 
             # t-test to compare score from folder with 'seqseg' in name to score from folder without 'seqseg' in name
             if len(scores.keys()) > 1:
-                t, p = ttest_ind(scores[list(scores.keys())[0]], scores[list(scores.keys())[1]])
-                print(f"p-value: {p:.3f}")
+                for i in range(len(scores.keys())-1):
+                    for j in range(i+1, len(scores.keys())):
+                        t, p = ttest_ind(scores[list(scores.keys())[i]], scores[list(scores.keys())[j]])
+                        print(f"unpaired p-value between {list(scores.keys())[i]} and {list(scores.keys())[j]}: {p}")
+                        t, p = ttest_rel(scores[list(scores.keys())[i]], scores[list(scores.keys())[j]])
+                        print(f"paired p-value between {list(scores.keys())[i]} and {list(scores.keys())[j]}: {p}")
 
             # Make box plot for modality
             import matplotlib.pyplot as plt
