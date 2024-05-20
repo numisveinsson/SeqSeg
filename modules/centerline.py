@@ -1201,6 +1201,8 @@ def create_centerline_polydata(points_list, distance_map_surf):
     Uses distance map to add radius to points.
     The distance value at each point is used as the radius.
     Radius is stored as array in the vtk polydata under name 'MaximumInscribedSphereRadius'
+    Global node id is stored as array in the vtk polydata under name 'GlobalNodeID'
+    Global node id is the index of the point in the list of points.
 
     Parameters
     ----------
@@ -1220,6 +1222,9 @@ def create_centerline_polydata(points_list, distance_map_surf):
     lines = vtk.vtkCellArray()
     radii = vtk.vtkDoubleArray()
     radii.SetName("MaximumInscribedSphereRadius")
+    global_node_id = vtk.vtkIntArray()
+    global_node_id.SetName("GlobalNodeID")
+
     # Iterate over all points
     for points_path in points_list:
         # flip the list so that the seed is the first point
@@ -1236,6 +1241,9 @@ def create_centerline_polydata(points_list, distance_map_surf):
             line.GetPointIds().SetId(i, id)
             # Add radius to radii
             radii.InsertNextValue(radius)
+            # Add global node id
+            global_node_id.InsertNextValue(i)
+
         # Add line to lines
         lines.InsertNextCell(line)
 
@@ -1243,6 +1251,7 @@ def create_centerline_polydata(points_list, distance_map_surf):
     centerline.SetPoints(points)
     centerline.SetLines(lines)
     centerline.GetPointData().AddArray(radii)
+    centerline.GetPointData().AddArray(global_node_id)
 
     return centerline
 
