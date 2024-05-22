@@ -195,7 +195,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     mag = 1
                     continue_enlarge = False
                 # Extract Volume
-                size_extract, index_extract = map_to_image(  step_seg['point'],
+                size_extract, index_extract, border = map_to_image(  step_seg['point'],
                                                                 step_seg['radius']*mag,
                                                                 volume_size_ratio,
                                                                 origin_im,
