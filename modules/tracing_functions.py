@@ -242,8 +242,10 @@ def orient_caps(caps, current_point, old_point, direction):
             sourcee = caps[i].tolist()
     target[source_id*3:source_id*3+3] = []
 
+    # sort the caps based on angle
     s = np.array(angles)
     sort_index = np.argsort(s).tolist()
+    # remove source_id from sort_index
     sort_index.remove(source_id)
     print(f"Sorted cap ids: {sort_index}")
 

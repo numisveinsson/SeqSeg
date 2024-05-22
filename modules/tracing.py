@@ -362,7 +362,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     seed = caps[source]
                     targets = [cap for ind, cap in enumerate(caps) if ind != source]
                 # calculate centerline
-                centerline_poly = calc_centerline_fmm(predicted_vessel, seed, targets, min_res=40)
+                centerline_poly, success = calc_centerline_fmm(predicted_vessel, seed, targets, min_res=40)
+                if not success:
+                    raise SkipThisStepError(
+                        "Centerline calculation failed, stop here"
+                    )
             else:
                 print(f"Calculating centerline using VMTK")
                 centerline_poly = calc_centerline(  surface_smooth,

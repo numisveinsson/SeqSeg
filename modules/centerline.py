@@ -1190,7 +1190,13 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
 
     print(f"Centerline calculated, success ratio: {success_list.count(True)} / {len(success_list)}")
 
-    return centerline
+    # If success is all False, return False
+    if not success_list.count(True):
+        success_overall = False
+    else:
+        success_overall = True
+
+    return centerline, success_overall
 
 def create_centerline_polydata(points_list, distance_map_surf):
     """
