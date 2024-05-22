@@ -156,9 +156,10 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min
     return:
         size_extract: number of voxels to extract in each dim
         index_extract: index for sitk volume extraction
-        voi_min/max: boundaries of volume for caps constraint
+        border: boolean, if subvolume is on global border
     """
     min_res = 0
+    border = False
 
     while min_res < min_resolution_any_dim:
         size_extract = np.ceil(size_volume*radius/spacing_im).astype(int)
@@ -173,13 +174,15 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             size_extract[i] = size_im[i] - index_extract[i]
+            border = True
 
     for i, ind in enumerate(np.logical_and(index_extract < np.zeros(3),(np.zeros(3)-index_extract) < 1/2*size_extract )):
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             index_extract[i] = 0
+            border = True
 
-    return size_extract.tolist(), index_extract.tolist()
+    return size_extract.tolist(), index_extract.tolist(), border
 
 def rotate_volume():
     "TODO: write function"
