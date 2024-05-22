@@ -6,7 +6,7 @@ DEBUG: False
 DEBUG_STEP: 100
 
 WRITE_STEPS: True # if we want to write out each step
-ANIMATION: False # to write out animation files
+ANIMATION: True # to write out animation files
 ANIMATION_STEPS: 3 # write out animation every x steps
 
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)

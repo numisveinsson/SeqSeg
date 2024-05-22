@@ -93,7 +93,7 @@ def get_testing_samples(dataset):
             ['0141_1001',0,0,10,'ct'], # Aortofemoral CT
             ['0146_1001',0,0,10,'ct'], # Aortofemoral CT
             ['0174_0000',0,5,10,'ct'], # Aorta CT
-            ['0176_0000',0,15,20,'ct'], # Aorta CT
+            ['0176_0000',0,10,15,'ct'], # Aorta CT
             ['0188_0001_aorta',5,-10,-20,'ct'], # Aorta CT
             ['O150323_2009_aorta',0,10,20,'ct'], # Aorta CT
             ['O344211000_2006_aorta',0,20,30,'ct'], # Aorta CT

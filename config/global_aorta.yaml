@@ -23,7 +23,7 @@ CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
 TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 2
-NR_ALLOW_RETRACE_STEPS: 10
+NR_ALLOW_RETRACE_STEPS: 5
 PREVENT_RETRACE: True
 SORT_NEXT: True
 MERGE_NEXT: False

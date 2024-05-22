@@ -235,3 +235,8 @@ def distance_map_from_seg(sitk_img):
     """
     distance_map = sitk.SignedMaurerDistanceMap(sitk_img, squaredDistance=False, useImageSpacing=True)
     return distance_map
+
+def check_seg_border(size_extract, index_extract, predicted_vessel):
+    """
+    Bla bla
+    """
