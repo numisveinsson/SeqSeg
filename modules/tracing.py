@@ -478,10 +478,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             vessel_tree.steps[i] = step_seg
 
             # end if on border and segmentation is on border
-            if border and check_seg_border(size_extract, index_extract, predicted_vessel):
-                raise SkipThisStepError(
-                    "Segmentation has reached border, stop here"
-                )
+            if border:
+                if check_seg_border(size_extract, index_extract, predicted_vessel, size_im):
+                    raise SkipThisStepError(
+                        "Segmentation has reached border, stop here"
+                    )
 
             if point_tree.size != 0:
 

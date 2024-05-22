@@ -207,8 +207,15 @@ def import_image(image_dir):
     return reader_im, origin_im, size_im, spacing_im
 
 def sitk_to_numpy(Image):
-
+    """
+    Function to convert sitk image to numpy array
+    args:
+        Image: sitk image
+    return:
+        np_array: numpy array
+    """
     np_array = sitk.GetArrayFromImage(Image)
+
     return np_array
 
 def numpy_to_sitk(numpy, file_reader = None):
@@ -236,7 +243,48 @@ def distance_map_from_seg(sitk_img):
     distance_map = sitk.SignedMaurerDistanceMap(sitk_img, squaredDistance=False, useImageSpacing=True)
     return distance_map
 
-def check_seg_border(size_extract, index_extract, predicted_vessel):
+def check_seg_border(size_extract, index_extract, predicted_vessel, size_im):
     """
-    Bla bla
+    This function takes in the size and index of the extracted volume, its segmentation 
+    and the size of the global image
+    
+    This function is only called if the subvolume is on the global border
+    This function returns true if there is at least one vessel voxel on the border of the global volume
+
+    This function:
+
+    1. Finds the face(s) of the subvolume that are on the border of the global volume
+    2. Extracts the part of the subvolume segmentation that corresponds to those faces
+    3. Checks if there is a vessel voxel in that part of the segmentation
+    4. Returns true if there is a vessel voxel on the border of the global volume
+
+    args:
+        size_extract: list of ints, size of the extracted volume
+        index_extract: list of ints, index of the lower corner for extraction
+        predicted_vessel: sitk volume, segmentation of the extracted volume
+        size_im: list of ints, size of the global volume
+    return:
+        border: boolean, if there exists a vessel voxel on the border of the global volume
     """
+
+    # Find the faces of the subvolume that are on the border of the global volume
+    faces = []
+    for i in range(3):
+        if index_extract[i] == 0:
+            faces.append(i)
+        if index_extract[i] + size_extract[i] == size_im[i]:
+            faces.append(i+3)
+
+    # Extract the part of the subvolume segmentation that corresponds to those faces
+    seg_np = sitk_to_numpy(predicted_vessel).transpose(2,1,0)
+    border = False
+    for face in faces:
+        if face < 3:
+            slice = seg_np[0,:,:]
+        else:
+            slice = seg_np[-1,:,:]
+        if np.sum(slice) > 0:
+            border = True
+            break
+
+    return border
