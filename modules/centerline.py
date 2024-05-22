@@ -1072,7 +1072,7 @@ def move_if_outside(target_index, distance_map_surf_np):
 
     return target_index
 
-def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300, homogeneous = False):
+def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300, homogeneous = False, out_dir = None):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1113,11 +1113,12 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
     # Switch sign of distance map
     distance_map_surf = distance_map_surf * -1
     distance_map_surf_np = sitk.GetArrayFromImage(distance_map_surf).transpose(2, 1, 0)
-    # sitk.WriteImage(distance_map_surf, '/Users/numisveins/Downloads/debug_centerline/distance_map_surf.mha')
+    if out_dir:
+        sitk.WriteImage(distance_map_surf, os.path.join(out_dir, 'distance_map_surf.mha'))
 
     # If seed and targets are not defined, use create using cluster map
     if seed is None and targets is None:
-        seed, targets, output = cluster_map(segmentation, return_wave_distance_map=True)
+        seed, targets, output = cluster_map(segmentation, return_wave_distance_map=True, out_dir=out_dir)
 
     elif seed is None:
         max_surf = distance_map_surf_np.max()
@@ -1168,7 +1169,8 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
     # sitk.WriteImage(output, '/Users/numisveins/Downloads/debug_centerline/output.mha')
     output_mask = sitk.Mask(output, segmentation)
     print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}, Min: {sitk.GetArrayFromImage(output_mask).min()}")
-    # sitk.WriteImage(output_mask, '/Users/numisveins/Downloads/debug_centerline/output_mask.mha')
+    if out_dir:
+        sitk.WriteImage(output_mask, os.path.join(out_dir, 'masked_out_fmm.mha'))
     # Get gradient of distance map
     gradient = gradient_matrix(sitk.GetArrayFromImage(output).transpose(2, 1, 0))
     print(f"Gradient calculated")
@@ -1342,7 +1344,7 @@ def get_neighbors(index, cluster_map_shape):
             neighbor[i] += j
             if neighbor[i] >= 0 and neighbor[i] < cluster_map_shape[i]:
                 neighbors.append(neighbor)
-
+    print(f"Neighbors: {neighbors}")
     return neighbors
 
 def get_neighbors_diag(index, cluster_map_shape):
@@ -1431,7 +1433,7 @@ def find_end_clusters(cluster_map_img):
 
     return end_clusters
 
-def cluster_map(segmentation, return_wave_distance_map=False):
+def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     """
     Function to cluster a distance map of a segmentation into integer values.
 
@@ -1498,6 +1500,8 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     wave_distance_map = sitk.Mask(wave_distance_map_output, segmentation)
     # Convert wave distance map to integers
     wave_distance_map = sitk.Cast(wave_distance_map, sitk.sitkInt32)
+    if out_dir:
+        sitk.WriteImage(wave_distance_map, os.path.join(out_dir, 'wave_distance_map.mha'))
     # sitk.WriteImage(wave_distance_map, '/Users/numisveins/Downloads/debug_centerline/wave_distance_map.mha')
 
     # Get unique values in wave distance map
@@ -1551,6 +1555,8 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
 
     # Write image
+    if out_dir:
+        sitk.WriteImage(cluster_map_img, os.path.join(out_dir, 'cluster_map_img.mha'))
     # sitk.WriteImage(cluster_map_img, '/Users/numisveins/Downloads/debug_centerline/cluster_map_img.mha')
 
     time_start = time.time()
@@ -1565,17 +1571,19 @@ def cluster_map(segmentation, return_wave_distance_map=False):
     
     # Convert end points to physical points
     end_points_phys = [segmentation.TransformIndexToPhysicalPoint(end_point.tolist()) for end_point in end_points]
+    
     # Create vtk polydata for points
-    polydata_point = points2polydata(end_points_phys)
-    pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/', 'end_points.vtp')
-    write_geo(pfn, polydata_point)
+    if out_dir:
+        polydata_point = points2polydata(end_points_phys)
+        # pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/', 'end_points.vtp')
+        write_geo(os.path.join(out_dir, 'end_points.vtp'), polydata_point)
     
     seed_np = np.array(segmentation.TransformIndexToPhysicalPoint((int(index[0]), int(index[1]), int(index[2]))))
     end_points_phys_np = [np.array(point) for point in end_points_phys]
 
     # write seed and end points as npy
-    np.save('/Users/numisveins/Downloads/debug_centerline/seed.npy', seed_np)
-    np.save('/Users/numisveins/Downloads/debug_centerline/end_points.npy', end_points_phys_np)
+    # np.save('/Users/numisveins/Downloads/debug_centerline/seed.npy', seed_np)
+    # np.save('/Users/numisveins/Downloads/debug_centerline/end_points.npy', end_points_phys_np)
     
     if return_wave_distance_map:
 
@@ -1723,17 +1731,18 @@ if __name__=='__main__':
 
     # Calculate cluster map
     # seg_file = '/Users/numisveins/Documents/PARSE_dataset/ct_train_masks/PA000005.nii.gz'
-    seg_file = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_new_aortas/pred_seqseg_ct/postprocessed/0176_0000.mha'
-    seg_file = '/Users/numisveins/Downloads/output_asoca_fmm/00_seg_rem_3d_fullres_0.mha'
+    # seg_file = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_new_aortas/pred_seqseg_ct/postprocessed/0176_0000.mha'
+    # seg_file = '/Users/numisveins/Downloads/output_asoca_fmm/00_seg_rem_3d_fullres_0.mha'
     # seg_file = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_5_all_surfaces/ct_train_masks/0188_0001_16_2.nii.gz'
-
+    seg_file = '/Users/numisveins/Documents/aortaseg24/process_binary/binary_segs/subject044.mha'
+    out_dir = '/Users/numisveins/Documents/aortaseg24/process_binary/centerlines/'
     segmentation = sitk.ReadImage(seg_file)
     sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation_cluster.mha'))
     time_start = time.time()
-    centerline = calc_centerline_fmm(segmentation)
+    centerline = calc_centerline_fmm(segmentation, out_dir=out_dir)
     print(f"Time in seconds: {time.time() - time_start:0.3f}")
     name = seg_file.split('/')[-1].split('.')[0]
-    pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
+    pfn = os.path.join(out_dir, 'centerline_fmm_'+name+'.vtp')
     write_geo(pfn, centerline)
 
     # # Use colliding fronts to calculate path

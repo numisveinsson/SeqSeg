@@ -147,6 +147,15 @@ def process_case_name(case_name):
 
     if 'seg' in case_name:
         name = case_name[13:]
+        name_split = case_name.split('_')
+        # add until 'seg'
+        name = ''
+        for n in name_split:
+            if n == 'seg':
+                break
+            name += n
+            name += '_'
+        name = name[:-1]
     else:
         name = case_name[15:]
     
@@ -314,7 +323,7 @@ if __name__=='__main__':
     print_case_names = True
 
     #input folder of segmentation results
-    pred_folder = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_new_aortas/'
+    pred_folder = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_aortas_may24/'
     pred_folders = os.listdir(pred_folder)
     #only keep folders and ignore hidden files
     pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder and 'gt' not in folder]
