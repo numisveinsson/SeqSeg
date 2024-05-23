@@ -316,12 +316,13 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 start_time_loc = time.time()
 
             sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'smooth.vtp'
-            # sfn_un = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp'
             cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'.vtp'
-            # cfn_un = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_unsmooth.vtp'
+
             if write_samples:
                 write_vtk_polydata(surface_smooth, sfn)
+                # sfn_un = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp'
                 # write_vtk_polydata(surface, sfn_un)
+
             step_seg['seg_file'] = pd_fn
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
@@ -363,10 +364,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     targets = [cap for ind, cap in enumerate(caps) if ind != source]
                 # calculate centerline
                 centerline_poly, success = calc_centerline_fmm(predicted_vessel, seed, targets, min_res=40)
-                if not success:
-                    raise SkipThisStepError(
-                        "Centerline calculation failed, stop here"
-                    )
+                
             else:
                 print(f"Calculating centerline using VMTK")
                 centerline_poly = calc_centerline(  surface_smooth,
@@ -376,18 +374,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                                     number = i,
                                                     caps = caps,
                                                     point = step_seg['point'])
-                if write_samples:
-                    write_centerline(centerline_poly, cfn)
 
                 centerline_poly = resample_centerline(centerline_poly)
-                if write_samples:
-                    write_centerline(centerline_poly, cfn.replace('.vtp', 'resampled.vtp'))
+                # if write_samples:
+                #     write_centerline(centerline_poly, cfn.replace('.vtp', 'resampled.vtp'))
                 centerline_poly = smooth_centerline(centerline_poly)
-                if write_samples:
-                    write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
-                # centerline_poly = get_largest_connected_polydata(centerline_poly)
-                # write_centerline(centerline_poly, cfn.replace('.vtp', 'largest.vtp'))
-                # centerline_poly = calc_branches(centerline_poly)
+                # if write_samples:
+                #     write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
+
                 if not centerline_poly or centerline_poly.GetNumberOfPoints() < 5:
                     print("\n Attempting with more smoothing \n")
                     surface_smooth1 = smooth_surface(surface, 15)
@@ -399,12 +393,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                                         number = i,
                                                         caps = caps,
                                                         point = step_seg['point'])
-                    # centerline_poly1 = calc_branches(centerline_poly1)
                     if centerline_poly1.GetNumberOfPoints() > 5:
                         sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_1.vtp'
                         surface_smooth = surface_smooth1
                         cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_1.vtp'
                         centerline_poly = centerline_poly1
+                        success = True
+                    else: success = False
+                else: success = True
 
             if write_samples:
                 step_seg['cent_file'] = cfn
@@ -420,6 +416,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             step_seg['point_pd'] = polydata_point
             step_seg['surface'] = surface_smooth
             step_seg['centerline'] = centerline_poly
+
+            if not success:
+                raise SkipThisStepError(
+                    "Centerline calculation failed, stop here"
+                )
 
             # Assembly
             if use_buffer:
