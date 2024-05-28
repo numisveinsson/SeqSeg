@@ -1,18 +1,18 @@
 
-## TODO: Implement centerline calculation using pathfinding and exploration
+# TODO: Implement centerline calculation using pathfinding and exploration
 import sys
 import os
-import pdb
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(SCRIPT_DIR))
-
 import time
 import vtk
 import SimpleITK as sitk
 import numpy as np
 from modules.sitk_functions import create_new, distance_map_from_seg
-from modules.vtk_functions import calc_caps, evaluate_surface, points2polydata, write_geo, appendPolyData
+from modules.vtk_functions import (calc_caps, evaluate_surface, 
+                                   points2polydata, write_geo)
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 
 def calculate_centerline(segmentation, surface, caps, initial_radius=1):
     """
@@ -41,6 +41,9 @@ def calculate_centerline(segmentation, surface, caps, initial_radius=1):
     # Calculate centerline by connecting caps
     path = pathfinding(segmentation, surface, source, targets, initial_radius)
 
+    return path
+
+
 def set_new(segmentation):
     """
     Function to set all values of a segmentation to 0.
@@ -57,6 +60,7 @@ def set_new(segmentation):
     explored = create_new(segmentation)
 
     return explored
+
 
 def add_explored(segmentation, explored, point, radius):
     """
@@ -86,30 +90,31 @@ def add_explored(segmentation, explored, point, radius):
     num_voxels : int
         Number of voxels added.
     """
-    
     # Create sphere around point
-    sphere = create_new(segmentation) # Create new segmentation sitk image
-    sphere = sphere * 0 # Set all values to 0
+    sphere = create_new(segmentation)  # Create new segmentation sitk image
+    sphere = sphere * 0  # Set all values to 0
 
-    # Get locations of all non-zero values in segmentation
-    locations = np.argwhere(sitk.GetArrayFromImage(segmentation).transpose(2, 1, 0) > 0) # N x 3 array of indices
+    # Get locations of all non-zero values in segmentation,
+    # N x 3 array of indices
+    locations = np.argwhere(sitk.GetArrayFromImage(
+                            segmentation).transpose(2, 1, 0) > 0)
     # Use filter to get the physical coordinates of the non-zero values
-    physical_locations = np.array([np.array(segmentation.TransformIndexToPhysicalPoint(location.tolist())) for location in locations]) # N x 3 array of physical coordinates
+    # N x 3 array of physical coordinates
+    physical_locations = np.array([np.array(
+                                  segmentation.TransformIndexToPhysicalPoint(
+                                      location.tolist()))
+                                  for location in locations])
 
     # Set values within sphere to 1 by calculating distance to point
     distances = np.linalg.norm(physical_locations - point, axis=1)
     # Points within sphere
     points_in_sphere = physical_locations[distances < radius]
     # Transform physical points to index
-    indices = [segmentation.TransformPhysicalPointToIndex(point) for point in points_in_sphere]
+    indices = [segmentation.TransformPhysicalPointToIndex(point)
+               for point in points_in_sphere]
     # Set values within sphere to 1
     for index in indices:
         sphere[index] = 1
-
-
-
-
-
     # for location in physical_locations:
     #     if np.linalg.norm(location - point) < radius:
     #         index = segmentation.TransformPhysicalPointToIndex(location)
@@ -124,12 +129,15 @@ def add_explored(segmentation, explored, point, radius):
     explored = explored + intersection
 
     return explored, num_voxels
-    
-def find_first_branch(segmentation, distance_map, explored, current, current_radius, targets):
+
+
+def find_first_branch(segmentation, distance_map, explored,
+                      current, current_radius, targets):
     """
     Function to find the first branch of the path.
 
-    We take steps based on the highest reward for each step until we reach a target.
+    We take steps based on the highest reward for each step
+    until we reach a target.
 
     Parameters
     ----------
@@ -153,15 +161,19 @@ def find_first_branch(segmentation, distance_map, explored, current, current_rad
     targets : list of np.array
         Updated list of target points.
     """
-    
+
     points = [current]
     while not reached_targets(current, targets, current_radius):
         # Get candidates for next point
         candidates = get_candidates(current, current_radius)
         # Remove candidates that are already explored
-        candidates = [candidate for candidate in candidates if sitk.GetArrayFromImage(explored).transpose(2, 1, 0)[segmentation.TransformPhysicalPointToIndex(candidate)] == 0]
+        candidates = [candidate for candidate in candidates
+                      if sitk.GetArrayFromImage(explored).transpose(2, 1, 0)
+                      [segmentation.TransformPhysicalPointToIndex(candidate)]
+                      == 0]
         # Get rewards for each candidate
-        # rewards = get_rewards_volume(segmentation, explored, candidates, current_radius)
+        # rewards = get_rewards_volume(segmentation, explored,
+        #           candidates, current_radius)
         rewards = get_rewards_distance(distance_map, candidates)
         # Select candidate with highest reward
         next_index = np.argmax(rewards)
@@ -171,14 +183,17 @@ def find_first_branch(segmentation, distance_map, explored, current, current_rad
         # Update current point
         current = next_point
         # Add next point to explored
-        explored, _ = add_explored(segmentation, explored, current, current_radius)
-    
+        explored, _ = add_explored(segmentation, explored,
+                                   current, current_radius)
+
     # Remove target from list and add the target as the last point
-    target_index = np.argwhere([reached_target(current, target, current_radius) for target in targets])[0]
+    target_index = np.argwhere([reached_target(current, target, current_radius)
+                                for target in targets])[0]
     target = targets.pop(target_index.item())
     points.append(target)
 
     return points, explored, targets
+
 
 def pathfinding(segmentation, surface, source, targets, radius):
     """
@@ -207,7 +222,9 @@ def pathfinding(segmentation, surface, source, targets, radius):
     # Initialize explored segmentation
     explored = set_new(segmentation)
     explored, _ = add_explored(segmentation, explored, source, radius)
-    sitk.WriteImage(explored, '/Users/numisveins/Downloads/debug_centerline/explored.mha')
+    sitk.WriteImage(explored,
+                    '/Users/numisveins/Downloads/debug_centerline/explored.mha'
+                    )
 
     # Initialize vtk polydata for path (lines) and points
     path = vtk.vtkPolyData()
@@ -219,18 +236,24 @@ def pathfinding(segmentation, surface, source, targets, radius):
     radii.SetName("Radius")
     
     # Initialize path
-    current = source        # Current point
-    current_radius = radius # Current radius
+    current = source         # Current point
+    current_radius = radius  # Current radius
     points.InsertNextPoint(current)
     lines.InsertNextCell(1)
     lines.InsertCellPoint(0)
     radii.InsertNextValue(current_radius)
 
     # Explore first branch, first is treated as inlet to outlet
-    points_list, explored, targets = find_first_branch(segmentation, distance_map, explored, current, current_radius, targets)
+    points_list, explored, targets = find_first_branch(segmentation,
+                                                       distance_map,
+                                                       explored,
+                                                       current,
+                                                       current_radius,
+                                                       targets)
     from modules.vtk_functions import points2polydata, write_geo
     polydata_point = points2polydata(points_list)
-    pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/', 'first_branch.vtp')
+    pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/',
+                       'first_branch.vtp')
     write_geo(pfn, polydata_point)
     for point in points_list[1:]:
         points.InsertNextPoint(point)
@@ -245,9 +268,13 @@ def pathfinding(segmentation, surface, source, targets, radius):
         # Get candidates for next point
         candidates = get_candidates_branches(points_list, current_radius)
         # Remove candidates that are already explored
-        candidates = [candidate for candidate in candidates if sitk.GetArrayFromImage(explored).transpose(2, 1, 0)[segmentation.TransformPhysicalPointToIndex(candidate)] == 0]
+        candidates = [candidate for candidate in candidates
+                      if sitk.GetArrayFromImage(explored).transpose(2, 1, 0)
+                      [segmentation.TransformPhysicalPointToIndex(candidate)]
+                      == 0]
         # Get rewards for each candidate
-        # rewards = get_rewards_volume(segmentation, explored, candidates, current_radius)
+        # rewards = get_rewards_volume(segmentation, explored,
+        #                              candidates, current_radius)
         rewards = get_rewards_distance(distance_map, candidates)
         # Select candidate with highest reward
         next_index = np.argmax(rewards)
@@ -262,8 +289,8 @@ def pathfinding(segmentation, surface, source, targets, radius):
         current = next_point
         # Add next point to explored
 
-    
     return path
+
 
 def reached_target(current, target, radius):
     """
@@ -284,6 +311,7 @@ def reached_target(current, target, radius):
     """
     reached = np.linalg.norm(current - target) < radius
     return reached
+
 
 def reached_targets(current, targets, radius):
     """
@@ -308,6 +336,7 @@ def reached_targets(current, targets, radius):
             reached = True
             break
     return reached
+
 
 def get_candidates(current, current_radius, degrees=30):
     """
@@ -343,6 +372,7 @@ def get_candidates(current, current_radius, degrees=30):
             z = current_radius * np.cos(np.radians(i))
             candidates.append(np.array([x, y, z]) + current)
     return candidates
+
 
 def get_candidates_branches(points_list, current_radius, degrees=30):
     """
@@ -386,6 +416,7 @@ def get_candidates_branches(points_list, current_radius, degrees=30):
             candidates.append(x + y + points_list[i])
     return candidates
 
+
 def get_rewards_volume(segmentation, explored, candidates, current_radius):
     """
     Function to get the rewards for each candidate point.
@@ -404,10 +435,12 @@ def get_rewards_volume(segmentation, explored, candidates, current_radius):
     """
     rewards = []
     for candidate in candidates:
-        _ , num_voxels = add_explored(segmentation, explored, candidate, current_radius)
+        _, num_voxels = add_explored(segmentation, explored,
+                                     candidate, current_radius)
         rewards.append(num_voxels)
 
     return rewards
+
 
 def get_rewards_distance(distance_map, candidates):
     """
@@ -432,6 +465,7 @@ def get_rewards_distance(distance_map, candidates):
         rewards.append(-distance_map[index])
 
     return rewards
+
 
 def initialize_seeds_random(segmentation, num_points=10):
     """
@@ -466,7 +500,8 @@ def initialize_seeds_random(segmentation, num_points=10):
 
     return seeds
 
-def initialize_seeds_pixels(segmentation, every=1, value = 0, negative=False):
+
+def initialize_seeds_pixels(segmentation, every=1, value=0, negative=False):
     """
     Function to initialize seed points at the center of the pixels of the segmentation.
 
@@ -498,6 +533,7 @@ def initialize_seeds_pixels(segmentation, every=1, value = 0, negative=False):
     physical_locations = physical_locations[::every]
 
     return physical_locations
+
 
 def frangi_filter(input_image):
     """
@@ -537,6 +573,7 @@ def frangi_filter(input_image):
 
     return images[0]
 
+
 def gradient_matrix(x):
     """
     Calculate the gradient matrix with finite differences
@@ -549,6 +586,7 @@ def gradient_matrix(x):
     gradients = np.gradient(x)
     gradients = np.array(gradients)[:, :, :]
     return gradients
+
 
 def hessian_matrix(x):
     """
@@ -570,6 +608,7 @@ def hessian_matrix(x):
     # make x_grad same shape as hessian
     x_grad = np.array(x_grad)[:, :, :]
     return hessian, x_grad
+
 
 def calculate_principal_direction(matrix):
     """
@@ -596,6 +635,7 @@ def calculate_principal_direction(matrix):
 
     return principal_direction
 
+
 def calc_inner_gradient_principal_direction(gradient_vector, hessian_matrix):
     """
     Function to calculate the inner gradient of the principal direction.
@@ -620,6 +660,7 @@ def calc_inner_gradient_principal_direction(gradient_vector, hessian_matrix):
     inner = np.dot(gradient_vector/np.linalg.norm(gradient_vector), eigenvectors)
 
     return inner, eigenvalues
+
 
 def take_steps_gradient(distance_map_np, seeds, seg_img, tol=1e-2, max_iter=100, step_size=0.5):
     """
@@ -784,6 +825,7 @@ def calculate_centerline_gradient(segmentation):
 
     return centerline
 
+
 def fast_marching_method_seg_dist(segmentation, distance_map, point):
     """
     Function to calculate the fast marching method from a seed point.
@@ -832,6 +874,7 @@ def fast_marching_method_seg_dist(segmentation, distance_map, point):
 
     return out
 
+
 def fast_marching_method(speed_image, point, stopping_value=1000):
     """
     Function to calculate the fast marching method from a seed point.
@@ -854,6 +897,7 @@ def fast_marching_method(speed_image, point, stopping_value=1000):
     output = fast_marching.Execute(speed_image)
 
     return output
+
 
 def upwind_fast_marching_method(speed_image, point):
     """
@@ -880,6 +924,7 @@ def upwind_fast_marching_method(speed_image, point):
 
     return out
 
+
 def colliding_fronts(segmentation, point1, point2):
     """
     Function to calculate the colliding fronts method from a seed point.
@@ -905,6 +950,7 @@ def colliding_fronts(segmentation, point1, point2):
     path = fast_marching.Execute(segmentation)
 
     return path
+
 
 def interpolate_gradient(gradient, current, seg_img):
     """
@@ -946,8 +992,9 @@ def interpolate_gradient(gradient, current, seg_img):
         (1-frac[0]) * frac[1] * frac[2] * gradient_y2 + \
         frac[0] * (1-frac[1]) * frac[2] * gradient_z2 + \
         frac[0] * frac[1] * frac[2] * gradient_x3
-    
+
     return gradient_current
+
 
 def backtracking_gradient(gradient, distance_map_surf_np, seg_img, seed, target):
     """
@@ -1034,6 +1081,7 @@ def backtracking_gradient(gradient, distance_map_surf_np, seg_img, seed, target)
 
     return points, success
 
+
 def move_if_outside(target_index, distance_map_surf_np):
     """
     Function to move the target point inside the segmentation if it is outside.
@@ -1071,6 +1119,7 @@ def move_if_outside(target_index, distance_map_surf_np):
         target_index = max_index
 
     return target_index
+
 
 def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300, homogeneous = False, out_dir = None):
     """
@@ -1151,7 +1200,7 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
     else:
         seed_np = segmentation.TransformIndexToPhysicalPoint(seed)
         targets_np = [segmentation.TransformIndexToPhysicalPoint(target) for target in targets]
-    
+
     if not output:
         # Mask distance map with segmentation
         distance_map = sitk.Mask(distance_map_surf, segmentation)
@@ -1173,8 +1222,8 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
         sitk.WriteImage(output_mask, os.path.join(out_dir, 'masked_out_fmm.mha'))
     # Get gradient of distance map
     gradient = gradient_matrix(sitk.GetArrayFromImage(output).transpose(2, 1, 0))
-    print(f"Gradient calculated")
-    
+    print("Gradient calculated")
+
     points_list, success_list = [], []
     for t_num, target_np in enumerate(targets_np):
         print(f"   Starting target {t_num+1}/{len(targets_np)}")
@@ -1197,6 +1246,7 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
         success_overall = True
 
     return centerline, success_overall
+
 
 def create_centerline_polydata(points_list, distance_map_surf):
     """
@@ -1263,6 +1313,7 @@ def create_centerline_polydata(points_list, distance_map_surf):
 
     return centerline
 
+
 def post_process_centerline(centerline):
     """
     Function to post process the centerline using vtk functionalities.
@@ -1304,6 +1355,7 @@ def post_process_centerline(centerline):
 
     return centerline
 
+
 def check_border(seed, seg_size):
     """
     Function to check if a point is on the border of the segmentation.
@@ -1327,6 +1379,7 @@ def check_border(seed, seg_size):
             seed[i] = seg_size[i] - 3
 
     return seed
+
 
 def get_neighbors(index, cluster_map_shape):
     """
@@ -1353,6 +1406,7 @@ def get_neighbors(index, cluster_map_shape):
     print(f"Neighbors: {neighbors}")
     return neighbors
 
+
 def get_neighbors_diag(index, cluster_map_shape):
     """
     Function to get the neighbors of a voxel including diagonals.
@@ -1377,6 +1431,7 @@ def get_neighbors_diag(index, cluster_map_shape):
                 neighbors.append(neighbor)
 
     return neighbors
+
 
 def find_end_clusters(cluster_map_img):
     """
@@ -1438,6 +1493,7 @@ def find_end_clusters(cluster_map_img):
             end_clusters.append(value)
 
     return end_clusters
+
 
 def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     """
@@ -1574,28 +1630,29 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     time_start = time.time()
     end_points = get_end_points(cluster_map_img, end_clusters, distance_map_masked)
     print(f"Time to get end points: {time.time() - time_start:0.2f}")
-    
+
     # Convert end points to physical points
     end_points_phys = [segmentation.TransformIndexToPhysicalPoint(end_point.tolist()) for end_point in end_points]
-    
+
     # Create vtk polydata for points
     if out_dir:
         polydata_point = points2polydata(end_points_phys)
         # pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/', 'end_points.vtp')
         write_geo(os.path.join(out_dir, 'end_points.vtp'), polydata_point)
-    
+
     seed_np = np.array(segmentation.TransformIndexToPhysicalPoint((int(index[0]), int(index[1]), int(index[2]))))
     end_points_phys_np = [np.array(point) for point in end_points_phys]
 
     # write seed and end points as npy
     # np.save('/Users/numisveins/Downloads/debug_centerline/seed.npy', seed_np)
     # np.save('/Users/numisveins/Downloads/debug_centerline/end_points.npy', end_points_phys_np)
-    
+
     if return_wave_distance_map:
 
         return seed_np, end_points_phys_np, wave_distance_map_output
 
     return seed_np, end_points_phys_np
+
 
 def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
     """
@@ -1644,6 +1701,7 @@ def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
 
     return end_points
 
+
 def test_centerline_fmm(directory, out_dir):
     """
     Function that tests the centerline calculation using the fast marching method.
@@ -1674,10 +1732,8 @@ def test_centerline_fmm(directory, out_dir):
         pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
         write_geo(pfn, centerline)
 
-if __name__=='__main__':
 
-    from modules.vtk_functions import points2polydata, write_geo
-    from modules.sitk_functions import distance_map_from_seg
+if __name__ == '__main__':
 
     # Out directory
     out_dir = '/Users/numisveins/Downloads/debug_centerline/'
