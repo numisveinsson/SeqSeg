@@ -1,25 +1,26 @@
 import time
+import pdb
 import numpy as np
 import SimpleITK as sitk
 
 from .sitk_functions import *
 from .vtk_functions import *
 from .vmtk_functions import *
-from .assembly import Segmentation, VesselTree, print_error, create_step_dict, get_old_ref_point
+from .assembly import (Segmentation, VesselTree, print_error,
+                       create_step_dict, get_old_ref_point)
 from .local_assembly import construct_subvolume
 from .tracing_functions import *
 from .centerline import calc_centerline_fmm
 
-import sys
-
-import pdb
 
 def trace_centerline(output_folder, image_file, case, model_folder, fold,
-                    potential_branches, max_step_size, global_config,
-                    unit = 'cm', scale = 1, seg_file=None):
+                     potential_branches, max_step_size, global_config,
+                     unit='cm', scale=1, seg_file=None):
 
-    if unit == 'cm': scale_unit = 0.1
-    else:            scale_unit = 1
+    if unit == 'cm':
+        scale_unit = 0.1
+    else:
+        scale_unit = 1
 
     # If tracing a an already segmented vasculature
     trace_seg =                     global_config['SEGMENTATION']
@@ -37,7 +38,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     # Animation params
     animation =                     global_config['ANIMATION']
     animation_steps =               global_config['ANIMATION_STEPS']
-    
+ 
     # Tracing params
     allowed_steps =                 global_config['NR_ALLOW_RETRACE_STEPS']
     prevent_retracing =             global_config['PREVENT_RETRACE']
@@ -56,7 +57,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     stop_radius =                   global_config['STOP_RADIUS'] * scale_unit
     max_step_branch =               global_config['MAX_STEPS_BRANCH']
 
-    #Assembly params
+    # Assembly params
     use_buffer =                    global_config['USE_BUFFER']
     N =                             global_config['ASSEMBLY_EVERY_N']
     buffer =                        global_config['BUFFER_N']
@@ -72,14 +73,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     print(f"Reading in image file: {image_file}, scale: {scale}")
     reader_im, origin_im, size_im, spacing_im = import_image(image_file)
     print(f"Image data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
-    
+
     init_step = potential_branches[0]
     vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
     assembly_segs = Segmentation(case, image_file, weighted, weight_type=weight_type)
 
     if not (seg_file and trace_seg):
-
-        # sys.path.append("/global/scratch/users/numi/SeqSeg/nnUNet/")
 
         from nnunetv2.paths import nnUNet_results
         import torch
@@ -120,14 +119,15 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     num_steps_direction = 0
     inside_branch = 0
     i = 0 # numbering chronological order
-    while vessel_tree.potential_branches and i < (max_step_size +1):
+    while vessel_tree.potential_branches and i < (max_step_size + 1):
 
-        if i in range(0, max_step_size, max_step_size*0 +1):
+        if i in range(0, max_step_size, max_step_size*0 + 1):
             print(f"\n*** Step number {i} ***")
             # print real time
             print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
-        if debug and i >= debug_step: pdb.set_trace()
+        if debug and i >= debug_step:
+            pdb.set_trace()
 
         try:
 
@@ -316,7 +316,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 start_time_loc = time.time()
 
             sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'smooth.vtp'
-            sfn_un = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp'
+            # sfn_un = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp'
             cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'.vtp'
             # cfn_un = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_unsmooth.vtp'
             if write_samples:
