@@ -1,7 +1,8 @@
-## Functions to bind SITK functionality
+# Functions to bind SITK functionality
 
 import SimpleITK as sitk
 import numpy as np
+
 
 def read_image(file_dir_image):
     """
@@ -16,7 +17,8 @@ def read_image(file_dir_image):
     file_reader.ReadImageInformation()
     return file_reader
 
-def create_new(file_reader, PixelID = None):
+
+def create_new(file_reader, PixelID=None):
     """
     Create new SITK image with same formating as another
     Args:
@@ -24,20 +26,23 @@ def create_new(file_reader, PixelID = None):
     Returns:
         SITK image
     """
-    if PixelID: pix_id = PixelID
-    else: pix_id = file_reader.GetPixelID()
+    if PixelID:
+        pix_id = PixelID
+    else:
+        pix_id = file_reader.GetPixelID()
 
     # check if reader or image object
-    if type(file_reader) == sitk.ImageFileReader:
+    if isinstance(file_reader, sitk.ImageFileReader):
         result_img = sitk.Image(file_reader.GetSize(), pix_id,
-                            file_reader.GetNumberOfComponents())
+                                file_reader.GetNumberOfComponents())
     else:
         result_img = sitk.Image(file_reader.GetSize(), pix_id)
     result_img.SetSpacing(file_reader.GetSpacing())
     result_img.SetOrigin(file_reader.GetOrigin())
     result_img.SetDirection(file_reader.GetDirection())
-    
+
     return result_img
+
 
 def copy_settings(img, ref_img):
 
@@ -46,6 +51,7 @@ def copy_settings(img, ref_img):
     img.SetDirection(ref_img.GetDirection())
 
     return img
+
 
 def write_image(image, outputImageFileName):
     """
@@ -58,7 +64,7 @@ def write_image(image, outputImageFileName):
     writer = sitk.ImageFileWriter()
     writer.SetFileName(outputImageFileName)
     writer.Execute(image)
-    return file_reader
+
 
 def keep_component_seeds(image, seeds):
     """
@@ -70,7 +76,8 @@ def keep_component_seeds(image, seeds):
     # create list of list of index values for each seed
     index_seeds = []
     for i in range(len(seeds)):
-        index_seeds.append(image.TransformPhysicalPointToIndex(seeds[i].tolist()))
+        index_seeds.append(image
+                           .TransformPhysicalPointToIndex(seeds[i].tolist()))
     print(f"Index of seeds: {index_seeds}")
 
     # create a new image with only the labels of interest
@@ -78,12 +85,14 @@ def keep_component_seeds(image, seeds):
 
     return labelImage
 
+
 def remove_other_vessels(image, seed):
     """
     Remove all labelled vessels except the one of interest
     Args:
         SITK image, seed point pointing to point in vessel of interest
-        seed(s): location of seed; either list (single point) or list of lists (multiple points)
+        seed(s): location of seed; either list (single point)
+        or list of lists (multiple points)
     Returns:
         binary image file (either 0 or 1)
     """
@@ -93,23 +102,31 @@ def remove_other_vessels(image, seed):
 
     # print(f"Seeds to remove around: {seed}")
 
-    if type(seed[0]) == tuple:
+    if isinstance(seed[0], tuple):
         labels_seeds = []
         for i in range(len(seed)):
             labels_seeds.append(ccimage[seed[i]])
         # create a new image with only the labels of interest
-        labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=labels_seeds[0], upperThreshold=labels_seeds[0])
+        labelImage = sitk.BinaryThreshold(ccimage,
+                                          lowerThreshold=labels_seeds[0],
+                                          upperThreshold=labels_seeds[0])
         for i in range(1, len(labels_seeds)):
-            labelImage = labelImage + sitk.BinaryThreshold(ccimage, lowerThreshold=labels_seeds[i], upperThreshold=labels_seeds[i])
+            labelImage = labelImage
+            + sitk.BinaryThreshold(ccimage,
+                                   lowerThreshold=labels_seeds[i],
+                                   upperThreshold=labels_seeds[i])
     else:
         label = ccimage[seed]
-        #print("The label we use is: " + str(label))
+        # print("The label we use is: " + str(label))
 
         if label == 0:
             label = 1
-        labelImage = sitk.BinaryThreshold(ccimage, lowerThreshold=label, upperThreshold=label)
+        labelImage = sitk.BinaryThreshold(ccimage,
+                                          lowerThreshold=label,
+                                          upperThreshold=label)
 
     return labelImage
+
 
 def connected_comp_info(original_seg, print_condition):
     """
@@ -120,11 +137,14 @@ def connected_comp_info(original_seg, print_condition):
     stats.Execute(removed_seg, original_seg)
     means = []
 
-    for l in stats.GetLabels():
+    for label in stats.GetLabels():
         if print_condition:
-            print("Label: {0} -> Mean: {1} Size: {2}".format(l, stats.GetMean(l), stats.GetPhysicalSize(l)))
-        means.append(stats.GetMean(l))
+            print("Label: {0} -> Mean: {1} Size: {2}"
+                  .format(label, stats.GetMean(label),
+                          stats.GetPhysicalSize(label)))
+        means.append(stats.GetMean(label))
     return stats.GetLabels(), means
+
 
 def extract_volume(reader_im, index_extract, size_extract):
     """
@@ -142,7 +162,9 @@ def extract_volume(reader_im, index_extract, size_extract):
 
     return new_img
 
-def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min_resolution_any_dim = 5):
+
+def map_to_image(point, radius, size_volume, origin_im, spacing_im,
+                 size_im, min_resolution_any_dim=5):
     """
     Function to map a point and radius to volume metrics
     Also checks if sub-volume is within global
@@ -169,20 +191,25 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min
 
     while min_res < min_resolution_any_dim:
         size_extract = np.ceil(size_volume*radius/spacing_im).astype(int)
-        index_extract = np.rint((point-origin_im - (size_volume/2)*radius)/spacing_im).astype(int)
+        index_extract = np.rint((point-origin_im - (size_volume/2)*radius) /
+                                spacing_im).astype(int)
         radius *= 1.05
         min_res = size_extract.min()
         print(f"Subvolume resolution: {size_extract}, Radius: {radius}")
 
     end_bounds = index_extract+size_extract
 
-    for i, ind in enumerate(np.logical_and(end_bounds > size_im,(end_bounds- size_im) < 1/3*size_extract )):
+    for i, ind in enumerate(np.logical_and(end_bounds > size_im,
+                                           (end_bounds - size_im)
+                                           < 1/3 * size_extract)):
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             size_extract[i] = size_im[i] - index_extract[i]
             border = True
 
-    for i, ind in enumerate(np.logical_and(index_extract < np.zeros(3),(np.zeros(3)-index_extract) < 1/3*size_extract )):
+    for i, ind in enumerate(np.logical_and(index_extract < np.zeros(3),
+                                           (np.zeros(3) - index_extract)
+                                           < 1/3 * size_extract)):
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             index_extract[i] = 0
@@ -209,6 +236,7 @@ def import_image(image_dir):
 
     return reader_im, origin_im, size_im, spacing_im
 
+
 def sitk_to_numpy(Image):
     """
     Function to convert sitk image to numpy array
@@ -221,7 +249,16 @@ def sitk_to_numpy(Image):
 
     return np_array
 
-def numpy_to_sitk(numpy, file_reader = None):
+
+def numpy_to_sitk(numpy, file_reader=None):
+    """
+    Function to convert numpy array to sitk image
+    args:
+        numpy: numpy array
+        file_reader: sitk image reader
+    return:
+        Image: sitk image
+    """
 
     Image = sitk.GetImageFromArray(numpy)
 
@@ -233,6 +270,7 @@ def numpy_to_sitk(numpy, file_reader = None):
 
     return Image
 
+
 def distance_map_from_seg(sitk_img):
     """
     Function to calculate distance map
@@ -243,23 +281,31 @@ def distance_map_from_seg(sitk_img):
     return:
         distance_map: sitk image
     """
-    distance_map = sitk.SignedMaurerDistanceMap(sitk_img, squaredDistance=False, useImageSpacing=True)
+    distance_map = sitk.SignedMaurerDistanceMap(sitk_img,
+                                                squaredDistance=False,
+                                                useImageSpacing=True)
     return distance_map
 
-def check_seg_border(size_extract, index_extract, predicted_vessel, size_im):
+
+def check_seg_border(size_extract, index_extract,
+                     predicted_vessel, size_im):
     """
-    This function takes in the size and index of the extracted volume, its segmentation 
-    and the size of the global image
-    
+    This function takes in the size and index of the extracted volume,
+    its segmentation and the size of the global image
+
     This function is only called if the subvolume is on the global border
-    This function returns true if there is at least one vessel voxel on the border of the global volume
+    This function returns true if there is at least one vessel voxel on the
+    border of the global volume
 
     This function:
 
-    1. Finds the face(s) of the subvolume that are on the border of the global volume
-    2. Extracts the part of the subvolume segmentation that corresponds to those faces
+    1. Finds the face(s) of the subvolume that are on the border of
+       the global volume
+    2. Extracts the part of the subvolume segmentation that corresponds
+       to those faces
     3. Checks if there is a vessel voxel in that part of the segmentation
-    4. Returns true if there is a vessel voxel on the border of the global volume
+    4. Returns true if there is a vessel voxel on the border
+       of the global volume
 
     args:
         size_extract: list of ints, size of the extracted volume
@@ -267,25 +313,28 @@ def check_seg_border(size_extract, index_extract, predicted_vessel, size_im):
         predicted_vessel: sitk volume, segmentation of the extracted volume
         size_im: list of ints, size of the global volume
     return:
-        border: boolean, if there exists a vessel voxel on the border of the global volume
+        border: boolean, if there exists a vessel voxel on the border
+                of the global volume
     """
 
-    # Find the faces of the subvolume that are on the border of the global volume
+    # Find the faces of the subvolume that are on the border
+    # of the global volume
     faces = []
     for i in range(3):
         if index_extract[i] == 0:
             faces.append(i)
         if index_extract[i] + size_extract[i] == size_im[i]:
             faces.append(i+3)
-    # import pdb; pdb.set_trace()
-    # Extract the part of the subvolume segmentation that corresponds to those faces
-    seg_np = sitk_to_numpy(predicted_vessel).transpose(2,1,0)
+
+    # Extract the part of the subvolume segmentation that corresponds
+    # to those faces
+    seg_np = sitk_to_numpy(predicted_vessel).transpose(2, 1, 0)
     border = False
     for face in faces:
         if face < 3:
-            slice = seg_np[0,:,:]
+            slice = seg_np[0, :, :]
         else:
-            slice = seg_np[-1,:,:]
+            slice = seg_np[-1, :, :]
         if np.sum(slice) > 0:
             border = True
             break
