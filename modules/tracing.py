@@ -421,7 +421,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                                 seed,
                                                 targets,
                                                 min_res=40)
-                
+
             else:
                 print("Calculating centerline using VMTK")
                 (centerline_poly,
@@ -478,10 +478,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                             vessel_tree.caps = (vessel_tree.caps
                                                 + vessel_tree.steps
                                                 [-(j+buffer)]['caps'])
-                    
+
                     if len(vessel_tree.steps) % (N*5) == 0 and write_samples:
-                        # sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.mha')
-                        assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=0.5, upperThreshold=1)
+                        # sitk.WriteImage(assembly_segs.assembly,
+                        #                 (output_folder + 'assembly/assembly_'
+                        #                  + case + '_'+str(i)+'.mha'))
+                        assembly = sitk.BinaryThreshold(assembly_segs.assembly,
+                                                        lowerThreshold=0.5,
+                                                        upperThreshold=1)
                         # assembly = remove_other_vessels(assembly, initial_seed)
                         surface_assembly = evaluate_surface(assembly, 1)
                         write_vtk_polydata(surface_assembly, output_folder +'assembly/assembly_surface_'+case+'_'+str(i)+'.vtp')
@@ -508,20 +512,29 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     surface_accum = appendPolyData(surfaces_animation)
                     cent_accum = appendPolyData(cent_animation)
                     # Write out polydata
-                    write_vtk_polydata(surface_accum, output_folder+'animation/animationsurf_'+str(i).zfill(3)+'.vtp')
-                    write_vtk_polydata(cent_accum, output_folder+'animation/animationcent_'+str(i).zfill(3)+'.vtp')
+                    write_vtk_polydata(surface_accum,
+                                       (output_folder +
+                                        'animation/animationsurf_' +
+                                        str(i).zfill(3)+'.vtp'))
+                    write_vtk_polydata(cent_accum,
+                                       (output_folder +
+                                        'animation/animationcent_' +
+                                        str(i).zfill(3)+'.vtp'))
 
-            point_tree, radius_tree, angle_change = get_next_points(    centerline_poly,
-                                                                        step_seg['point'],
-                                                                        step_seg['old point'],
-                                                                        step_seg['old radius'],
-                                                                        magn_radius = magnify_radius,
-                                                                        min_radius = min_radius,
-                                                                        mega_sub = global_config['MEGA_SUBVOLUME']
-                                                                    )
+            (point_tree,
+             radius_tree,
+             angle_change) = get_next_points(centerline_poly,
+                                             step_seg['point'],
+                                             step_seg['old point'],
+                                             step_seg['old radius'],
+                                             magn_radius=magnify_radius,
+                                             min_radius=min_radius,
+                                             mega_sub=(global_config
+                                                       ['MEGA_SUBVOLUME']))
 
             if take_time:
-                print("\n Calc next point: " + str(time.time() - start_time_loc) + " s\n")
+                print("\n Calc next point: " +
+                      str(time.time() - start_time_loc) + " s\n")
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
@@ -531,7 +544,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             # end if on border and segmentation is on border
             if border:
                 print("Checking if segmentation has reached the border")
-                if check_seg_border(size_extract, index_extract, predicted_vessel, size_im):
+                if check_seg_border(size_extract,
+                                    index_extract,
+                                    predicted_vessel,
+                                    size_im):
                     raise SkipThisStepError(
                         "Segmentation has reached border, stop here"
                     )
@@ -540,21 +556,20 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
                 i += 1
                 num_steps_direction += 1
-                next_step = create_step_dict(   step_seg['point'],
-                                                step_seg['radius'],
-                                                point_tree[0],
-                                                radius_tree[0],
-                                                angle_change[0]
-                                            )
-                
+                next_step = create_step_dict(step_seg['point'],
+                                             step_seg['radius'],
+                                             point_tree[0],
+                                             radius_tree[0],
+                                             angle_change[0])
+
                 print("Next radius is: " + str(radius_tree[0]))
                 vessel_tree.add_step(i, next_step, branch)
 
                 if len(radius_tree) > 1:
                     print('\n _ \n')
-                    print(f"\n BIFURCATION BIFURCATION BIFURCATION - {len(radius_tree)} BRANCHES \n")
+                    print(f"\n BIFURCATION - {len(radius_tree)} BRANCHES \n")
                     print('\n _ \n')
-                    
+
                     for j in range(1, len(radius_tree)):
                         dict = create_step_dict(step_seg['point'],
                                                 step_seg['radius'],
@@ -564,7 +579,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                         dict['connection'] = [branch, i-1]
                         if forceful_sidebranch:
                             dict['point'] += dict['radius']*dict['tangent']
-                            dict['radius'] = dict['radius']*forceful_sidebranch_magnify
+                            dict['radius'] = (dict['radius']
+                                              * forceful_sidebranch_magnify)
 
                         vessel_tree.potential_branches.append(dict)
                     list_points_pot = []
@@ -572,37 +588,51 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                         list_points_pot.append(points2polydata([pot.tolist()]))
                     final_pot = appendPolyData(list_points_pot)
                     if write_samples:
-                        write_vtk_polydata(  final_pot, output_folder+'/points/bifurcation_'+case+'_'+str(branch)+'_'+str(i-1)+'_points.vtp')
+                        write_vtk_polydata(final_pot,
+                                           (output_folder
+                                            + '/points/bifurcation_'+case+'_'
+                                            + str(branch)+'_'+str(i-1)
+                                            + '_points.vtp'))
             else:
                 print('point_tree.size is 0')
                 raise SkipThisStepError(
                     "No next points, stop here"
                 )
-            # print("\n This location done: " + str(time.time() - start_time_loc) + " s\n")
-
+            print("\n This location done: "
+                  + str(time.time() - start_time_loc) + " s\n")
 
         except Exception as e:
             print(e)
 
             if step_seg['centerline']:
-                print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel, old_point_ref, centerline_poly)
+                print_error(output_folder, i, step_seg, cropped_volume,
+                            predicted_vessel, old_point_ref, centerline_poly)
             elif step_seg['seg_file']:
-                print_error(output_folder, i, step_seg, cropped_volume, predicted_vessel)
+                print_error(output_folder, i, step_seg, cropped_volume,
+                            predicted_vessel)
             elif step_seg['img_file']:
                 print_error(output_folder, i, step_seg, cropped_volume)
 
             if i == 0:
                 print("Didnt work for first surface")
-                #break
+                # break
 
-            if vessel_tree.steps[i]['chances'] < number_chances and not step_seg['is_inside']:
+            if (vessel_tree.steps[i]['chances'] < number_chances
+               and not step_seg['is_inside']):
                 print("Giving chance for surface: " + str(i))
                 if take_time:
                     print('Radius is ', step_seg['radius'])
-                if step_seg['seg_file'] and perc>0.33 and vessel_tree.steps[i]['chances'] > 0:
-                    print(f'Magnifying radius by 1.2 because percentage vessel is above 0.33: {perc:.3f}')
+                if (step_seg['seg_file'] and perc > 0.33
+                   and vessel_tree.steps[i]['chances'] > 0):
+                    print(f"""Magnifying radius by 1.2 because percentage
+                          vessel is above 0.33: {perc:.3f}""")
                     vessel_tree.steps[i]['radius'] *= 1.2
-                vessel_tree.steps[i]['point'] = vessel_tree.steps[i]['point'] + vessel_tree.steps[i]['radius']*vessel_tree.steps[i]['tangent']
+                (vessel_tree.steps[i]['point']) = ((vessel_tree.steps[i]
+                                                    ['point'])
+                                                   + (vessel_tree.steps[i]
+                                                      ['radius'])
+                                                   * (vessel_tree.steps[i]
+                                                      ['tangent']))
                 vessel_tree.steps[i]['chances'] += 1
 
             else:
