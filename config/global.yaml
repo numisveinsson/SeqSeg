@@ -2,7 +2,7 @@
 # True if we have a segmentation, False if we are predicting
 SEGMENTATION: False # usually False
 
-DEBUG: False
+DEBUG: True
 DEBUG_STEP: 63
 
 WRITE_STEPS: True # if we want to write out each step

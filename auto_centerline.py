@@ -184,7 +184,7 @@ if __name__ == '__main__':
         else:
             print("Press c to start tracing")
             import pdb
-            pdb.set_trace()
+            # pdb.set_trace()
 
         print(test_case)
         print(f"Initial points: {potential_branches}")

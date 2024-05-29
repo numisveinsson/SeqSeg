@@ -46,7 +46,7 @@ python3 auto_centerline.py \
     -outdir output_aortas_june24mr/ \
     -scale 1 \
     -start 0 \
-    -stop 10 \
+    -stop 1 \
     -max_n_steps 1500 \
     -unit cm \
 
