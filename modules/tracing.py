@@ -62,8 +62,8 @@ def trace_centerline(
     min_radius = global_config['MIN_RADIUS'] * scale_unit
     run_time = global_config['TIME_ANALYSIS']
     forceful_sidebranch = global_config['FORCEFUL_SIDEBRANCH']
-    forceful_sidebranch_magnify = global_config["""FORCEFUL_
-                                                SIDEBRANCH_MAGN_RADIUS"""]
+    forceful_sidebranch_magnify = (global_config
+                                   ["FORCEFUL_SIDEBRANCH_MAGN_RADIUS"])
     stop_pre = global_config['STOP_PRE']
     stop_radius = global_config['STOP_RADIUS'] * scale_unit
     max_step_branch = global_config['MAX_STEPS_BRANCH']
