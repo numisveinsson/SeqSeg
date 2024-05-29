@@ -6,7 +6,7 @@
 #SBATCH --account=fc_biome
 #
 # Partition:
-#SBATCH --partition=savio4_htc
+#SBATCH --partition=savio3_htc
 #
 # QoS:
 #SBATCH --qos=savio_normal
@@ -21,7 +21,7 @@
 #SBATCH --cpus-per-task=2
 #
 # Wall clock limit:
-#SBATCH --time=72:00:00
+#SBATCH --time=12:00:00
 #
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=numi@berkeley.edu
@@ -43,11 +43,11 @@ python3 auto_centerline.py \
     -dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
-    -outdir output_aortas_may24mr/ \
+    -outdir output_aortas_june24mr/ \
     -scale 1 \
     -start 0 \
-    -stop 1 \
-    -max_n_steps 1000 \
+    -stop 10 \
+    -max_n_steps 1500 \
     -unit cm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \

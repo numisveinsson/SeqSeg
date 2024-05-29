@@ -274,7 +274,7 @@ def check_seg_border(size_extract, index_extract, predicted_vessel, size_im):
             faces.append(i)
         if index_extract[i] + size_extract[i] == size_im[i]:
             faces.append(i+3)
-
+    # import pdb; pdb.set_trace()
     # Extract the part of the subvolume segmentation that corresponds to those faces
     seg_np = sitk_to_numpy(predicted_vessel).transpose(2,1,0)
     border = False
