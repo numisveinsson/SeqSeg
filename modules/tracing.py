@@ -248,17 +248,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     img_np = sitk.GetArrayFromImage(cropped_volume)
                     img_np = img_np[None]
                     img_np = img_np.astype('float32')
-                    # prediction0 = predictor.predict_from_files([[volume_fn]],
-                    #                      None,
-                    #                      save_probabilities=False, overwrite=False,
-                    #                      num_processes_preprocessing=1, num_processes_segmentation_export=1,
-                    #                      folder_with_segs_from_prev_stage=None, num_parts=1, part_id=0)
 
-                    # prediction1 = predictor.predict_from_list_of_npy_arrays([img_np],
-                    #                                         None,
-                    #                                         [props],
-                    #                                         None, 1, save_probabilities=False,
-                    #                                         num_processes_segmentation_export=2)
                     start_time_pred = time.time()
                     prediction = predictor.predict_single_npy_array(img_np,
                                                                     props,
