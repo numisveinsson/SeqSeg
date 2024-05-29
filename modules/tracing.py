@@ -13,9 +13,19 @@ from .tracing_functions import *
 from .centerline import calc_centerline_fmm
 
 
-def trace_centerline(output_folder, image_file, case, model_folder, fold,
-                     potential_branches, max_step_size, global_config,
-                     unit='cm', scale=1, seg_file=None):
+def trace_centerline(
+    output_folder,
+    image_file,
+    case,
+    model_folder,
+    fold,
+    potential_branches,
+    max_step_size,
+    global_config,
+    unit='cm',
+    scale=1,
+    seg_file=None
+):
 
     if unit == 'cm':
         scale_unit = 0.1
@@ -38,7 +48,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     # Animation params
     animation = global_config['ANIMATION']
     animation_steps = global_config['ANIMATION_STEPS']
- 
+
     # Tracing params
     allowed_steps = global_config['NR_ALLOW_RETRACE_STEPS']
     prevent_retracing = global_config['PREVENT_RETRACE']
@@ -194,10 +204,10 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             continue_enlarge = True
             max_mag = 1.3  # stops when reaches this
             add_mag = 0.2
-            
+
             if step_seg['radius'] > 3 * scale_unit:
                 mag = max_mag  # if above 3mm then dont change size
-            
+
             while perc > perc_enlarge and continue_enlarge:
                 if mag > 1 and mag < max_mag:
                     print("""Enlarging bounding box because
@@ -216,13 +226,13 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                                         spacing_im,
                                         size_im,
                                         global_config['MIN_RES'])
-                
+
                 step_seg['img_index'] = index_extract
                 step_seg['img_size'] = size_extract
                 cropped_volume = extract_volume(reader_im,
                                                 index_extract,
                                                 size_extract)
-                
+
                 volume_fn = (output_folder +
                              'volumes/volume_'+case+'_'+str(i)+'.mha')
 
@@ -301,7 +311,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 start_time_loc = time.time()
             if write_samples:
                 sitk.WriteImage(predicted_vessel, pd_fn)
-                
+
             if global_config['MEGA_SUBVOLUME']:
                 (predicted_vessel,
                  cropped_volume) = construct_subvolume(step_seg,
@@ -641,7 +651,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 print("\n Moving onto another branch")
 
                 if step_seg['is_inside'] and global_config['RESTART_BRANCH']:
-                    # If inside, then move on to next branch and remove allowed_steps
+                    # If inside, then move on to next branch
+                    # and remove allowed_steps
                     # i -= allowed_steps
                     print(f"Redoing this branch, i is now {i}")
                     # vessel_tree.restart_branch(branch)
@@ -649,13 +660,17 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
                     if debug:
                         pdb.set_trace()
-                    
+
                     del vessel_tree.branches[branch][-1]
-                    list_surf_branch, list_cent_branch, list_pts_branch = [], [], []
+                    (list_surf_branch, list_cent_branch,
+                     list_pts_branch) = [], [], []
                     for id in vessel_tree.branches[branch][1:]:
-                        list_surf_branch.append(vessel_tree.steps[id]['surface'])
-                        list_cent_branch.append(vessel_tree.steps[id]['centerline'])
-                        list_pts_branch.append(vessel_tree.steps[id]['point_pd'])
+                        list_surf_branch.append((vessel_tree.steps[id]
+                                                 ['surface']))
+                        list_cent_branch.append((vessel_tree.steps[id]
+                                                 ['centerline']))
+                        list_pts_branch.append((vessel_tree.steps[id]
+                                                ['point_pd']))
                         del vessel_tree.steps[id]['surface']
                         del vessel_tree.steps[id]['centerline']
                         del vessel_tree.steps[id]['point_pd']
@@ -663,31 +678,54 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     list_surfaces.extend(list_surf_branch)
                     list_points.extend(list_pts_branch)
 
-                    #print('Printing potentials')
+                    # print('Printing potentials')
                     list_pot = []
                     for pot in vessel_tree.potential_branches:
-                        list_pot.append(points2polydata([pot['point'].tolist()]))
+                        list_pot.append(points2polydata([pot['point']
+                                                         .tolist()]))
                     final_pot = appendPolyData(list_pot)
 
                     if take_time:
                         print("Branches are: ", vessel_tree.branches)
                     if write_samples:
-                        final_surface    = appendPolyData(list_surf_branch)
+                        final_surface = appendPolyData(list_surf_branch)
                         final_centerline = appendPolyData(list_cent_branch)
-                        final_points     = appendPolyData(list_pts_branch)
-                        write_vtk_polydata(final_pot, output_folder+'/assembly/potentials_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
-                        write_vtk_polydata(final_surface, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_surfaces.vtp')
-                        write_vtk_polydata(final_centerline, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_centerlines.vtp')
-                        write_vtk_polydata(final_points, output_folder+'/assembly/branch_'+case+'_'+str(branch)+'_'+str(i)+'_points.vtp')
+                        final_points = appendPolyData(list_pts_branch)
+                        write_vtk_polydata(final_pot,
+                                           output_folder
+                                           + '/assembly/potentials_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_points.vtp')
+                        write_vtk_polydata(final_surface,
+                                           output_folder
+                                           + '/assembly/branch_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_surfaces.vtp')
+                        write_vtk_polydata(final_centerline,
+                                           output_folder
+                                           + '/assembly/branch_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_centerlines.vtp')
+                        write_vtk_polydata(final_points,
+                                           output_folder
+                                           + '/assembly/branch_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_points.vtp')
 
-                    vessel_tree.caps = vessel_tree.caps + [step_seg['point'] + volume_size_ratio*step_seg['radius']*step_seg['tangent']]
+                    vessel_tree.caps = (vessel_tree.caps
+                                        + [step_seg['point']
+                                           + volume_size_ratio
+                                           * step_seg['radius']
+                                           * step_seg['tangent']])
 
                     if retrace_cent:
-                        ind = vessel_tree.branches[branch][1] # second step on this branch
+                        # second step on this branch
+                        ind = vessel_tree.branches[branch][1]
                         step_to_add = vessel_tree.steps[ind]
-                        step_to_add['connection'] = [-branch+1, ind] # add connection that says retrace
+                        # add connection that says retrace
+                        step_to_add['connection'] = [-branch+1, ind]
                         vessel_tree.potential_branches.append(step_to_add)
-                
+
                 # Merge potentials
                 if merge_potentials:
                     vessel_tree.merge_pots_radius()
@@ -697,7 +735,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     vessel_tree.sort_potential_radius()
                 else:
                     vessel_tree.shuffle_potential()
-                
+
                 if len(vessel_tree.potential_branches) == 1:
                     break
                 next_step = vessel_tree.potential_branches.pop(1)
@@ -711,28 +749,42 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 if take_time:
                     print("Post Branches are: ", vessel_tree.branches)
                     print("Number of steps are: ", len(vessel_tree.steps))
-                    print("Connections of branches are: ", vessel_tree.bifurcations)
-                    print("Number of potentials left are: ", len(vessel_tree.potential_branches))
+                    print("Connections of branches are: ",
+                          vessel_tree.bifurcations)
+                    print("Number of potentials left are: ",
+                          len(vessel_tree.potential_branches))
 
     if len(vessel_tree.potential_branches) > 0:
         print('Printing potentials')
         list_pot = []
         for pot in vessel_tree.potential_branches:
             list_pot.append(points2polydata([pot['point'].tolist()]))
-            #vessel_tree.caps = vessel_tree.caps + [pot['point']+ volume_size_ratio*pot['radius']*pot['tangent']]
         final_pot = appendPolyData(list_pot)
-        write_vtk_polydata(final_pot, output_folder+'/potentials_'+case+'_'+str(i)+'_points.vtp')
+        write_vtk_polydata(final_pot,
+                           output_folder+'/potentials_'+case+'_'+str(i)
+                           + '_points.vtp')
 
     if use_buffer:
         print("Adding rest of segs to global")
         # Add rest of local segs to global before returning
         check = 2
-        while check < len(vessel_tree.steps) and vessel_tree.steps[-check]['prob_predicted_vessel']:
-            assembly_segs.add_segmentation( vessel_tree.steps[-check]['prob_predicted_vessel'],
-                                            vessel_tree.steps[-check]['img_index'],
-                                            vessel_tree.steps[-check]['img_size'],
-                                            (1/vessel_tree.steps[-check]['radius'])**2)
+        while (check < len(vessel_tree.steps)
+               and vessel_tree.steps[-check]['prob_predicted_vessel']):
+            assembly_segs.add_segmentation((vessel_tree.steps[-check]
+                                            ['prob_predicted_vessel']),
+                                           (vessel_tree.steps[-check]
+                                            ['img_index']),
+                                           (vessel_tree.steps[-check]
+                                            ['img_size']),
+                                           (1/vessel_tree.steps[-check]
+                                            ['radius'])**2)
             vessel_tree.steps[-check]['prob_predicted_vessel'] = None
             check += 1
 
-    return list_centerlines, list_surfaces, list_points, list_inside_pts, assembly_segs, vessel_tree, i
+    return (list_centerlines,
+            list_surfaces,
+            list_points,
+            list_inside_pts,
+            assembly_segs,
+            vessel_tree,
+            i)
