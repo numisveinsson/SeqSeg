@@ -23,60 +23,64 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
         scale_unit = 1
 
     # If tracing a an already segmented vasculature
-    trace_seg =                     global_config['SEGMENTATION']
+    trace_seg = global_config['SEGMENTATION']
 
     # Debugging
-    debug =                         global_config['DEBUG']
-    debug_step =                    global_config['DEBUG_STEP']
+    debug = global_config['DEBUG']
+    debug_step = global_config['DEBUG_STEP']
 
     # Write out params
-    write_samples =                 global_config['WRITE_STEPS']
+    write_samples = global_config['WRITE_STEPS']
 
-    retrace_cent   =                global_config['RETRACE']
-    take_time      =                global_config['TIME_ANALYSIS']
+    retrace_cent = global_config['RETRACE']
+    take_time = global_config['TIME_ANALYSIS']
 
     # Animation params
-    animation =                     global_config['ANIMATION']
-    animation_steps =               global_config['ANIMATION_STEPS']
+    animation = global_config['ANIMATION']
+    animation_steps = global_config['ANIMATION_STEPS']
  
     # Tracing params
-    allowed_steps =                 global_config['NR_ALLOW_RETRACE_STEPS']
-    prevent_retracing =             global_config['PREVENT_RETRACE']
-    sort_potentials =               global_config['SORT_NEXT']
-    merge_potentials =              global_config['MERGE_NEXT']
+    allowed_steps = global_config['NR_ALLOW_RETRACE_STEPS']
+    prevent_retracing = global_config['PREVENT_RETRACE']
+    sort_potentials = global_config['SORT_NEXT']
+    merge_potentials = global_config['MERGE_NEXT']
 
-    volume_size_ratio =             global_config['VOLUME_SIZE_RATIO']
-    perc_enlarge =                  global_config['MAX_PERC_ENLARGE']
-    magnify_radius =                global_config['MAGN_RADIUS']
-    number_chances =                global_config['NR_CHANCES']
-    min_radius =                    global_config['MIN_RADIUS'] * scale_unit
-    run_time =                      global_config['TIME_ANALYSIS']
-    forceful_sidebranch =           global_config['FORCEFUL_SIDEBRANCH']
-    forceful_sidebranch_magnify =   global_config['FORCEFUL_SIDEBRANCH_MAGN_RADIUS']
-    stop_pre =                      global_config['STOP_PRE']
-    stop_radius =                   global_config['STOP_RADIUS'] * scale_unit
-    max_step_branch =               global_config['MAX_STEPS_BRANCH']
+    volume_size_ratio = global_config['VOLUME_SIZE_RATIO']
+    perc_enlarge = global_config['MAX_PERC_ENLARGE']
+    magnify_radius = global_config['MAGN_RADIUS']
+    number_chances = global_config['NR_CHANCES']
+    min_radius = global_config['MIN_RADIUS'] * scale_unit
+    run_time = global_config['TIME_ANALYSIS']
+    forceful_sidebranch = global_config['FORCEFUL_SIDEBRANCH']
+    forceful_sidebranch_magnify = global_config["""FORCEFUL_
+                                                SIDEBRANCH_MAGN_RADIUS"""]
+    stop_pre = global_config['STOP_PRE']
+    stop_radius = global_config['STOP_RADIUS'] * scale_unit
+    max_step_branch = global_config['MAX_STEPS_BRANCH']
 
     # Assembly params
-    use_buffer =                    global_config['USE_BUFFER']
-    N =                             global_config['ASSEMBLY_EVERY_N']
-    buffer =                        global_config['BUFFER_N']
-    weighted =                      global_config['WEIGHTED_ASSEMBLY']
-    weight_type =                   global_config['WEIGHT_TYPE']
+    use_buffer = global_config['USE_BUFFER']
+    N = global_config['ASSEMBLY_EVERY_N']
+    buffer = global_config['BUFFER_N']
+    weighted = global_config['WEIGHTED_ASSEMBLY']
+    weight_type = global_config['WEIGHT_TYPE']
 
     if (seg_file and trace_seg):
-        print(f"We are tracing a segmented vasculature! No need for prediction.")
+        print("We are tracing a segmented vasculature!No need for prediction.")
         print(f"Reading in seg file: {seg_file}")
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
-        print(f"Seg data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
+        print(f"""Seg data. size: {size_im},
+               spacing: {spacing_im}, origin: {origin_im}""")
 
     print(f"Reading in image file: {image_file}, scale: {scale}")
     reader_im, origin_im, size_im, spacing_im = import_image(image_file)
-    print(f"Image data. size: {size_im}, spacing: {spacing_im}, origin: {origin_im}")
+    print(f"""Image data. size: {size_im},
+           spacing: {spacing_im}, origin: {origin_im}""")
 
     init_step = potential_branches[0]
-    vessel_tree   = VesselTree(case, image_file, init_step, potential_branches)
-    assembly_segs = Segmentation(case, image_file, weighted, weight_type=weight_type)
+    vessel_tree = VesselTree(case, image_file, init_step, potential_branches)
+    assembly_segs = Segmentation(case, image_file, weighted,
+                                 weight_type=weight_type)
 
     if not (seg_file and trace_seg):
 
@@ -108,17 +112,19 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
     else:
         print('No need to load model, we are using a given segmentation')
 
-    ## Note: make initial seed within loop
-    initial_seed = assembly_segs.assembly.TransformPhysicalPointToIndex(vessel_tree.steps[0]['point'].tolist())
+    # Note: make initial seed within loop
+    # initial_seed = assembly_segs.assembly.TransformPhysicalPointToIndex(
+    #                vessel_tree.steps[0]['point'].tolist())
     branch = 0
 
     # Track combos of all polydata
-    list_centerlines, list_surfaces, list_points, list_inside_pts = [], [], [], []
+    list_centerlines, list_surfaces = [], []
+    list_points, list_inside_pts = [], []
     surfaces_animation, cent_animation = [], []
 
     num_steps_direction = 0
     inside_branch = 0
-    i = 0 # numbering chronological order
+    i = 0  # numbering chronological order
     while vessel_tree.potential_branches and i < (max_step_size + 1):
 
         if i in range(0, max_step_size, max_step_size*0 + 1):
@@ -156,17 +162,21 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 if inside_branch == allowed_steps:
                     step_seg['is_inside'] = True
                     inside_branch = 0
-                    list_inside_pts.append(points2polydata([step_seg['point'].tolist()]))
+                    list_inside_pts.append(
+                        points2polydata([step_seg['point'].tolist()]))
                     if write_samples:
-                        polydata_point = points2polydata([step_seg['point'].tolist()])
-                        pfn = output_folder + 'points/inside_point_'+case+'_'+str(i)+'.vtp'
+                        polydata_point = points2polydata(
+                                         [step_seg['point'].tolist()])
+                        pfn = (output_folder + 
+                               'points/inside_point_'+case+'_'+str(i)+'.vtp')
                         write_geo(pfn, polydata_point)
                     # cause failure
                     raise SkipThisStepError(
                         "Inside already segmented vessel, stop here"
                     )
                     
-                elif is_point_in_image(assembly_segs.assembly, step_seg['point']): #+ step_seg['radius']*step_seg['tangent']):
+                elif is_point_in_image(assembly_segs.assembly,
+                                       step_seg['point']):  # + step_seg['radius']*step_seg['tangent']):
                     inside_branch += 1
                 else:
                     inside_branch = 0
@@ -182,30 +192,39 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             mag = 1
             perc = 1
             continue_enlarge = True
-            max_mag = 1.3 # stops when reaches this
+            max_mag = 1.3  # stops when reaches this
             add_mag = 0.2
             
-            if step_seg['radius'] > 3 *scale_unit: mag = max_mag # if above 3mm then dont change size
+            if step_seg['radius'] > 3 * scale_unit:
+                mag = max_mag  # if above 3mm then dont change size
             
             while perc > perc_enlarge and continue_enlarge:
                 if mag > 1 and mag < max_mag:
-                    print(f"Enlarging bounding box because percentage vessel > 0.33")
+                    print("""Enlarging bounding box because
+                           percentage vessel > 0.33""")
                 if mag >= max_mag:
-                    print(f"Keeping original size")
+                    print("Keeping original size")
                     mag = 1
                     continue_enlarge = False
                 # Extract Volume
-                size_extract, index_extract, border = map_to_image(  step_seg['point'],
-                                                                step_seg['radius']*mag,
-                                                                volume_size_ratio,
-                                                                origin_im,
-                                                                spacing_im,
-                                                                size_im,
-                                                                global_config['MIN_RES'])
+                (size_extract,
+                 index_extract,
+                 border) = map_to_image(step_seg['point'],
+                                        step_seg['radius']*mag,
+                                        volume_size_ratio,
+                                        origin_im,
+                                        spacing_im,
+                                        size_im,
+                                        global_config['MIN_RES'])
+                
                 step_seg['img_index'] = index_extract
                 step_seg['img_size'] = size_extract
-                cropped_volume = extract_volume(reader_im, index_extract, size_extract)
-                volume_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'.mha'
+                cropped_volume = extract_volume(reader_im,
+                                                index_extract,
+                                                size_extract)
+                
+                volume_fn = (output_folder +
+                             'volumes/volume_'+case+'_'+str(i)+'.mha')
 
                 step_seg['img_file'] = volume_fn
                 if write_samples:
@@ -213,17 +232,18 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     # if seg_file:
                     #     sitk.WriteImage(seg_volume, seg_fn)
                 if take_time:
-                    print("\n Extracting and writing volumes: " + str(time.time() - start_time_loc) + " s\n")
+                    print("\n Extracting and writing volumes: " +
+                          str(time.time() - start_time_loc) + " s\n")
                 if run_time:
-                    step_seg['time']=[]
+                    step_seg['time'] = []
                     step_seg['time'].append(time.time()-start_time_loc)
                     start_time_loc = time.time()
 
                 if not (seg_file and trace_seg):
                     # Prediction
-                    spacing = (spacing_im* scale).tolist()
+                    spacing = (spacing_im * scale).tolist()
                     spacing = spacing[::-1]
-                    props={}
+                    props = {}
                     props['spacing'] = spacing
                     img_np = sitk.GetArrayFromImage(cropped_volume)
                     img_np = img_np[None]
@@ -240,7 +260,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     #                                         None, 1, save_probabilities=False,
                     #                                         num_processes_segmentation_export=2)
                     start_time_pred = time.time()
-                    prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
+                    prediction = predictor.predict_single_npy_array(img_np,
+                                                                    props,
+                                                                    None,
+                                                                    None,
+                                                                    True)
                     print(f"""Prediction time:
                           {(time.time() - start_time_pred):.3f} s""")
 
@@ -254,10 +278,13 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 
                 else:
                     # Use the given segmentation
-                    pred_img = extract_volume(reader_seg, index_extract, size_extract)
+                    pred_img = extract_volume(reader_seg,
+                                              index_extract,
+                                              size_extract)
                     predicted_vessel = sitk.GetArrayFromImage(pred_img)
 
-                    # in this case, the probability is the same as the segmentation
+                    # in this case, the probability is the same
+                    # as the segmentation
                     prob_prediction = pred_img
                     # seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
                     
