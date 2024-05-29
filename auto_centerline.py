@@ -9,6 +9,7 @@ import SimpleITK as sitk
 from modules import sitk_functions as sf
 from modules import vtk_functions as vf
 from modules import initialization as init
+from modules.assembly import calc_global_centerline
 from modules.tracing import trace_centerline
 from modules.datasets import get_testing_samples
 from modules.params import load_yaml
