@@ -154,6 +154,10 @@ if __name__ == '__main__':
     for sample in testing_samples:
         print(sample)
 
+    # Choose testing samples
+    if args.stop == -1:
+        args.stop = len(testing_samples)
+
     for test_case in testing_samples[args.start: args.stop]:
 
         print(f'\n{test_case}\n')
