@@ -358,8 +358,8 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
 
-            sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'smooth.vtp'
-            cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'.vtp'
+            sfn = output_folder + 'surfaces/surf_'+case+'_'+str(i)+'smooth.vtp'
+            cfn = output_folder + 'centerlines/cent_'+case+'_'+str(i)+'.vtp'
 
             if write_samples:
                 write_vtk_polydata(surface_smooth, sfn)
@@ -385,14 +385,14 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             caps = calc_caps(surface_smooth)
 
             step_seg['caps'] = caps
-            sorted_targets , source_id = orient_caps(caps,
-                                                     step_seg['point'],
-                                                     old_point_ref,
-                                                     step_seg['tangent'])
+            sorted_targets, source_id = orient_caps(caps,
+                                                    step_seg['point'],
+                                                    old_point_ref,
+                                                    step_seg['tangent'])
             print(f"Source id: {source_id}")
 
             print('Number of caps: ', len(caps))
-            if len(caps) < 2 and i > 1 : 
+            if len(caps) < 2 and i > 1:
                 raise SkipThisStepError(
                     "Less than 2 caps, stop here"
                 )
@@ -403,29 +403,44 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # Centerline
             if not global_config['CENTERLINE_EXTRACTION_VMTK']:
-                print(f"Calculating centerline using FMM + Gradient Stepping")
+                print("Calculating centerline using FMM + Gradient Stepping")
                 # if first steps and only one cap, use point as source
                 if i <= 1 and len(caps) == 1:
                     seed = step_seg['point']
-                    targets = caps #[cap for ind, cap in enumerate(caps) if ind != source_id] #caps
+                    targets = caps  # [cap for ind, cap in enumerate(caps)
+                    #  if ind != source_id] #caps
                 # else use info from orientation
                 else:
                     source = source_id
                     seed = caps[source]
-                    targets = [cap for ind, cap in enumerate(caps) if ind != source]
+                    targets = [cap for ind, cap in enumerate(caps)
+                               if ind != source]
                 # calculate centerline
-                centerline_poly, success = calc_centerline_fmm(predicted_vessel, seed, targets, min_res=40)
+                (centerline_poly,
+                 success) = calc_centerline_fmm(predicted_vessel,
+                                                seed,
+                                                targets,
+                                                min_res=40)
                 
             else:
-                print(f"Calculating centerline using VMTK")
-                centerline_poly, success = calc_centerline_vmtk(surface_smooth, global_config, source_id, sorted_targets, i, caps, step_seg, length)
+                print("Calculating centerline using VMTK")
+                (centerline_poly,
+                 success) = calc_centerline_vmtk(surface_smooth,
+                                                 global_config,
+                                                 source_id,
+                                                 sorted_targets,
+                                                 i,
+                                                 caps,
+                                                 step_seg,
+                                                 length)
 
             if write_samples:
                 step_seg['cent_file'] = cfn
                 write_centerline(centerline_poly, cfn)
                 write_vtk_polydata(surface_smooth, sfn)
             if take_time:
-                print("\n Calc centerline: " + str(time.time() - start_time_loc) + " s\n")
+                print("\n Calc centerline: "
+                      + str(time.time() - start_time_loc) + " s\n")
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
@@ -442,25 +457,38 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # Assembly
             if use_buffer:
-                if len(vessel_tree.steps) % N == 0 and len(vessel_tree.steps) >= (N+buffer):
-                    for j in range(1,N+1):
-                        if vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel']:
-                            print(f"Adding step {-(j+buffer)} and number of steps are {len(vessel_tree.steps)}")
-                            assembly_segs.add_segmentation( vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'],
-                                                            vessel_tree.steps[-(j+buffer)]['img_index'],
-                                                            vessel_tree.steps[-(j+buffer)]['img_size'],
-                                                            (1/vessel_tree.steps[-(j+buffer)]['radius'])**2)
-                            vessel_tree.steps[-(j+buffer)]['prob_predicted_vessel'] = None
-                            vessel_tree.caps = vessel_tree.caps + vessel_tree.steps[-(j+buffer)]['caps']
+                if (len(vessel_tree.steps) % N == 0
+                   and len(vessel_tree.steps) >= (N+buffer)):
+
+                    for j in range(1, N+1):
+                        if (vessel_tree.steps[-(j+buffer)]
+                           ['prob_predicted_vessel']):
+                            print(f"""Adding step {-(j+buffer)} and number of
+                                  steps are {len(vessel_tree.steps)}""")
+                            assembly_segs.add_segmentation(
+                                (vessel_tree.steps[-(j+buffer)]
+                                 ['prob_predicted_vessel']),
+                                vessel_tree.steps[-(j+buffer)]['img_index'],
+                                vessel_tree.steps[-(j+buffer)]['img_size'],
+                                (1/vessel_tree.steps[-(j+buffer)]
+                                 ['radius'])**2
+                                 )
+                            (vessel_tree.steps[-(j+buffer)]
+                             ['prob_predicted_vessel']) = None
+                            vessel_tree.caps = (vessel_tree.caps
+                                                + vessel_tree.steps
+                                                [-(j+buffer)]['caps'])
+                    
                     if len(vessel_tree.steps) % (N*5) == 0 and write_samples:
-                            #sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.mha')
-                            assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=0.5, upperThreshold=1)
-                            # assembly = remove_other_vessels(assembly, initial_seed)
-                            surface_assembly = evaluate_surface(assembly, 1)
-                            write_vtk_polydata(surface_assembly, output_folder +'assembly/assembly_surface_'+case+'_'+str(i)+'.vtp')
+                        # sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.mha')
+                        assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=0.5, upperThreshold=1)
+                        # assembly = remove_other_vessels(assembly, initial_seed)
+                        surface_assembly = evaluate_surface(assembly, 1)
+                        write_vtk_polydata(surface_assembly, output_folder +'assembly/assembly_surface_'+case+'_'+str(i)+'.vtp')
 
                 if take_time:
-                        print("\n Adding to seg volume: " + str(time.time() - start_time_loc) + " s\n")
+                        print("\n Adding to seg volume: "
+                              + str(time.time() - start_time_loc) + " s\n")
                 if run_time:
                     step_seg['time'].append(time.time()-start_time_loc)
                     start_time_loc = time.time()
