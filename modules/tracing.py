@@ -260,12 +260,12 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
                     # Create probability prediction
                     prob_prediction = sitk.GetImageFromArray(prediction[1][1])
-                    
+
                     # Create segmentation prediction (binary)
                     predicted_vessel = prediction[0]
                     pred_img = sitk.GetImageFromArray(predicted_vessel)
                     pred_img = copy_settings(pred_img, cropped_volume)
-                
+
                 else:
                     # Use the given segmentation
                     pred_img = extract_volume(reader_seg,
@@ -277,7 +277,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     # as the segmentation
                     prob_prediction = pred_img
                     # seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
-                    
+
                 perc = predicted_vessel.mean()
                 print(f"Perc as 1: {perc:.3f}, mag: {mag}")
                 mag += add_mag
@@ -287,14 +287,15 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             step_seg['prob_predicted_vessel'] = prob_prediction
 
             seed = np.rint(np.array(size_extract)/2).astype(int).tolist()
-            
+
             predicted_vessel = remove_other_vessels(pred_img, seed)
 
-            #print("Now the components are: ")
-            #labels, means = connected_comp_info(predicted_vessel, True)
-            pd_fn = output_folder +'predictions/seg_'+case+'_'+str(i)+'.mha'
+            # print("Now the components are: ")
+            # labels, means = connected_comp_info(predicted_vessel, True)
+            pd_fn = output_folder + 'predictions/seg_'+case+'_'+str(i)+'.mha'
             if take_time:
-                print("\n Prediction, forward pass: " + str(time.time() - start_time_loc) + " s\n")
+                print("\n Prediction, forward pass: " +
+                      str(time.time() - start_time_loc) + " s\n")
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
@@ -302,10 +303,20 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                 sitk.WriteImage(predicted_vessel, pd_fn)
                 
             if global_config['MEGA_SUBVOLUME']:
-                predicted_vessel, cropped_volume = construct_subvolume(step_seg, vessel_tree, global_config['NR_MEGA_SUB'], i, inside_branch)
+                (predicted_vessel,
+                 cropped_volume) = construct_subvolume(step_seg,
+                                                       vessel_tree,
+                                                       global_config
+                                                       ['NR_MEGA_SUB'],
+                                                       i,
+                                                       inside_branch)
                 if write_samples:
-                    sitk.WriteImage(cropped_volume, volume_fn.replace('.mha', '_mega'+str(time.time())+'.mha'))
-                    sitk.WriteImage(predicted_vessel, pd_fn.replace('.mha', '_mega'+str(time.time())+'.mha'))
+                    sitk.WriteImage(cropped_volume,
+                                    volume_fn.replace('.mha', '_mega' +
+                                                      str(time.time())+'.mha'))
+                    sitk.WriteImage(predicted_vessel,
+                                    pd_fn.replace('.mha', '_mega' +
+                                                  str(time.time())+'.mha'))
 
             # Surface
 
@@ -316,20 +327,33 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
 
             # surface = evaluate_surface(predicted_vessel) # Marching cubes
 
-            surface = convert_seg_to_surfs(predicted_vessel, mega_sub = global_config['MEGA_SUBVOLUME'], ref_min_dims = size_extract)
+            surface = convert_seg_to_surfs(predicted_vessel,
+                                           mega_sub=global_config
+                                           ['MEGA_SUBVOLUME'],
+                                           ref_min_dims=size_extract)
 
-            num_iterations = get_smoothing_params(step_seg['radius'], scale_unit, mega_sub = global_config['MEGA_SUBVOLUME'], already_seg = trace_seg)
+            num_iterations = get_smoothing_params(step_seg['radius'],
+                                                  scale_unit,
+                                                  mega_sub=global_config
+                                                  ['MEGA_SUBVOLUME'],
+                                                  already_seg=trace_seg)
 
-            surface_smooth = smooth_surface(surface, smoothingIterations = num_iterations) # Smooth marching cubes
+            surface_smooth = smooth_surface(surface,
+                                            smoothingIterations=num_iterations
+                                            )  # Smooth marching cubes
 
             vtkimage = exportSitk2VTK(cropped_volume)
-            length = predicted_vessel.GetSize()[0]*predicted_vessel.GetSpacing()[0]
-            surface_smooth = bound_polydata_by_image(vtkimage[0], surface_smooth, length*1/40)
+            length = (predicted_vessel.GetSize()[0]
+                      * predicted_vessel.GetSpacing()[0])
+            surface_smooth = bound_polydata_by_image(vtkimage[0],
+                                                     surface_smooth,
+                                                     length*1/40)
 
             surface_smooth = get_largest_connected_polydata(surface_smooth)
 
             if take_time:
-                print("\n Calc and smooth surface: " + str(time.time() - start_time_loc) + " s\n")
+                print("\n Calc and smooth surface: "
+                      + str(time.time() - start_time_loc) + " s\n")
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
@@ -346,17 +370,25 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
             step_seg['surf_file'] = sfn
             step_seg['surface'] = surface_smooth
 
-            old_point_ref = get_old_ref_point(vessel_tree, step_seg, i, global_config['MEGA_SUBVOLUME'], global_config['NR_MEGA_SUB'])
+            old_point_ref = get_old_ref_point(vessel_tree,
+                                              step_seg,
+                                              i,
+                                              global_config['MEGA_SUBVOLUME'],
+                                              global_config['NR_MEGA_SUB'])
             step_seg['old_point_ref'] = old_point_ref
             if write_samples:
                 polydata_point = points2polydata([old_point_ref.tolist()])
-                pfn = output_folder + 'points/point_'+case+'_'+str(i)+'_ref.vtp'
+                pfn = (output_folder + 'points/point_'
+                       + case + '_'+str(i)+'_ref.vtp')
                 write_geo(pfn, polydata_point)
                 
             caps = calc_caps(surface_smooth)
 
             step_seg['caps'] = caps
-            sorted_targets , source_id = orient_caps(caps, step_seg['point'], old_point_ref, step_seg['tangent'])
+            sorted_targets , source_id = orient_caps(caps,
+                                                     step_seg['point'],
+                                                     old_point_ref,
+                                                     step_seg['tangent'])
             print(f"Source id: {source_id}")
 
             print('Number of caps: ', len(caps))
