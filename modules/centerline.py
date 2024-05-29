@@ -1403,7 +1403,7 @@ def get_neighbors(index, cluster_map_shape):
             neighbor[i] += j
             if neighbor[i] >= 0 and neighbor[i] < cluster_map_shape[i]:
                 neighbors.append(neighbor)
-    print(f"Neighbors: {neighbors}")
+    # print(f"Neighbors: {neighbors}")
     return neighbors
 
 
