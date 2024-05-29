@@ -184,9 +184,6 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min
 
     return size_extract.tolist(), index_extract.tolist(), border
 
-def rotate_volume():
-    "TODO: write function"
-    return rotated_voi
 
 def import_image(image_dir):
     """
