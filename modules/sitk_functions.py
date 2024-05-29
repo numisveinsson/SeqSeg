@@ -146,6 +146,12 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min
     """
     Function to map a point and radius to volume metrics
     Also checks if sub-volume is within global
+
+    Note: only corrects if less than (1/3) of the subvolume
+    is outside the global volume. This can be changed
+    -> less means it will fail sooner when approaching the
+    global volume border
+
     args:
         point: point of volume center
         radius: radius at that point
@@ -170,13 +176,13 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im, size_im, min
 
     end_bounds = index_extract+size_extract
 
-    for i, ind in enumerate(np.logical_and(end_bounds > size_im,(end_bounds- size_im) < 1/2*size_extract )):
+    for i, ind in enumerate(np.logical_and(end_bounds > size_im,(end_bounds- size_im) < 1/3*size_extract )):
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             size_extract[i] = size_im[i] - index_extract[i]
             border = True
 
-    for i, ind in enumerate(np.logical_and(index_extract < np.zeros(3),(np.zeros(3)-index_extract) < 1/2*size_extract )):
+    for i, ind in enumerate(np.logical_and(index_extract < np.zeros(3),(np.zeros(3)-index_extract) < 1/3*size_extract )):
         if ind:
             print('\nsub-volume outside global volume, correcting\n')
             index_extract[i] = 0
