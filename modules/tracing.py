@@ -239,9 +239,11 @@ def trace_centerline(output_folder, image_file, case, model_folder, fold,
                     #                                         [props],
                     #                                         None, 1, save_probabilities=False,
                     #                                         num_processes_segmentation_export=2)
-                    
+                    start_time_pred = time.time()
                     prediction = predictor.predict_single_npy_array(img_np, props, None, None, True)
-                    
+                    print(f"""Prediction time:
+                          {(time.time() - start_time_pred):.3f} s""")
+
                     # Create probability prediction
                     prob_prediction = sitk.GetImageFromArray(prediction[1][1])
                     
