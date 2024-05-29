@@ -14,16 +14,16 @@ RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
 TREE_ANALYSIS: True
 
-VOLUME_SIZE_RATIO: 5 # default 5, 5.5 for coronaries, 4 for segs
+VOLUME_SIZE_RATIO: 5.5 # default 5, 5.5 for coronaries, 4 for segs
 MAGN_RADIUS: 1
-MAX_PERC_ENLARGE: 0.5 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
+MAX_PERC_ENLARGE: 0.33 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
 MIN_RADIUS: 0.3 # mm (keep in mm)
-MIN_RES: 6
+MIN_RES: 5
 CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
 TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 2
-NR_ALLOW_RETRACE_STEPS: 5
+NR_ALLOW_RETRACE_STEPS: 10
 PREVENT_RETRACE: True
 SORT_NEXT: True
 MERGE_NEXT: False
@@ -42,6 +42,6 @@ NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
 
 STOP_PRE: True # whether to stop tracing prematurely, if True then options below will be used
 STOP_RADIUS: 0.46 # (mm) 0.48 if radius goes below, stop tracing
-MAX_STEPS_BRANCH: 1000 # max num of steps per branch, stop when reached
+MAX_STEPS_BRANCH: 100 # max num of steps per branch, stop when reached
 
 RESTART_BRANCH: False
