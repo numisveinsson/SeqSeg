@@ -1,5 +1,6 @@
 import pdb
 from .sitk_functions import *
+from .centerline import calc_centerline_fmm
 from .vtk_functions import is_point_in_image, write_vtk_polydata, points2polydata
 import numpy as np
 import SimpleITK as sitk
@@ -740,3 +741,10 @@ def get_old_ref_point(vessel_tree, step_seg, i, mega_sub = False, mega_sub_N = 0
         old_point_ref = step['old point']
 
     return old_point_ref
+
+def calc_centerline_global(predicted_vessels, initial_seeds):
+    """
+    Function to loop over inital seeds and construct global centerline(s)
+    """
+
+    calc_centerline_fmm(predicted_vessels, seed, targets, min_res=40)
