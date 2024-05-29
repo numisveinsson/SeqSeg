@@ -1044,7 +1044,7 @@ def backtracking_gradient(gradient, distance_map_surf_np, seg_img, seed, target)
     # print(f"Tolerance: {tol}")
 
     # Backtrack until we reach the seed point
-    while np.linalg.norm(current - seed) > tol/2 and len(points) < max_number_points:
+    while np.linalg.norm(current - seed) > tol/1 and len(points) < max_number_points:
         # print(f"Current: {current}, Seed: {seed}, Dist between: {np.linalg.norm(current - seed)}")
         # print(f"Seg value at current: {seg_img[current_index]}")
         # Get gradient at current point
