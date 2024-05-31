@@ -1,7 +1,6 @@
-import pdb
 from .sitk_functions import *
 from .centerline import calc_centerline_fmm
-from .vtk_functions import is_point_in_image, write_vtk_polydata, points2polydata
+from .vtk_functions import is_point_in_image, write_vtk_polydata, points2polydata, appendPolyData
 import numpy as np
 import SimpleITK as sitk
 import operator
@@ -9,6 +8,7 @@ import time
 from datetime import datetime
 import sys
 sys.stdout.flush()
+
 
 class Segmentation:
     """
@@ -76,7 +76,6 @@ class Segmentation:
         # Isolate current subvolume of interest
         curr_sub_section = np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]]
         np_arr_add = np_arr_add[cut:size_extract[2]-cut, cut:size_extract[1]-cut, cut:size_extract[0]-cut]
-        # import pdb; pdb.set_trace()
         # Find indexes where we need to average predictions
         ind = curr_n > 0
         # Where this is the first update, copy directly
@@ -129,13 +128,11 @@ class Segmentation:
         "Function to create a global image mask of areas that were segmented"
         mask = (self.number_updates > 0).astype(int)
         mask = numpy_to_sitk(mask,self.image_reader)
-        # import pdb; pdb.set_trace()
         self.mask = mask
 
         return mask
     def upsample(self, template_size=[1000,1000,1000]):
         from .prediction import centering
-        import pdb; pdb.set_trace()
         or_im = sitk.GetImageFromArray(self.assembly)
         or_im.SetSpacing(self.image_resampled.GetSpacing())
         or_im.SetOrigin(self.image_resampled.GetOrigin())
@@ -144,7 +141,6 @@ class Segmentation:
         target_im.SetSize(template_size)
         new_spacing = (np.array(or_im.GetSize())*np.array(or_im.GetSpacing()))/np.array(template_size)
         target_im.SetSpacing(new_spacing)
-        import pdb; pdb.set_trace()
 
         resampled = centering(or_im, target_im, order=0)
         return resampled
@@ -717,6 +713,7 @@ def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=
 
     return step_dict
 
+
 def get_old_ref_point(vessel_tree, step_seg, i, mega_sub = False, mega_sub_N = 0):
 
     if not mega_sub:
@@ -742,9 +739,32 @@ def get_old_ref_point(vessel_tree, step_seg, i, mega_sub = False, mega_sub_N = 0
 
     return old_point_ref
 
+
 def calc_centerline_global(predicted_vessels, initial_seeds):
     """
     Function to loop over inital seeds and construct global centerline(s)
-    """
 
-    calc_centerline_fmm(predicted_vessels, seed, targets, min_res=40)
+    Targets are not defined here, but in the calc_centerline_fmm function
+
+    Parameters:
+    -----------
+        predicted_vessels: SITK image
+            the predicted vessel segmentation
+        initial_seeds: list of np arrays
+            the initial seeds for the global centerline
+    """
+    print(f"""Calculating global centerline
+          with {len(initial_seeds)} initial seeds""")
+    # create a list for centerline polydata
+    centerline_poly = []
+    # loop over the initial seeds
+    for seed in initial_seeds:
+        # keep the component with the seed
+        predicted_vessel = keep_component_seeds(predicted_vessels, [seed])
+        # calculate the centerline
+        centerline_poly.append(calc_centerline_fmm(predicted_vessel, seed))
+
+    # append the centerline polydata list to a single polydata
+    centerline_poly = appendPolyData(centerline_poly)
+
+    return centerline_poly

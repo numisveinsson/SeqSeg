@@ -273,6 +273,14 @@ if __name__ == '__main__':
         vf.write_vtk_polydata(final_points,     dir_output+'/final_'+case+'_'
                               + test_name + '_'+str(i)+'_'+str(n_steps_taken)
                               + '_points.vtp')
+        if calc_global_centerline:
+            # Calculate global centerline
+            global_centerline = calc_centerline_global(assembly_binary,
+                                                       initial_seeds)
+            vf.write_vtk_polydata(global_centerline, dir_output+'/final_'
+                                  + case + '_' + test_name + '_'+str(i)+'_'
+                                  + str(n_steps_taken)
+                                  + '_global_centerline.vtp')
 
         if global_config['PREVENT_RETRACE']:
             final_inside_pts = vf.appendPolyData(inside_pts)
