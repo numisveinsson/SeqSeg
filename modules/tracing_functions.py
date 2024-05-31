@@ -1,12 +1,17 @@
 import sys
-sys.stdout.flush()
 import numpy as np
-from .vtk_functions import collect_arrays, get_points_cells, exportSitk2VTK, vtkImageResample, vtk_marching_cube, appendPolyData, bound_polydata_by_image, read_geo
+from .vtk_functions import (collect_arrays, get_points_cells, exportSitk2VTK,
+                            vtkImageResample, vtk_marching_cube,
+                            appendPolyData, bound_polydata_by_image, read_geo)
 from vtk.util.numpy_support import numpy_to_vtk as n2v
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 
+
+sys.stdout.flush()
+
+
 def get_smoothing_params(radius, scale_unit, mega_sub = False, already_seg = False):
-    
+
     if not mega_sub:
         if not already_seg:
             num_iterations = 6
@@ -30,8 +35,10 @@ def get_smoothing_params(radius, scale_unit, mega_sub = False, already_seg = Fal
 
     return num_iterations
 
+
 class SkipThisStepError(Exception):
     pass
+
 
 def get_next_points(centerline_poly, current_point, old_point, old_radius, post_proc = False, magn_radius = 1, min_radius = 0, mega_sub = False):
     """
