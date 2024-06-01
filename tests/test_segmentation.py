@@ -1,5 +1,5 @@
-import sys
 import os
+
 if __name__ == '__main__':
     """
     Test SeqSeg on a case of already segmented data
