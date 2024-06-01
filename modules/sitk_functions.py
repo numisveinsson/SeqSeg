@@ -340,3 +340,17 @@ def check_seg_border(size_extract, index_extract,
             break
 
     return border
+
+
+def is_point_in_image(assembly_image, location):
+
+    index = assembly_image.TransformPhysicalPointToIndex(location.tolist())
+
+    try:
+        vessel_value = assembly_image[index]
+        #print("Vessel value is: " + str(vessel_value))
+        is_inside = vessel_value > 0.5
+    except:
+        is_inside = False
+
+    return is_inside

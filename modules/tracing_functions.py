@@ -324,6 +324,7 @@ def sort_centerline(centerline):
     
     return num_points, c_loc, radii, cent_ids, bifurc_id, num_cent
 
+
 def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,1.,1.], mega_sub = False, ref_min_dims = None):
     
     import SimpleITK as sitk
@@ -375,41 +376,42 @@ def convert_seg_to_surfs(seg, target_node_num=100, bound=False, new_spacing=[1.,
         poly = bound_polydata_by_image(seg_vtk, poly, 1.5)
     return poly
 
-    def calc_centerline_vmtk(surface_smooth, global_config, source_id, sorted_targets, i, caps, step_seg, length):
 
-        centerline_poly = calc_centerline(  surface_smooth,
-                                        global_config['TYPE_CENT'],
-                                        var_source=[source_id],
-                                        var_target = sorted_targets,
-                                        number = i,
-                                        caps = caps,
-                                        point = step_seg['point'])
+def calc_centerline_vmtk(surface_smooth, global_config, source_id, sorted_targets, i, caps, step_seg, length):
 
-        centerline_poly = resample_centerline(centerline_poly)
-        # if write_samples:
-        #     write_centerline(centerline_poly, cfn.replace('.vtp', 'resampled.vtp'))
-        centerline_poly = smooth_centerline(centerline_poly)
-        # if write_samples:
-        #     write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
+    centerline_poly = calc_centerline(  surface_smooth,
+                                    global_config['TYPE_CENT'],
+                                    var_source=[source_id],
+                                    var_target = sorted_targets,
+                                    number = i,
+                                    caps = caps,
+                                    point = step_seg['point'])
 
-        if not centerline_poly or centerline_poly.GetNumberOfPoints() < 5:
-            print("\n Attempting with more smoothing \n")
-            surface_smooth1 = smooth_surface(surface, 15)
-            surface_smooth1 = bound_polydata_by_image(vtkimage[0], surface_smooth1, length*1/40)
-            centerline_poly1 = calc_centerline(surface_smooth1,
-                                                global_config['TYPE_CENT'],
-                                                var_source=[source_id],
-                                                var_target = sorted_targets,
-                                                number = i,
-                                                caps = caps,
-                                                point = step_seg['point'])
-            if centerline_poly1.GetNumberOfPoints() > 5:
-                sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_1.vtp'
-                surface_smooth = surface_smooth1
-                cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_1.vtp'
-                centerline_poly = centerline_poly1
-                success = True
-            else: success = False
-        else: success = True
+    centerline_poly = resample_centerline(centerline_poly)
+    # if write_samples:
+    #     write_centerline(centerline_poly, cfn.replace('.vtp', 'resampled.vtp'))
+    centerline_poly = smooth_centerline(centerline_poly)
+    # if write_samples:
+    #     write_centerline(centerline_poly, cfn.replace('.vtp', 'smooth.vtp'))
 
-        return centerline_poly, success
+    if not centerline_poly or centerline_poly.GetNumberOfPoints() < 5:
+        print("\n Attempting with more smoothing \n")
+        surface_smooth1 = smooth_surface(surface, 15)
+        surface_smooth1 = bound_polydata_by_image(vtkimage[0], surface_smooth1, length*1/40)
+        centerline_poly1 = calc_centerline(surface_smooth1,
+                                            global_config['TYPE_CENT'],
+                                            var_source=[source_id],
+                                            var_target = sorted_targets,
+                                            number = i,
+                                            caps = caps,
+                                            point = step_seg['point'])
+        if centerline_poly1.GetNumberOfPoints() > 5:
+            sfn = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_1.vtp'
+            surface_smooth = surface_smooth1
+            cfn = output_folder +'centerlines/cent_'+case+'_'+str(i)+'_1.vtp'
+            centerline_poly = centerline_poly1
+            success = True
+        else: success = False
+    else: success = True
+
+    return centerline_poly, success

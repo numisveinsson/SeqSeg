@@ -3,13 +3,26 @@ import pdb
 import numpy as np
 import SimpleITK as sitk
 
-from .sitk_functions import *
-from .vtk_functions import *
-from .vmtk_functions import *
+from .sitk_functions import (import_image, is_point_in_image,
+                             map_to_image, extract_volume, copy_settings,
+                             remove_other_vessels, check_seg_border)
+
+from .vtk_functions import (points2polydata, write_geo, smooth_surface,
+                            exportSitk2VTK, bound_polydata_by_image,
+                            get_largest_connected_polydata, write_vtk_polydata,
+                            calc_caps, evaluate_surface, appendPolyData)
+
+from .vmtk_functions import write_centerline
+
 from .assembly import (Segmentation, VesselTree, print_error,
                        create_step_dict, get_old_ref_point)
+
 from .local_assembly import construct_subvolume
-from .tracing_functions import *
+
+from .tracing_functions import (SkipThisStepError, convert_seg_to_surfs,
+                                get_smoothing_params, orient_caps,
+                                calc_centerline_vmtk, get_next_points)
+
 from .centerline import calc_centerline_fmm
 
 
@@ -177,20 +190,24 @@ def trace_centerline(
                     if write_samples:
                         polydata_point = points2polydata(
                                          [step_seg['point'].tolist()])
-                        pfn = (output_folder + 
+                        pfn = (output_folder +
                                'points/inside_point_'+case+'_'+str(i)+'.vtp')
                         write_geo(pfn, polydata_point)
+
                     # cause failure
                     raise SkipThisStepError(
                         "Inside already segmented vessel, stop here"
                     )
-                    
+
                 elif is_point_in_image(assembly_segs.assembly,
-                                       step_seg['point']):  # + step_seg['radius']*step_seg['tangent']):
+                                       step_seg['point']
+                                       # + step_seg['radius']
+                                       # * step_seg['tangent']
+                                       ):
                     inside_branch += 1
                 else:
                     inside_branch = 0
-            #print('\n The inside branch is ', inside_branch)
+            # print('\n The inside branch is ', inside_branch)
 
             # Point
             polydata_point = points2polydata([step_seg['point'].tolist()])
@@ -286,7 +303,9 @@ def trace_centerline(
                     # in this case, the probability is the same
                     # as the segmentation
                     prob_prediction = pred_img
-                    # seg_fn = output_folder +'volumes/volume_'+case+'_'+str(i)+'_truth.mha'
+                    # seg_fn = (output_folder
+                    #           + 'volumes/volume_'+case+'_'
+                    #           + str(i)+'_truth.mha')
 
                 perc = predicted_vessel.mean()
                 print(f"Perc as 1: {perc:.3f}, mag: {mag}")
@@ -373,7 +392,8 @@ def trace_centerline(
 
             if write_samples:
                 write_vtk_polydata(surface_smooth, sfn)
-                # sfn_un = output_folder +'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp'
+                # sfn_un = (output_folder
+                #           + 'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp')
                 # write_vtk_polydata(surface, sfn_un)
 
             step_seg['seg_file'] = pd_fn
@@ -391,7 +411,7 @@ def trace_centerline(
                 pfn = (output_folder + 'points/point_'
                        + case + '_'+str(i)+'_ref.vtp')
                 write_geo(pfn, polydata_point)
-                
+
             caps = calc_caps(surface_smooth)
 
             step_seg['caps'] = caps
@@ -446,7 +466,8 @@ def trace_centerline(
 
             if write_samples:
                 step_seg['cent_file'] = cfn
-                write_centerline(centerline_poly, cfn)
+                # write_centerline(centerline_poly, cfn)
+                write_vtk_polydata(centerline_poly, cfn)
                 write_vtk_polydata(surface_smooth, sfn)
             if take_time:
                 print("\n Calc centerline: "
@@ -496,18 +517,26 @@ def trace_centerline(
                         assembly = sitk.BinaryThreshold(assembly_segs.assembly,
                                                         lowerThreshold=0.5,
                                                         upperThreshold=1)
-                        # assembly = remove_other_vessels(assembly, initial_seed)
+                        # assembly = remove_other_vessels(assembly,
+                        #                                 initial_seed)
                         surface_assembly = evaluate_surface(assembly, 1)
-                        write_vtk_polydata(surface_assembly, output_folder +'assembly/assembly_surface_'+case+'_'+str(i)+'.vtp')
+                        write_vtk_polydata(surface_assembly,
+                                           output_folder
+                                           + 'assembly/assembly_surface_'+case
+                                           + '_'+str(i)+'.vtp')
 
                 if take_time:
-                        print("\n Adding to seg volume: "
-                              + str(time.time() - start_time_loc) + " s\n")
+                    print("\n Adding to seg volume: "
+                          + str(time.time() - start_time_loc) + " s\n")
                 if run_time:
                     step_seg['time'].append(time.time()-start_time_loc)
                     start_time_loc = time.time()
             else:
-                assembly_segs.add_segmentation(step_seg['prob_predicted_vessel'], step_seg['img_index'], step_seg['img_size'], step_seg['radius'])
+                assembly_segs.add_segmentation(
+                    step_seg['prob_predicted_vessel'],
+                    step_seg['img_index'],
+                    step_seg['img_size'],
+                    step_seg['radius'])
                 step_seg['prob_predicted_vessel'] = None
 
             # Print polydata surfaces,cents together for animation
@@ -517,7 +546,7 @@ def trace_centerline(
                 surfaces_animation.append(surface_smooth)
                 cent_animation.append(centerline_poly)
 
-                if i % animation_steps == 0: # only write out every 10 steps
+                if i % animation_steps == 0:  # only write out every 10 steps
                     # Create single polydata
                     surface_accum = appendPolyData(surfaces_animation)
                     cent_accum = appendPolyData(cent_animation)

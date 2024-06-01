@@ -792,18 +792,6 @@ def get_largest_connected_polydata(poly):
 
     return poly
 
-def is_point_in_image(assembly_image, location):
-
-    index = assembly_image.TransformPhysicalPointToIndex(location.tolist())
-
-    try:
-        vessel_value = assembly_image[index]
-        #print("Vessel value is: " + str(vessel_value))
-        is_inside = vessel_value > 0.5
-    except:
-        is_inside = False
-
-    return is_inside
 
 def is_point_in_surface(surface, point):
     """
