@@ -12,7 +12,7 @@ from .vtk_functions import (points2polydata, write_geo, smooth_surface,
                             get_largest_connected_polydata, write_vtk_polydata,
                             calc_caps, evaluate_surface, appendPolyData)
 
-from .vmtk_functions import write_centerline
+# from .vmtk_functions import write_centerline
 
 from .assembly import (Segmentation, VesselTree, print_error,
                        create_step_dict, get_old_ref_point)
