@@ -1,4 +1,3 @@
-
 # TODO: Implement centerline calculation using pathfinding and exploration
 import sys
 import os
@@ -14,7 +13,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 
-def calculate_centerline(segmentation, surface, caps, initial_radius=1):
+def calculate_centerline(segmentation, caps, initial_radius=1):
     """
     Function to calculate the centerline of a segmentation
     using pathfinding and exploration to connect caps of the surface.
@@ -23,8 +22,6 @@ def calculate_centerline(segmentation, surface, caps, initial_radius=1):
     ----------
     segmentation : sitk image
         Segmentation of the vessel.
-    surface : vtkPolyData
-        Surface mesh of the vessel.
     caps : list of np.array
         List of np.array with the coordinates of the caps of the surface mesh.
         Assume first cap is the inlet and the rest are outlets.
@@ -39,7 +36,7 @@ def calculate_centerline(segmentation, surface, caps, initial_radius=1):
     targets = caps[1:]
 
     # Calculate centerline by connecting caps
-    path = pathfinding(segmentation, surface, source, targets, initial_radius)
+    path = pathfinding(segmentation, source, targets, initial_radius)
 
     return path
 
@@ -195,7 +192,7 @@ def find_first_branch(segmentation, distance_map, explored,
     return points, explored, targets
 
 
-def pathfinding(segmentation, surface, source, targets, radius):
+def pathfinding(segmentation, source, targets, radius):
     """
     Function to calculate the path between two points on a surface mesh.
 
@@ -203,8 +200,6 @@ def pathfinding(segmentation, surface, source, targets, radius):
     ----------
     segmentation : sitk image
         Segmentation of the vessel.
-    surface : vtkPolyData
-        Surface mesh of the vessel.
     source : np.array
         Coordinates of the source point.
     target : list of np.array
@@ -234,7 +229,7 @@ def pathfinding(segmentation, surface, source, targets, radius):
     path.SetLines(lines)
     radii = vtk.vtkDoubleArray()
     radii.SetName("Radius")
-    
+
     # Initialize path
     current = source         # Current point
     current_radius = radius  # Current radius
@@ -315,7 +310,8 @@ def reached_target(current, target, radius):
 
 def reached_targets(current, targets, radius):
     """
-    Function to check if the current point is close enough to any of the target points.
+    Function to check if the current point is close enough
+    to any of the target points.
 
     Parameters
     ----------
@@ -380,7 +376,8 @@ def get_candidates_branches(points_list, current_radius, degrees=30):
     Here we already have a list of points and we want to explore the branches
     diverging from these points.
 
-    For each point we calculate the tangent between the current point and the next point
+    For each point we calculate the tangent between the current point
+    and the next point
     and calculate the candidates in the plane perpendicular to the tangent.
 
     The candidates are x number of degrees apart.
@@ -483,10 +480,10 @@ def initialize_seeds_random(segmentation, num_points=10):
     # Get physical size of the segmentation
     size = segmentation.GetSize()
     print(f"Size: {size}")
-    spacing = segmentation.GetSpacing()
-    origin = segmentation.GetOrigin()
-    bounds_min = np.array(segmentation.TransformIndexToPhysicalPoint([0, 0, 0]))
-    bounds_max = np.array(segmentation.TransformIndexToPhysicalPoint(size))
+    bounds_min = np.array(segmentation
+                          .TransformIndexToPhysicalPoint([0, 0, 0]))
+    bounds_max = np.array(segmentation
+                          .TransformIndexToPhysicalPoint(size))
 
     # Initialize seed points randomly
     seeds = []
@@ -494,7 +491,9 @@ def initialize_seeds_random(segmentation, num_points=10):
         point = np.random.uniform(bounds_min, bounds_max).tolist()
         index = segmentation.TransformPhysicalPointToIndex(point)
         # print(f"Index: {index}")
-        if index[0] > 0 and index[1] > 0 and index[2] > 0 and index[0] < size[0] and index[1] < size[1] and index[2] < size[2]:
+        if (index[0] > 0 and index[1] > 0
+           and index[2] > 0 and index[0] < size[0]
+           and index[1] < size[1] and index[2] < size[2]):
             if segmentation[index] > 0:
                 seeds.append(np.array(point))
 
@@ -503,7 +502,8 @@ def initialize_seeds_random(segmentation, num_points=10):
 
 def initialize_seeds_pixels(segmentation, every=1, value=0, negative=False):
     """
-    Function to initialize seed points at the center of the pixels of the segmentation.
+    Function to initialize seed points at the center of
+    the pixels of the segmentation.
 
     Parameters
     ----------
@@ -514,20 +514,21 @@ def initialize_seeds_pixels(segmentation, every=1, value=0, negative=False):
     -------
     seeds : list of np.array
     """
-    # Get physical size of the segmentation
-    size = segmentation.GetSize()
-    spacing = segmentation.GetSpacing()
-    origin = segmentation.GetOrigin()
-    physical_size = np.array(size) * np.array(spacing) + np.array(origin)
 
     # Initialize seed points at the center of the pixels
     # Get locations of all non-zero values in segmentation
     if not negative:
-        locations = np.argwhere(sitk.GetArrayFromImage(segmentation).transpose(2, 1, 0) > value) # N x 3 array of indices
+        # N x 3 array of indices
+        locations = np.argwhere(sitk.GetArrayFromImage(segmentation)
+                                .transpose(2, 1, 0) > value)
     else:
-        locations = np.argwhere(sitk.GetArrayFromImage(segmentation).transpose(2, 1, 0) < value) # N x 3 array of indices
+        # N x 3 array of indices
+        locations = np.argwhere(sitk.GetArrayFromImage(segmentation)
+                                .transpose(2, 1, 0) < value)
     # Use filter to get the physical coordinates of the non-zero values
-    physical_locations = np.array([np.array(segmentation.TransformIndexToPhysicalPoint(location.tolist())) for location in locations]) # N x 3 array of physical coordinates
+    physical_locations = np.array([np.array(
+        segmentation.TransformIndexToPhysicalPoint(location.tolist()))
+        for location in locations])  # N x 3 array of physical coordinates
 
     # keep every nth point
     physical_locations = physical_locations[::every]
@@ -551,8 +552,10 @@ def frangi_filter(input_image):
     # Set the parameters for the objectness measure
     sigmas = [0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 40]
 
-    # Set the parameters for the objectness measure according to specific input, 
-    # for example the vessels in the fundus image are dark, so brightObject=False
+    # Set the parameters for the objectness measure
+    # according to specific input,
+    # for example the vessels in the fundus image are dark,
+    # so brightObject=False
     images = [
         sitk.ObjectnessMeasure(
             sitk.SmoothingRecursiveGaussian(input_image, s),
@@ -561,8 +564,8 @@ def frangi_filter(input_image):
             gamma=5.0,
             scaleObjectnessMeasure=True,  # changed from default value
             objectDimension=1,
-            brightObject=True, # changed from default value
-        )  
+            brightObject=True,  # changed from default value
+        )
         for s in sigmas
     ]
     # # change data type to float32
@@ -581,7 +584,8 @@ def gradient_matrix(x):
        - x : ndarray
     Returns:
        an array of shape (x.ndim,) + x.shape
-       where the array[i, ...] corresponds to the gradient of x along the ith dimension.
+       where the array[i, ...] corresponds to the gradient of
+       x along the ith dimension.
     """
     gradients = np.gradient(x)
     gradients = np.array(gradients)[:, :, :]
@@ -597,14 +601,14 @@ def hessian_matrix(x):
        an array of shape (x.dim, x.ndim) + x.shape
        where the array[i, j, ...] corresponds to the second derivative x_ij
     """
-    x_grad = np.gradient(x) 
-    hessian = np.empty((x.ndim, x.ndim) + x.shape, dtype=x.dtype) 
+    x_grad = np.gradient(x)
+    hessian = np.empty((x.ndim, x.ndim) + x.shape, dtype=x.dtype)
     for k, grad_k in enumerate(x_grad):
         # iterate over dimensions
         # apply gradient again to every component of the first derivative.
-        tmp_grad = np.gradient(grad_k) 
-        for l, grad_kl in enumerate(tmp_grad):
-            hessian[k, l, :, :] = grad_kl
+        tmp_grad = np.gradient(grad_k)
+        for lim, grad_kl in enumerate(tmp_grad):
+            hessian[k, lim, :, :] = grad_kl
     # make x_grad same shape as hessian
     x_grad = np.array(x_grad)[:, :, :]
     return hessian, x_grad
@@ -629,9 +633,11 @@ def calculate_principal_direction(matrix):
     # print(f"Condition number: {np.linalg.cond(matrix)}")
     # Get index of maximum eigenvalue
     max_index = np.argmin(eigenvalues)
-    # print(f"Max Eig: {eigenvalues[max_index]:.4f}, Min Eig: {eigenvalues.min():.4f}")
+    # print(f"Max Eig: {eigenvalues[max_index]:.4f},
+    # Min Eig: {eigenvalues.min():.4f}")
     # Get principal direction
-    principal_direction = eigenvectors[max_index] / np.linalg.norm(eigenvectors[max_index])
+    principal_direction = (eigenvectors[max_index] /
+                           np.linalg.norm(eigenvectors[max_index]))
 
     return principal_direction
 
@@ -652,21 +658,22 @@ def calc_inner_gradient_principal_direction(gradient_vector, hessian_matrix):
     inner_gradient : np.array
     """
     eigenvalues, eigenvectors = np.linalg.eig(hessian_matrix)
-
-    
+    # Normalize eigenvectors
     for i in range(len(eigenvalues)):
         eigenvectors[i] = eigenvectors[i] / np.linalg.norm(eigenvectors[i])
 
-    inner = np.dot(gradient_vector/np.linalg.norm(gradient_vector), eigenvectors)
+    inner = np.dot(gradient_vector/np.linalg.norm(gradient_vector),
+                   eigenvectors)
 
     return inner, eigenvalues
 
 
-def take_steps_gradient(distance_map_np, seeds, seg_img, tol=1e-2, max_iter=100, step_size=0.5):
+def take_steps_gradient(distance_map_np, seeds, seg_img, tol=1e-2,
+                        max_iter=100, step_size=0.5):
     """
     Function to take steps in the direction of the gradient at the seed points.
-    We calculate the principal direction of the gradient and move the seed points
-    in that direction. This is repeated until convergence.
+    We calculate the principal direction of the gradient and move the
+    seed points in that direction. This is repeated until convergence.
 
     We use the Hessian to calculate the curvature of the distance map.
     Then we take steps in the direction where the curvature is the highest.
@@ -694,7 +701,6 @@ def take_steps_gradient(distance_map_np, seeds, seg_img, tol=1e-2, max_iter=100,
     # Get spacings and origin
     spacings = np.array(seg_img.GetSpacing())
     print(f"Spacings: {spacings}")
-    origin = np.array(seg_img.GetOrigin())
 
     # Calculate bounds of the distance map
     bounds_min = seg_img.TransformIndexToPhysicalPoint([0, 0, 0])
@@ -705,38 +711,47 @@ def take_steps_gradient(distance_map_np, seeds, seg_img, tol=1e-2, max_iter=100,
     current_seeds = seeds
     from modules.vtk_functions import points2polydata, write_geo
     polydata_point = points2polydata(current_seeds)
-    pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/', 'initial_seeds.vtp')
+    pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/',
+                       'initial_seeds.vtp')
     write_geo(pfn, polydata_point)
 
     # Calculate hessian of distance map
-    hessian, gradient = hessian_matrix(distance_map_np) # Hessian of distance map
+    hessian, gradient = hessian_matrix(distance_map_np)
 
     # Get hessian around seed points
     hessian_seeds = []
     gradient_seeds = []
     for seed in current_seeds:
-        index = np.array(seg_img.TransformPhysicalPointToIndex(seed)).astype(int)
+        index = np.array(seg_img
+                         .TransformPhysicalPointToIndex(seed)).astype(int)
         hessian_seeds.append(hessian[:, :, index[0], index[1], index[2]])
         gradient_seeds.append(gradient[:, index[0], index[1], index[2]])
-    
+
     # Calculate principal direction of hessian
-    principal_directions = [calculate_principal_direction(hessian_seed) for hessian_seed in hessian_seeds]
+    principal_directions = [calculate_principal_direction(hessian_seed)
+                            for hessian_seed in hessian_seeds]
 
     # Take steps in the direction of the principal direction
     for i in range(max_iter):
         new_seeds = []
         for j, seed in enumerate(current_seeds):
-            inners, eigs = calc_inner_gradient_principal_direction(gradient_seeds[j], hessian_seeds[j])
+            inners, eigs = calc_inner_gradient_principal_direction(
+                gradient_seeds[j], hessian_seeds[j])
             # print(f"Inner product: {inners}")
             # print(f"Eigenvalues: {eigs}")
-            # print(f"{i}                             Grad norm magnitude: {np.linalg.norm(gradient_seeds[j]):.4f}")
-            # print(f"                                Inner product: {np.dot(principal_directions[j], gradient_seeds[j]/np.linalg.norm(gradient_seeds[j])):.4f}")
-            if use_hessian: # Use hessian
+            # print(f"""{i} Grad norm magnitude:
+            #       {np.linalg.norm(gradient_seeds[j]):.4f}""")
+            # print(f""" Inner product: {np.dot(principal_directions[j],
+            #                                   gradient_seeds[j]/np.linalg.norm(
+            #                                       gradient_seeds[j])):.4f}""")
+            if use_hessian:  # Use hessian
                 new_seed = seed + step_size * principal_directions[j]
-            else: # Use gradient
+            else:  # Use gradient
                 new_seed = seed - step_size * gradient_seeds[j]
 
-            if new_seed[0] < bounds_min[0] or new_seed[1] < bounds_min[1] or new_seed[2] < bounds_min[2] or new_seed[0] > bounds_max[0] or new_seed[1] > bounds_max[1] or new_seed[2] > bounds_max[2]:
+            if (new_seed[0] < bounds_min[0] or new_seed[1] < bounds_min[1]
+               or new_seed[2] < bounds_min[2] or new_seed[0] > bounds_max[0]
+               or new_seed[1] > bounds_max[1] or new_seed[2] > bounds_max[2]):
                 continue
             # End if gradient is close to 0
             # print(f"Gradient norm: {np.linalg.norm(gradient_seeds[j])}")
@@ -752,26 +767,35 @@ def take_steps_gradient(distance_map_np, seeds, seg_img, tol=1e-2, max_iter=100,
 
         current_seeds = new_seeds
         polydata_point = points2polydata(current_seeds)
-        pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/', f'seeds_{i}.vtp')
+        pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/',
+                           f'seeds_{i}.vtp')
         write_geo(pfn, polydata_point)
 
         # Update hessian around seed points
         hessian_seeds = []
         gradient_seeds = []
         for seed in current_seeds:
-            index = np.array(seg_img.TransformPhysicalPointToIndex(seed)).astype(int)
-            if index[0] < 0: index[0] = 0
-            if index[1] < 0: index[1] = 0
-            if index[2] < 0: index[2] = 0
-            if index[0] >= seg_img.GetSize()[0]: index[0] = seg_img.GetSize()[0] - 1
-            if index[1] >= seg_img.GetSize()[1]: index[1] = seg_img.GetSize()[1] - 1
-            if index[2] >= seg_img.GetSize()[2]: index[2] = seg_img.GetSize()[2] - 1
+            index = np.array(seg_img
+                             .TransformPhysicalPointToIndex(seed)).astype(int)
+            if index[0] < 0:
+                index[0] = 0
+            if index[1] < 0:
+                index[1] = 0
+            if index[2] < 0:
+                index[2] = 0
+            if index[0] >= seg_img.GetSize()[0]:
+                index[0] = seg_img.GetSize()[0] - 1
+            if index[1] >= seg_img.GetSize()[1]:
+                index[1] = seg_img.GetSize()[1] - 1
+            if index[2] >= seg_img.GetSize()[2]:
+                index[2] = seg_img.GetSize()[2] - 1
 
             hessian_seeds.append(hessian[:, :, index[0], index[1], index[2]])
             gradient_seeds.append(gradient[:, index[0], index[1], index[2]])
 
         # Calculate principal direction of hessian
-        principal_directions = [calculate_principal_direction(hessian_seed) for hessian_seed in hessian_seeds]
+        principal_directions = [calculate_principal_direction(hessian_seed)
+                                for hessian_seed in hessian_seeds]
 
     final_seeds += current_seeds
 
@@ -803,16 +827,16 @@ def calculate_centerline_gradient(segmentation):
     # Create distance map
     distance_map = distance_map_from_seg(segmentation)
     distance_map_np = sitk.GetArrayFromImage(distance_map).transpose(2, 1, 0)
-    spacings = np.array(distance_map.GetSpacing())
-    origin = np.array(distance_map.GetOrigin())
 
     # Initialize seed points
     # seeds = initialize_seeds_random(segmentation, num_points=100)
     # seeds = initialize_seeds_pixels(segmentation, every=100)
-    seeds = initialize_seeds_pixels(distance_map, every=50, value=-0.01, negative=True)
+    seeds = initialize_seeds_pixels(distance_map, every=50, value=-0.01,
+                                    negative=True)
 
     # Calculate final location of seed points
-    final_seeds = take_steps_gradient(distance_map_np, seeds, segmentation, tol=1e-3, max_iter=200, step_size=0.5)
+    final_seeds = take_steps_gradient(distance_map_np, seeds, segmentation,
+                                      tol=1e-3, max_iter=200, step_size=0.5)
 
     # Create vtk polydata for points
     points = vtk.vtkPoints()
@@ -844,16 +868,21 @@ def fast_marching_method_seg_dist(segmentation, distance_map, point):
     # Index of seed point
     index = segmentation.TransformPhysicalPointToIndex(point.tolist())
     index = [94, 124, 3]
-    print(f"Max: {sitk.GetArrayFromImage(segmentation).max()}, Min: {sitk.GetArrayFromImage(segmentation).min()}")
+    print(f"""Max: {sitk.GetArrayFromImage(segmentation).max()},
+          Min: {sitk.GetArrayFromImage(segmentation).min()}""")
     # Invert the distance map so positive values are inside the vessel
     distance_map = distance_map * -1
-    print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}, Min: {sitk.GetArrayFromImage(distance_map).min()}")
-    # Now make all values that are 0 in the segmentation to 0 in the distance map
+    print(f"""Max: {sitk.GetArrayFromImage(distance_map).max()},
+          Min: {sitk.GetArrayFromImage(distance_map).min()}""")
+    # Now make all values that are 0 in the segmentation to 0
+    # in the distance map
     # distance_map = sitk.Mask(distance_map, segmentation)
-    print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}, Min: {sitk.GetArrayFromImage(distance_map).min()}")
+    print(f"""Max: {sitk.GetArrayFromImage(distance_map).max()},
+          Min: {sitk.GetArrayFromImage(distance_map).min()}""")
     # Now rescale to 10-255
     distance_map = sitk.RescaleIntensity(distance_map, 1, 255)
-    print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}, Min: {sitk.GetArrayFromImage(distance_map).min()}")
+    print(f"""Max: {sitk.GetArrayFromImage(distance_map).max()},
+          Min: {sitk.GetArrayFromImage(distance_map).min()}""")
     # Create fast marching filter
     fast_marching = sitk.FastMarchingImageFilter()
     fast_marching.AddTrialPoint((index[0], index[1], index[2]))
@@ -864,10 +893,15 @@ def fast_marching_method_seg_dist(segmentation, distance_map, point):
     # rescale segmentation values to 1-255
     new_segmentation = sitk.Cast(segmentation, sitk.sitkFloat32)
     new_segmentation = new_segmentation * distance_map
-    sitk.WriteImage(new_segmentation, '/Users/numisveins/Downloads/debug_centerline/new_segmentation_0.mha')
+    sitk.WriteImage(new_segmentation,
+                    '/Users/numisveins/Downloads/debug_centerline'
+                    + '/new_segmentation_0.mha')
     new_segmentation = sitk.RescaleIntensity(segmentation, 0.1, 1)
-    sitk.WriteImage(new_segmentation, '/Users/numisveins/Downloads/debug_centerline/new_segmentation.mha')
-    print(f"Max: {sitk.GetArrayFromImage(new_segmentation).max()}, Min: {sitk.GetArrayFromImage(new_segmentation).min()}")
+    sitk.WriteImage(new_segmentation,
+                    '/Users/numisveins/Downloads/debug_centerline'
+                    + '/new_segmentation.mha')
+    print(f"""Max: {sitk.GetArrayFromImage(new_segmentation).max()},
+          Min: {sitk.GetArrayFromImage(new_segmentation).min()}""")
     # Create fast marching filter
     out = fast_marching.Execute(new_segmentation)
     out = sitk.Mask(path, segmentation)
@@ -972,19 +1006,37 @@ def interpolate_gradient(gradient, current, seg_img):
     # Get index of current point
     current_index = seg_img.TransformPhysicalPointToIndex(current.tolist())
     # Get fractional part of current point
-    frac = current - np.array(seg_img.TransformIndexToPhysicalPoint(current_index))
+    frac = current - np.array(seg_img
+                              .TransformIndexToPhysicalPoint(current_index))
     # Get gradient at current point
-    gradient_current = gradient[:, current_index[0], current_index[1], current_index[2]]
+    gradient_current = gradient[:, current_index[0],
+                                current_index[1],
+                                current_index[2]]
     # Get gradient at neighboring points
-    gradient_x1 = gradient[:, current_index[0]+1, current_index[1], current_index[2]]
-    gradient_y1 = gradient[:, current_index[0], current_index[1]+1, current_index[2]]
-    gradient_z1 = gradient[:, current_index[0], current_index[1], current_index[2]+1]
-    gradient_x2 = gradient[:, current_index[0]+1, current_index[1]+1, current_index[2]]
-    gradient_y2 = gradient[:, current_index[0], current_index[1]+1, current_index[2]+1]
-    gradient_z2 = gradient[:, current_index[0]+1, current_index[1], current_index[2]+1]
-    gradient_x3 = gradient[:, current_index[0]+1, current_index[1]+1, current_index[2]+1]
+    gradient_x1 = gradient[:, current_index[0]+1,
+                           current_index[1],
+                           current_index[2]]
+    gradient_y1 = gradient[:, current_index[0],
+                           current_index[1]+1,
+                           current_index[2]]
+    gradient_z1 = gradient[:, current_index[0],
+                           current_index[1],
+                           current_index[2]+1]
+    gradient_x2 = gradient[:, current_index[0]+1,
+                           current_index[1]+1,
+                           current_index[2]]
+    gradient_y2 = gradient[:, current_index[0],
+                           current_index[1]+1,
+                           current_index[2]+1]
+    gradient_z2 = gradient[:, current_index[0]+1,
+                           current_index[1],
+                           current_index[2]+1]
+    gradient_x3 = gradient[:, current_index[0]+1,
+                           current_index[1]+1,
+                           current_index[2]+1]
     # Interpolate gradient
-    gradient_current = (1-frac[0]) * (1-frac[1]) * (1-frac[2]) * gradient_current + \
+    gradient_current = (1-frac[0]) * (1-frac[1]) * \
+        (1-frac[2]) * gradient_current + \
         frac[0] * (1-frac[1]) * (1-frac[2]) * gradient_x1 + \
         (1-frac[0]) * frac[1] * (1-frac[2]) * gradient_y1 + \
         (1-frac[0]) * (1-frac[1]) * frac[2] * gradient_z1 + \
@@ -996,9 +1048,11 @@ def interpolate_gradient(gradient, current, seg_img):
     return gradient_current
 
 
-def backtracking_gradient(gradient, distance_map_surf_np, seg_img, seed, target):
+def backtracking_gradient(gradient, distance_map_surf_np,
+                          seg_img, seed, target):
     """
-    Function to backtrack from a target point to a seed point using the gradient.
+    Function to backtrack from a target point to
+    a seed point using the gradient.
 
     Parameters
     ----------
@@ -1028,28 +1082,30 @@ def backtracking_gradient(gradient, distance_map_surf_np, seg_img, seed, target)
 
     # Index of seed and target points
     target_index = seg_img.TransformPhysicalPointToIndex(target.tolist())
-    # target_index = [2, 74, 18]
-    # Correct target if it is outside the segmentation
-    # if target_index[0] <= 0 or target_index[1] <= 0 or target_index[2] <= 0 or target_index[0] >= seg_img.GetSize()[0] or target_index[1] >= seg_img.GetSize()[1] or target_index[2] >= seg_img.GetSize()[2]:
-    #     target_index = move_if_outside(list(target_index), distance_map_surf_np)
-    #     print(f"Moved target to: {target_index}")
-    #     target_index = check_border(target_index, distance_map_surf_np.shape)
-    #     print(f"Checked border: {target_index}")
+
     # Initialize points
     current = target
     current_index = target_index
     points = [current]
     # Initialize tolerance
-    tol = distance_map_surf_np[target_index[0], target_index[1], target_index[2]]
+    tol = distance_map_surf_np[target_index[0],
+                               target_index[1],
+                               target_index[2]]
     # print(f"Tolerance: {tol}")
 
     # Backtrack until we reach the seed point
-    while np.linalg.norm(current - seed) > tol/1 and len(points) < max_number_points:
-        # print(f"Current: {current}, Seed: {seed}, Dist between: {np.linalg.norm(current - seed)}")
+    while (np.linalg.norm(current - seed) > tol/1
+           and len(points) < max_number_points):
+        # print(f"""Current: {current},
+        #       Seed: {seed},
+        #       Dist between: {np.linalg.norm(current - seed)}""")
         # print(f"Seg value at current: {seg_img[current_index]}")
         # Get gradient at current point
         if use_gradient_grid:
-            gradient_current = gradient[:, current_index[0], current_index[1], current_index[2]]
+            gradient_current = gradient[:,
+                                        current_index[0],
+                                        current_index[1],
+                                        current_index[2]]
         else:
             gradient_current = interpolate_gradient(gradient, current, seg_img)
         # print(f"Gradient norm: {np.linalg.norm(gradient_current)}")
@@ -1063,18 +1119,25 @@ def backtracking_gradient(gradient, distance_map_surf_np, seg_img, seed, target)
         # Add current point to path
         points.append(current)
         # If index is on the border, break
-        if current_index[0] < 0 or current_index[1] < 0 or current_index[2] < 0 or current_index[0] >= seg_img.GetSize()[0] or current_index[1] >= seg_img.GetSize()[1] or current_index[2] >= seg_img.GetSize()[2]:
-            print(f"   Fail: Reached border, breaking")
+        if (current_index[0] < 0
+           or current_index[1] < 0
+           or current_index[2] < 0
+           or current_index[0] >= seg_img.GetSize()[0]
+           or current_index[1] >= seg_img.GetSize()[1]
+           or current_index[2] >= seg_img.GetSize()[2]):
+            print("   Fail: Reached border, breaking")
             success = False
             break
         # Update tolerance
-        tol = distance_map_surf_np[current_index[0], current_index[1], current_index[2]]
+        tol = distance_map_surf_np[current_index[0],
+                                   current_index[1],
+                                   current_index[2]]
 
     if len(points) == max_number_points:
-        print(f"   Fail: Reached max number of points")
+        print("   Fail: Reached max number of points")
         success = False
     else:
-        print(f"   Success: {len(points)} points")
+        print("   Success: {len(points)} points")
 
     # Add seed point to path
     points.append(seed)
@@ -1082,46 +1145,8 @@ def backtracking_gradient(gradient, distance_map_surf_np, seg_img, seed, target)
     return points, success
 
 
-def move_if_outside(target_index, distance_map_surf_np):
-    """
-    Function to move the target point inside the segmentation if it is outside.
-    Outside means the distance map value is > 0.
-
-    Parameters
-    ----------
-    target_index : np.array
-        Target point.
-    distance_map_surf_np : np.array
-        Distance map of the vessel.
-
-    Returns
-    -------
-    target_index : np.array
-    """
-    # First check if target is on border
-    target_index = check_border(target_index, distance_map_surf_np.shape)
-
-    # Find the largest value in the distance map within a radius of 5 pixels
-    radius = 5
-    max_value = 0
-    max_index = target_index
-    for i in range(-radius, radius):
-        for j in range(-radius, radius):
-            for k in range(-radius, radius):
-                index = target_index + np.array([i, j, k])
-                if index[0] >= 0 and index[1] >= 0 and index[2] >= 0 and index[0] < distance_map_surf_np.shape[0] and index[1] < distance_map_surf_np.shape[1] and index[2] < distance_map_surf_np.shape[2]:
-                    if distance_map_surf_np[index[0], index[1], index[2]] > max_value:
-                        max_value = distance_map_surf_np[index[0], index[1], index[2]]
-                        max_index = index
-
-    # If the max value is larger than the target value, move target to max index
-    if max_value > distance_map_surf_np[target_index[0], target_index[1], target_index[2]]:
-        target_index = max_index
-
-    return target_index
-
-
-def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300, homogeneous = False, out_dir = None):
+def calc_centerline_fmm(segmentation, seed=None, targets=None,
+                        min_res=300, out_dir=None):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1152,22 +1177,36 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
 
     # Resample if segmentation resolution is too low
     if segmentation.GetSize()[2] < min_res:
-        print(f"Resampling segmentation from size {segmentation.GetSize()} to size {min_res}")
+        print(f"""Resampling segmentation from size {segmentation.GetSize()}
+              to size {min_res}""")
         # Divide spacing so that the size is at least 50
         divide = segmentation.GetSize()[2] / min_res
-        segmentation = sitk.Resample(segmentation, [int(x/divide) for x in segmentation.GetSize()], sitk.Transform(), sitk.sitkNearestNeighbor, segmentation.GetOrigin(), [x*divide for x in segmentation.GetSpacing()], segmentation.GetDirection(), 0, segmentation.GetPixelID())
+        segmentation = sitk.Resample(segmentation,
+                                     [int(x/divide) for x in segmentation
+                                      .GetSize()],
+                                     sitk.Transform(),
+                                     sitk.sitkNearestNeighbor,
+                                     segmentation.GetOrigin(),
+                                     [x*divide for x in segmentation
+                                      .GetSpacing()],
+                                     segmentation.GetDirection(), 0,
+                                     segmentation.GetPixelID())
         print(f"New size: {segmentation.GetSize()}")
     # Create distance map
     distance_map_surf = distance_map_from_seg(segmentation)
     # Switch sign of distance map
     distance_map_surf = distance_map_surf * -1
-    distance_map_surf_np = sitk.GetArrayFromImage(distance_map_surf).transpose(2, 1, 0)
+    distance_map_surf_np = sitk.GetArrayFromImage(
+        distance_map_surf).transpose(2, 1, 0)
     if out_dir:
-        sitk.WriteImage(distance_map_surf, os.path.join(out_dir, 'distance_map_surf.mha'))
+        sitk.WriteImage(distance_map_surf,
+                        os.path.join(out_dir, 'distance_map_surf.mha'))
 
     # If seed and targets are not defined, use create using cluster map
     if seed is None and targets is None:
-        seed, targets, output = cluster_map(segmentation, return_wave_distance_map=True, out_dir=out_dir)
+        seed, targets, output = cluster_map(segmentation,
+                                            return_wave_distance_map=True,
+                                            out_dir=out_dir)
 
     elif seed is None:
         max_surf = distance_map_surf_np.max()
@@ -1180,11 +1219,13 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
             # else list of indices
             seed = list(index)
     elif targets is None:
-        _ , targets, output = cluster_map(segmentation)
+        _, targets, output = cluster_map(segmentation)
         # have same format as seed
         if isinstance(seed, list):
             # then list of indices
-            targets = [list(segmentation.TransformPhysicalPointToIndex(target.tolist())) for target in targets]
+            targets = [list(
+                segmentation.TransformPhysicalPointToIndex(target.tolist()))
+                for target in targets]
 
     # if seed/targets is np.array, convert to index
     if isinstance(seed, np.ndarray):
@@ -1193,42 +1234,55 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
         # if any are outside or on boundary, move inside
         seed = check_border(seed, segmentation.GetSize())
         targets_np = [target for target in targets]
-        targets = [list(segmentation.TransformPhysicalPointToIndex(target.tolist())) for target in targets]
+        targets = [list(
+            segmentation.TransformPhysicalPointToIndex(target.tolist()))
+            for target in targets]
         for i, target in enumerate(targets):
             targets[i] = check_border(target, segmentation.GetSize())
 
     else:
         seed_np = segmentation.TransformIndexToPhysicalPoint(seed)
-        targets_np = [segmentation.TransformIndexToPhysicalPoint(target) for target in targets]
+        targets_np = [segmentation.TransformIndexToPhysicalPoint(target)
+                      for target in targets]
 
     if not output:
         # Mask distance map with segmentation
         distance_map = sitk.Mask(distance_map_surf, segmentation)
-        # print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}, Min: {sitk.GetArrayFromImage(distance_map).min()}")
+        # print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}")
+        # print(f"Min: {sitk.GetArrayFromImage(distance_map).min()}")
         # Scale distance map to 1-255
         distance_map = sitk.RescaleIntensity(distance_map, 0.01, 1)
-        # print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}, Min: {sitk.GetArrayFromImage(distance_map).min()}")
+        # print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}")
+        # print(f"Min: {sitk.GetArrayFromImage(distance_map).min()}")
 
         # Calculate distance map using fast marching method
-        print(f"Starting fast marching method")
+        print("Starting fast marching method")
         output = fast_marching_method(distance_map, seed, stopping_value=1000)
-        print(f"Finished fast marching method")
+        print("Finished fast marching method")
 
-    print(f"Max of output: {sitk.GetArrayFromImage(output).max()}, Min: {sitk.GetArrayFromImage(output).min()}")
-    # sitk.WriteImage(output, '/Users/numisveins/Downloads/debug_centerline/output.mha')
+    print(f"Max of output: {sitk.GetArrayFromImage(output).max()}")
+    print(f"Min: {sitk.GetArrayFromImage(output).min()}")
+    # sitk.WriteImage(output,
+    #                 '/Users/numisveins/Downloads/debug_centerline/output.mha')
     output_mask = sitk.Mask(output, segmentation)
-    print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}, Min: {sitk.GetArrayFromImage(output_mask).min()}")
+    print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}")
+    print(f"Min: {sitk.GetArrayFromImage(output_mask).min()}")
     if out_dir:
-        sitk.WriteImage(output_mask, os.path.join(out_dir, 'masked_out_fmm.mha'))
+        sitk.WriteImage(output_mask,
+                        os.path.join(out_dir, 'masked_out_fmm.mha'))
     # Get gradient of distance map
-    gradient = gradient_matrix(sitk.GetArrayFromImage(output).transpose(2, 1, 0))
+    gradient = gradient_matrix(
+        sitk.GetArrayFromImage(output).transpose(2, 1, 0))
     print("Gradient calculated")
 
     points_list, success_list = [], []
     for t_num, target_np in enumerate(targets_np):
         print(f"   Starting target {t_num+1}/{len(targets_np)}")
         # Calculate path from seed to target
-        points, success = backtracking_gradient(gradient, distance_map_surf_np, segmentation, seed_np, target_np)
+        points, success = backtracking_gradient(gradient,
+                                                distance_map_surf_np,
+                                                segmentation,
+                                                seed_np, target_np)
         # Add points to list
         points_list.append(points)
         success_list.append(success)
@@ -1237,7 +1291,8 @@ def calc_centerline_fmm(segmentation, seed = None, targets = None, min_res = 300
     centerline = create_centerline_polydata(points_list, distance_map_surf)
     centerline = post_process_centerline(centerline)
 
-    print(f"Centerline calculated, success ratio: {success_list.count(True)} / {len(success_list)}")
+    print(f"""Centerline calculated, success ratio:
+          {success_list.count(True)} / {len(success_list)}""")
 
     # If success is all False, return False
     if not success_list.count(True):
@@ -1258,8 +1313,10 @@ def create_centerline_polydata(points_list, distance_map_surf):
 
     Uses distance map to add radius to points.
     The distance value at each point is used as the radius.
-    Radius is stored as array in the vtk polydata under name 'MaximumInscribedSphereRadius'
-    Global node id is stored as array in the vtk polydata under name 'GlobalNodeID'
+    Radius is stored as array in the vtk polydata under name
+    'MaximumInscribedSphereRadius'
+    Global node id is stored as array in the vtk polydata under name
+    'GlobalNodeID'
     Global node id is the index of the point in the list of points.
 
     Parameters
@@ -1291,7 +1348,8 @@ def create_centerline_polydata(points_list, distance_map_surf):
         line.GetPointIds().SetNumberOfIds(len(points_path))
         for i, point in enumerate(points_path):
             # Get index of point
-            index = distance_map_surf.TransformPhysicalPointToIndex(point.tolist())
+            index = distance_map_surf.TransformPhysicalPointToIndex(
+                point.tolist())
             # Get distance value at point
             radius = distance_map_surf.GetPixel(index)
             # Add point to points
@@ -1330,7 +1388,8 @@ def post_process_centerline(centerline):
     -------
     centerline : vtkPolyData
     """
-    print(f"Number of points before post processing: {centerline.GetNumberOfPoints()}")
+    print(f"""Number of points before post processing:
+          {centerline.GetNumberOfPoints()}""")
     # Remove duplicate points
     cleaner = vtk.vtkCleanPolyData()
     cleaner.SetInputData(centerline)
@@ -1351,7 +1410,8 @@ def post_process_centerline(centerline):
     smoother.Update()
     centerline = smoother.GetOutput()
 
-    print(f"Number of points after post processing: {centerline.GetNumberOfPoints()}")
+    print(f"""Number of points after post processing:
+          {centerline.GetNumberOfPoints()}""")
 
     return centerline
 
@@ -1476,7 +1536,9 @@ def find_end_clusters(cluster_map_img):
             # Iterate over all neighbors
             for neighbor in neighbors:
                 # If neighbor is not in the current cluster
-                if cluster_map[tuple(neighbor)] != value and cluster_map[tuple(neighbor)] != 0 and cluster_map[tuple(neighbor)] not in values_connected:
+                if (cluster_map[tuple(neighbor)] != value
+                   and cluster_map[tuple(neighbor)] != 0
+                   and cluster_map[tuple(neighbor)] not in values_connected):
                     # Increment number of connections
                     connections += 1
                     # Add value of connected cluster
@@ -1499,10 +1561,13 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     """
     Function to cluster a distance map of a segmentation into integer values.
 
-    The segmentation is converted to a inverted distance map (high value inside).
+    The segmentation is converted to a inverted distance map
+    (high value inside).
     The maximum value in the distance map is found.
-    The index of the maximum value is used as the seed point for the fast marching method.
-    The wave distance map is calculated using the fast marching method and the seed point.
+    The index of the maximum value is used as the seed point for
+    the fast marching method.
+    The wave distance map is calculated using the fast marching method
+    and the seed point.
     The wave distance map is converted to integers.
     Each connected region of the same integer value is considered a cluster.
     Each cluster is assigned a unique integer value.
@@ -1522,27 +1587,36 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     # Resample segmentation to smaller
     divide = 1
     if divide != 1:
-        segmentation = sitk.Resample(segmentation, [int(x/divide) for x in segmentation.GetSize()], sitk.Transform(), sitk.sitkNearestNeighbor, segmentation.GetOrigin(), [x*divide for x in segmentation.GetSpacing()], segmentation.GetDirection(), 0, segmentation.GetPixelID())
-        # sitk.WriteImage(segmentation, '/Users/numisveins/Downloads/debug_centerline/segmentation_resampled.mha')
+        segmentation = sitk.Resample(segmentation,
+                                     [int(x/divide)
+                                      for x in segmentation.GetSize()],
+                                     sitk.Transform(),
+                                     sitk.sitkNearestNeighbor,
+                                     segmentation.GetOrigin(),
+                                     [x*divide
+                                      for x in segmentation.GetSpacing()],
+                                     segmentation.GetDirection(), 0,
+                                     segmentation.GetPixelID())
     # Create distance map
     distance_map = distance_map_from_seg(segmentation)
     # Invert distance map
     distance_map = distance_map * -1
-    # sitk.WriteImage(distance_map, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map.mha')
+
     distance_map_masked = sitk.Mask(distance_map, segmentation)
-    # sitk.WriteImage(distance_map_masked, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_masked.mha')
+
     # Shift distance map by 0.5
     distance_map = distance_map + 1
-    # sitk.WriteImage(distance_map, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_shifted.mha')
+
     distance_map_masked = sitk.Mask(distance_map, segmentation)
-    # sitk.WriteImage(distance_map_masked, '/Users/numisveins/Downloads/debug_centerline/resampled_distance_map_masked_shifted.mha')
+
     # Find maximum value
     dist_map_np = sitk.GetArrayFromImage(distance_map).transpose(2, 1, 0)
     max_value = np.max(dist_map_np)
     # Find index of maximum value
     index = np.where(dist_map_np == max_value)
     # If multiple max values, take first
-    if len(index[0]) > 1: index = [index[0][0], index[1][0], index[2][0]]
+    if len(index[0]) > 1:
+        index = [index[0][0], index[1][0], index[2][0]]
     # Create fast marching filter
     fast_marching = sitk.FastMarchingImageFilter()
     fast_marching.AddTrialPoint((int(index[0]), int(index[1]), int(index[2])))
@@ -1553,21 +1627,22 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     speed_image = sitk.RescaleIntensity(speed_image, 0.00001, float(max_value))
     # And raise all values to the power of 0.5
     speed_image = sitk.Pow(speed_image, 0.5)
-    print(f"Done preprocessing speed image")
-    # sitk.WriteImage(speed_image, '/Users/numisveins/Downloads/debug_centerline/speed_image_cluster.mha')
+    print("Done preprocessing speed image")
+
     # Calculate wave distance map
     wave_distance_map_output = fast_marching.Execute(speed_image)
-    print(f"Done fast marching")
+    print("Done fast marching")
     # Only keep values inside the segmentation
     wave_distance_map = sitk.Mask(wave_distance_map_output, segmentation)
     # Convert wave distance map to integers
     wave_distance_map = sitk.Cast(wave_distance_map, sitk.sitkInt32)
     if out_dir:
-        sitk.WriteImage(wave_distance_map, os.path.join(out_dir, 'wave_distance_map.mha'))
-    # sitk.WriteImage(wave_distance_map, '/Users/numisveins/Downloads/debug_centerline/wave_distance_map.mha')
+        sitk.WriteImage(wave_distance_map,
+                        os.path.join(out_dir, 'wave_distance_map.mha'))
 
     # Get unique values in wave distance map
-    unique_values = np.unique(sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0))
+    unique_values = np.unique(
+        sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0))
     print(f"Unique values: {unique_values}")
     # Create new image with same size as wave distance map
     cluster_map_img = sitk.Image(wave_distance_map.GetSize(), sitk.sitkInt32)
@@ -1580,46 +1655,51 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
         N = 10
     elif np.max(unique_values) > 50:
         N = 5
-    elif np.max(unique_values) > 20:   
+    elif np.max(unique_values) > 20:
         N = 3
     elif np.max(unique_values) > 10:
         N = 2
     else:
         N = 1
     cluster_count = 1
-    for i, value in enumerate(range(1, np.max(unique_values)+1, N)): #
+    for i, value in enumerate(range(1, np.max(unique_values)+1, N)):
         if value == 0:
             continue
         # Create mask for value
-        mask = sitk.BinaryThreshold(wave_distance_map, lowerThreshold=value, upperThreshold=(value+N-1))
+        mask = sitk.BinaryThreshold(wave_distance_map,
+                                    lowerThreshold=value,
+                                    upperThreshold=(value+N-1))
         print(f"Values: {value} to {value+N-1}")
         # Connected components
         connected = sitk.ConnectedComponentImageFilter()
-        connected.SetFullyConnected(True) # Fully connected to include diagonal connections
+        # Fully connected to include diagonal connections
+        connected.SetFullyConnected(True)
         connected = connected.Execute(mask)
         # Get number of connected components
-        num_connected = np.max(sitk.GetArrayFromImage(connected).transpose(2, 1, 0))
+        num_connected = np.max(
+            sitk.GetArrayFromImage(connected).transpose(2, 1, 0))
         print(f"   Num connected: {num_connected}")
         # Assign unique value to each connected component
         for j in range(1, num_connected+1):
-            mask = sitk.BinaryThreshold(connected, lowerThreshold=j, upperThreshold=j)
+            mask = sitk.BinaryThreshold(connected,
+                                        lowerThreshold=j,
+                                        upperThreshold=j)
             # if cluster is too small, ignore
-            # print(f"Cluster has size: {np.sum(sitk.GetArrayFromImage(mask).transpose(2, 1, 0))}")
+            # print(f"Cluster has size:{np.sum(sitk.GetArrayFromImage(mask))}")
             if np.sum(sitk.GetArrayFromImage(mask).transpose(2, 1, 0)) < 5:
                 continue
             cluster_map_img = sitk.Mask(cluster_map_img, sitk.Not(mask))
             mask = sitk.Cast(mask, sitk.sitkInt32) * (cluster_count)
             cluster_count += 1
             cluster_map_img = cluster_map_img + mask
-            # Write image
-            sitk.WriteImage(cluster_map_img, '/Users/numisveins/Downloads/debug_centerline/cluster_map_img_'+str(i)+'.mha')
+
     print(f"Cluster count: {cluster_count}")
     print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
 
     # Write image
     if out_dir:
-        sitk.WriteImage(cluster_map_img, os.path.join(out_dir, 'cluster_map_img.mha'))
-    # sitk.WriteImage(cluster_map_img, '/Users/numisveins/Downloads/debug_centerline/cluster_map_img.mha')
+        sitk.WriteImage(cluster_map_img, os.path.join(out_dir,
+                                                      'cluster_map_img.mha'))
 
     time_start = time.time()
     end_clusters = find_end_clusters(cluster_map_img)
@@ -1628,24 +1708,31 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     print(f"Number of end clusters: {len(end_clusters)}")
 
     time_start = time.time()
-    end_points = get_end_points(cluster_map_img, end_clusters, distance_map_masked)
+    end_points = get_end_points(cluster_map_img,
+                                end_clusters,
+                                distance_map_masked)
     print(f"Time to get end points: {time.time() - time_start:0.2f}")
 
     # Convert end points to physical points
-    end_points_phys = [segmentation.TransformIndexToPhysicalPoint(end_point.tolist()) for end_point in end_points]
+    end_points_phys = [segmentation.TransformIndexToPhysicalPoint(
+        end_point.tolist()) for end_point in end_points]
 
     # Create vtk polydata for points
     if out_dir:
         polydata_point = points2polydata(end_points_phys)
-        # pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/', 'end_points.vtp')
         write_geo(os.path.join(out_dir, 'end_points.vtp'), polydata_point)
 
-    seed_np = np.array(segmentation.TransformIndexToPhysicalPoint((int(index[0]), int(index[1]), int(index[2]))))
+    seed_np = np.array(
+        segmentation.TransformIndexToPhysicalPoint((int(index[0]),
+                                                    int(index[1]),
+                                                    int(index[2]))))
     end_points_phys_np = [np.array(point) for point in end_points_phys]
 
     # write seed and end points as npy
-    # np.save('/Users/numisveins/Downloads/debug_centerline/seed.npy', seed_np)
-    # np.save('/Users/numisveins/Downloads/debug_centerline/end_points.npy', end_points_phys_np)
+    # np.save('/Users/numisveins/Downloads/debug_centerline/seed.npy',
+    #         seed_np)
+    # np.save('/Users/numisveins/Downloads/debug_centerline/end_points.npy',
+    #         end_points_phys_np)
 
     if return_wave_distance_map:
 
@@ -1672,9 +1759,11 @@ def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
     end_points : list of np.array
     """
     # Get array from cluster map
-    cluster_map = sitk.GetArrayFromImage(cluster_map_img).transpose(2, 1, 0)
+    cluster_map = sitk.GetArrayFromImage(
+        cluster_map_img).transpose(2, 1, 0)
     # Get array from distance map
-    distance_map = sitk.GetArrayFromImage(distance_map_masked).transpose(2, 1, 0)
+    distance_map = sitk.GetArrayFromImage(
+        distance_map_masked).transpose(2, 1, 0)
     # Initialize end points
     end_points = []
     # Iterate over all end clusters
@@ -1704,8 +1793,10 @@ def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
 
 def test_centerline_fmm(directory, out_dir):
     """
-    Function that tests the centerline calculation using the fast marching method.
-    It loops through the segmentations .nii.gz files in the directory and calculates the centerline.
+    Function that tests the centerline calculation
+    using the fast marching method.
+    It loops through the segmentations .nii.gz files in the directory
+    and calculates the centerline.
     And writes the centerlines as .vtp files.
     """
     # Get all files in directory
@@ -1716,7 +1807,8 @@ def test_centerline_fmm(directory, out_dir):
         print(f"\n\nCalculating centerline for: {file}\n\n")
         # Load segmentation
         segmentation = sitk.ReadImage(os.path.join(directory, file))
-        # pfn = os.path.join(out_dir, 'segmentation_'+file.replace('.nii.gz', '.mha'))
+        # pfn = os.path.join(out_dir,
+        #                    'segmentation_'+file.replace('.nii.gz', '.mha'))
         # sitk.WriteImage(segmentation, pfn)
         # Get surface mesh
         surface = evaluate_surface(segmentation)
@@ -1726,7 +1818,9 @@ def test_centerline_fmm(directory, out_dir):
         caps = calc_caps(surface)
         print(f"  # Caps: {len(caps)}")
         # Calculate centerline
-        centerline = calc_centerline_fmm(segmentation, caps[0], [cap for i, cap in enumerate(caps) if i != 0])
+        centerline = calc_centerline_fmm(
+            segmentation, caps[0],
+            [cap for i, cap in enumerate(caps) if i != 0])
         # Write centerline
         name = file.split('.')[0]
         pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
@@ -1739,9 +1833,9 @@ if __name__ == '__main__':
     out_dir = '/Users/numisveins/Downloads/debug_centerline/'
 
     # Path to segmentation
-    path_seg = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_5_all_surfaces/ct_train_masks/0188_0001_16_2.nii.gz'
-    # # path_seg = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_5_all_surfaces/ct_train_masks/0091_0001_26_2.nii.gz'
-    # # path_seg = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_5_all_surfaces/ct_train_masks/0149_1001_5_1.nii.gz'
+    path_seg = '/Users/numisveins/Documents/Automatic_Tracing_Data' \
+               '/train_version_5_all_surfaces/ct_train_masks' \
+               '/0188_0001_16_2.nii.gz'
     name = path_seg.split('/')[-1].split('.')[0]
     # Load segmentation
     segmentation = sitk.ReadImage(path_seg)
@@ -1776,40 +1870,41 @@ if __name__ == '__main__':
     # sitk.WriteImage(path, os.path.join(out_dir, 'path_fmm.mha'))
 
     # Use upwind FMM to calculate path
-    # path = upwind_fast_marching_method(sitk.RescaleIntensity(distance, 1, 255), caps[1])
+    # path = upwind_fast_marching_method(
+    #     sitk.RescaleIntensity(distance, 1, 255), caps[1])
     # sitk.WriteImage(path, os.path.join(out_dir, 'path_upwind.mha'))
 
     # Test centerline calculation using FMM
-    # directory = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_5_all_surfaces/ct_train_masks/'
+    # directory = '/Users/numisveins/Documents/Automatic_Tracing_Data/' \
+    #     'train_version_5_all_surfaces/ct_train_masks/'
     # test_centerline_fmm(directory, out_dir)
 
     # Calculate centerline using FMM
     # time_start = time.time()
     # source = 0
-    # centerline = calc_centerline_fmm(segmentation, caps[source], [cap for i, cap in enumerate(caps) if i != source], min_res=30)
-    # print(f"Time in seconds: {time.time() - time_start}")
+    # centerline = calc_centerline_fmm(
+    #     segmentation, caps[source], [cap for i, cap in enumerate(caps)
+    #                                  if i != source], min_res=30)
+    # # print(f"Time in seconds: {time.time() - time_start}")
     # pfn = os.path.join(out_dir, 'centerline_fm_'+name+'_'+str(source)+'.vtp')
     # write_geo(pfn, centerline)
 
     # Calculate cluster map
-    # seg_file = '/Users/numisveins/Documents/PARSE_dataset/ct_train_masks/PA000005.nii.gz'
-    # seg_file = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_new_aortas/pred_seqseg_ct/postprocessed/0176_0000.mha'
-    # seg_file = '/Users/numisveins/Downloads/output_asoca_fmm/00_seg_rem_3d_fullres_0.mha'
-    # seg_file = '/Users/numisveins/Documents/Automatic_Tracing_Data/train_version_5_all_surfaces/ct_train_masks/0188_0001_16_2.nii.gz'
-    seg_file = '/Users/numisveins/Documents/aortaseg24/process_binary/binary_segs/subject044.mha'
-    out_dir = '/Users/numisveins/Documents/aortaseg24/process_binary/centerlines/'
+    # seg_file = '/Users/numisveins/Documents/PARSE_dataset/ct_train_masks/'\
+    #     'PA000005.nii.gz'
+    # seg_file = '/Users/numisveins/Documents/Automatic_Tracing_Data/'\
+    #     'train_version_5_all_surfaces/ct_train_masks/0188_0001_16_2.nii.gz'
+    seg_file = '/Users/numisveins/Documents/aortaseg24/process_binary/' \
+        'binary_segs/subject044.mha'
+    out_dir = '/Users/numisveins/Documents/aortaseg24/process_binary/' \
+        'centerlines/'
     segmentation = sitk.ReadImage(seg_file)
-    sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation_cluster.mha'))
+    sitk.WriteImage(segmentation, os.path.join(out_dir,
+                                               'segmentation_cluster.mha'))
     time_start = time.time()
     centerline = calc_centerline_fmm(segmentation, out_dir=out_dir)
     print(f"Time in seconds: {time.time() - time_start:0.3f}")
     name = seg_file.split('/')[-1].split('.')[0]
     pfn = os.path.join(out_dir, 'centerline_fmm_'+name+'.vtp')
     write_geo(pfn, centerline)
-
-    # # Use colliding fronts to calculate path
-    # path = colliding_fronts(segmentation, caps[0], caps[1])
-    # sitk.WriteImage(path, os.path.join(out_dir, 'path_colliding.mha'))
-
-    # # Calculate centerline
-    # centerline = calculate_centerline(segmentation, surface, caps, initial_radius=1)
+    print(f"Centerline written to: {pfn}")

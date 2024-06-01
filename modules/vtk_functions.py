@@ -79,7 +79,7 @@ class ClosestPoints:
             if radius is not None:
                 result = vtk.vtkIdList()
                 self.locator.FindPointsWithinRadius(radius, p, result)
-                ids += [result.GetId(k) 
+                ids += [result.GetId(k)
                         for k in range(result.GetNumberOfIds())]
             else:
                 ids += [self.locator.FindClosestPoint(p)]
