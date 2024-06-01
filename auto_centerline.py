@@ -182,8 +182,8 @@ if __name__ == '__main__':
         if not global_config['DEBUG']:
             sys.stdout = open(dir_output+"/out.txt", "w")
         else:
-            print("Press c to start tracing")
-            import pdb
+            print("Start tracing with debug mode on")
+            # import pdb
             # pdb.set_trace()
 
         print(test_case)

@@ -456,6 +456,7 @@ def trace_centerline(
                 print("Calculating centerline using VMTK")
                 (centerline_poly,
                  success) = calc_centerline_vmtk(surface_smooth,
+                                                 vtkimage,
                                                  global_config,
                                                  source_id,
                                                  sorted_targets,
