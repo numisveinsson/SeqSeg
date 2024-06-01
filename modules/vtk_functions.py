@@ -1,10 +1,7 @@
 # Built on top of code from Martin Pfaller
 
-#!/usr/bin/env python
-
 import os
 import vtk
-import pdb
 
 import numpy as np
 from collections import defaultdict
@@ -12,6 +9,7 @@ from collections import defaultdict
 from vtk.util.numpy_support import numpy_to_vtk as n2v
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 from vtk.util.numpy_support import get_vtk_array_type
+
 
 def calc_caps(polyData):
     """
@@ -81,7 +79,8 @@ class ClosestPoints:
             if radius is not None:
                 result = vtk.vtkIdList()
                 self.locator.FindPointsWithinRadius(radius, p, result)
-                ids += [result.GetId(k) for k in range(result.GetNumberOfIds())]
+                ids += [result.GetId(k) 
+                        for k in range(result.GetNumberOfIds())]
             else:
                 ids += [self.locator.FindClosestPoint(p)]
         return ids
@@ -125,6 +124,7 @@ def read_geo(fname):
 
     return reader
 
+
 def read_img(fname):
     """
     Read image from file, chose corresponding vtk reader
@@ -144,6 +144,7 @@ def read_img(fname):
 
     return reader
 
+
 def write_img(fname, input):
     """
     Write image to file
@@ -162,6 +163,7 @@ def write_img(fname, input):
     writer.Update()
     writer.Write()
 
+
 def change_vti_vtk(fname):
     """
     Change image file from vti to vtk
@@ -175,9 +177,10 @@ def change_vti_vtk(fname):
 
     # Write out the VTK file
     writer = vtk.vtkDataSetWriter()
-    writer.SetFileName(fname.replace('.vti','.vtk'))
+    writer.SetFileName(fname.replace('.vti', '.vtk'))
     writer.SetInputConnection(reader.GetOutputPort())
     writer.Write()
+
 
 def write_geo(fname, input):
     """
@@ -284,7 +287,7 @@ def connectivity(inp, origin):
         con: connectivity object
     """
     con = vtk.vtkConnectivityFilter()
-    con.SetInputData(inp) #.GetOutput())
+    con.SetInputData(inp)  # .GetOutput())
     con.SetExtractionModeToClosestPointRegion()
     con.SetClosestPoint(origin[0], origin[1], origin[2])
     con.Update()
@@ -349,8 +352,12 @@ def add_scalars(inp, name, fill):
     """
     Add constant value array to point and cell data
     """
-    inp.GetOutput().GetCellData().AddArray(scalar_array(inp.GetOutput().GetNumberOfCells(), name, fill))
-    inp.GetOutput().GetPointData().AddArray(scalar_array(inp.GetOutput().GetNumberOfPoints(), name, fill))
+    inp.GetOutput().GetCellData().AddArray(scalar_array(inp.GetOutput()
+                                                        .GetNumberOfCells(),
+                                                        name, fill))
+    inp.GetOutput().GetPointData().AddArray(scalar_array(inp.GetOutput()
+                                                         .GetNumberOfPoints(),
+                                                         name, fill))
 
 
 def rename(inp, old, new):
@@ -387,8 +394,9 @@ def region_grow(geo, seed_points, seed_ids, n_max=99):
     pids_all = set(seed_points.tolist())
     pids_new = set(seed_points.tolist())
 
-    surf = extract_surface(geo)
-    pids_surf = set(v2n(surf.GetPointData().GetArray('GlobalNodeID')).tolist())
+    # surf = extract_surface(geo)
+    # pids_surf = set(v2n(surf
+    #                     .GetPointData().GetArray('GlobalNodeID')).tolist())
 
     # loop until region stops growing or reaches maximum number of iterations
     i = 0
@@ -427,10 +435,14 @@ def region_grow(geo, seed_points, seed_ids, n_max=99):
 
         # find closest point in new wave front
         for i_new in pids_new:
-            array_ids[i_new] = array_ids[pids_old_arr[locator.FindClosestPoint(geo.GetPoint(i_new))]]
+            array_ids[i_new] = array_ids[pids_old_arr[locator
+                                                      .FindClosestPoint(
+                                                          geo.GetPoint(i_new))
+                                                      ]]
             array_dist[i_new] = i
 
     return array_ids, array_dist + 1
+
 
 def appendPolyData(poly_list):
     """
@@ -446,6 +458,7 @@ def appendPolyData(poly_list):
     appendFilter.Update()
     out = appendFilter.GetOutput()
     return out
+
 
 def grow(geo, array, pids_in, pids_all, cids_all):
     # ids of propagating wave-front
@@ -475,7 +488,8 @@ def grow(geo, array, pids_in, pids_all, cids_all):
                 # get point id
                 pi_new = pids.GetId(k)
 
-                # add point only if it's new and doesn't fullfill stopping criterion
+                # add point only if it's new
+                # and doesn't fullfill stopping criterion
                 if array[pi_new] == -1 and pi_new not in pids_in:
                     pids_out.add(pi_new)
                     pids_all.add(pi_new)
@@ -485,7 +499,8 @@ def grow(geo, array, pids_in, pids_all, cids_all):
 
 def cell_connectivity(geo):
     """
-    Extract the point connectivity from vtk and return a dictionary that can be used in meshio
+    Extract the point connectivity from vtk and return a dictionary
+    that can be used in meshio
     """
     vtk_to_meshio = {3: 'line', 5: 'triangle', 10: 'tetra'}
 
@@ -495,7 +510,8 @@ def cell_connectivity(geo):
         if cell_type_vtk in vtk_to_meshio:
             cell_type = vtk_to_meshio[cell_type_vtk]
         else:
-            raise ValueError('vtkCellType ' + str(cell_type_vtk) + ' not supported')
+            raise ValueError('vtkCellType '
+                             + str(cell_type_vtk) + ' not supported')
 
         points = geo.GetCell(i).GetPointIds()
         point_ids = []
@@ -507,6 +523,7 @@ def cell_connectivity(geo):
         cells[t] = np.array(c)
 
     return cells
+
 
 def get_location_cells(surface):
     """
@@ -525,7 +542,8 @@ def get_location_cells(surface):
     surface_locations = v2n(ecCentroids.GetPoints().GetData())
     return surface_locations
 
-def exportSitk2VTK(sitkIm,spacing=None):
+
+def exportSitk2VTK(sitkIm, spacing=None):
     """
     This function creates a vtk image from a simple itk image
     Args:
@@ -538,12 +556,12 @@ import SimpleITK as sitk
         spacing = sitkIm.GetSpacing()
     import SimpleITK as sitk
     import vtk
-    img = sitk.GetArrayFromImage(sitkIm).transpose(2,1,0)
+    img = sitk.GetArrayFromImage(sitkIm).transpose(2, 1, 0)
     vtkArray = exportPython2VTK(img)
     imageData = vtk.vtkImageData()
     imageData.SetDimensions(sitkIm.GetSize())
     imageData.GetPointData().SetScalars(vtkArray)
-    imageData.SetOrigin([0.,0.,0.])
+    imageData.SetOrigin([0., 0., 0.])
     imageData.SetSpacing(spacing)
     matrix = build_transform_matrix(sitkIm)
     space_matrix = np.diag(list(spacing)+[1.])
@@ -552,22 +570,26 @@ import SimpleITK as sitk
     vtkmatrix = vtk.vtkMatrix4x4()
     for i in range(4):
         for j in range(4):
-            vtkmatrix.SetElement(i, j, matrix[i,j])
+            vtkmatrix.SetElement(i, j, matrix[i, j])
     reslice = vtk.vtkImageReslice()
     reslice.SetInputData(imageData)
     reslice.SetResliceAxes(vtkmatrix)
     reslice.SetInterpolationModeToNearestNeighbor()
     reslice.Update()
     imageData = reslice.GetOutput()
-    #imageData.SetDirectionMatrix(sitkIm.GetDirection())
+    # imageData.SetDirectionMatrix(sitkIm.GetDirection())
 
     return imageData, vtkmatrix
 
+
 def build_transform_matrix(image):
     matrix = np.eye(4)
-    matrix[:-1,:-1] = np.matmul(np.reshape(image.GetDirection(), (3,3)), np.diag(image.GetSpacing()))
-    matrix[:-1,-1] = np.array(image.GetOrigin())
+    matrix[:-1, :-1] = np.matmul(np.reshape(image.GetDirection(),
+                                            (3, 3)),
+                                 np.diag(image.GetSpacing()))
+    matrix[:-1, -1] = np.array(image.GetOrigin())
     return matrix
+
 
 def exportPython2VTK(img):
     """
@@ -577,9 +599,12 @@ def exportPython2VTK(img):
     Returns:
         imageData: vtk image
     """
-    vtkArray = n2v(num_array=img.flatten('F'), deep=True, array_type=get_vtk_array_type(img.dtype))
-    #vtkArray = n2v(img.flatten())
+    vtkArray = n2v(num_array=img.flatten('F'),
+                   deep=True,
+                   array_type=get_vtk_array_type(img.dtype))
+    # vtkArray = n2v(img.flatten())
     return vtkArray
+
 
 def bound_polydata_by_image(image, poly, threshold):
     """
@@ -589,8 +614,9 @@ def bound_polydata_by_image(image, poly, threshold):
     bound = vtk.vtkBox()
     image.ComputeBounds()
     b_bound = image.GetBounds()
-    b_bound = [b+threshold if (i % 2) ==0 else b-threshold for i, b in enumerate(b_bound)]
-    #print("Bounding box: ", b_bound)
+    b_bound = [b+threshold if (i % 2) == 0 else b-threshold
+               for i, b in enumerate(b_bound)]
+    # print("Bounding box: ", b_bound)
     bound.SetBounds(b_bound)
     clipper = vtk.vtkClipPolyData()
     clipper.SetClipFunction(bound)
@@ -598,6 +624,7 @@ def bound_polydata_by_image(image, poly, threshold):
     clipper.InsideOutOn()
     clipper.Update()
     return clipper.GetOutput()
+
 
 def write_vtk_polydata(poly, fn):
     """
@@ -608,11 +635,11 @@ def write_vtk_polydata(poly, fn):
     Returns:
         None
     """
-    #print('Writing vtp with name:', fn)
+    # print('Writing vtp with name:', fn)
     if (fn == ''):
         return 0
 
-    _ , extension = os.path.splitext(fn)
+    _, extension = os.path.splitext(fn)
 
     if extension == '.vtk':
         writer = vtk.vtkPolyDataWriter()
@@ -626,9 +653,11 @@ def write_vtk_polydata(poly, fn):
     writer.Write()
     return
 
+
 def vtk_marching_cube(vtkLabel, bg_id, seg_id, smooth=None):
     """
-    Use the VTK marching cube to create isosrufaces for all classes excluding the background
+    Use the VTK marching cube to create isosrufaces
+    for all classes excluding the background
     Args:
         labels: vtk image contraining the label map
         bg_id: id number of background class
@@ -643,6 +672,7 @@ def vtk_marching_cube(vtkLabel, bg_id, seg_id, smooth=None):
     mesh = contour.GetOutput()
 
     return mesh
+
 
 def voi_contain_caps(voi_min, voi_max, caps_locations):
     """
@@ -659,6 +689,7 @@ def voi_contain_caps(voi_min, voi_max, caps_locations):
     contain = np.any(np.logical_and(smaller.all(axis=1), larger.all(axis=1)))
     return contain
 
+
 def points2polydata(xyz):
     import vtk
     points = vtk.vtkPoints()
@@ -668,7 +699,7 @@ def points2polydata(xyz):
     for i in range(0, len(xyz)):
         try:
             p = xyz.loc[i].values.tolist()
-        except:
+        except AttributeError:
             p = xyz[i]
 
         point_id = points.InsertNextPoint(p)
@@ -676,14 +707,17 @@ def points2polydata(xyz):
         vertices.InsertCellPoint(point_id)
     # Create a poly data object
     polydata = vtk.vtkPolyData()
-    # Set the points and vertices we created as the geometry and topology of the polydata
+    # Set the points and vertices we created as the geometry
+    # and topology of the polydata
     polydata.SetPoints(points)
     polydata.SetVerts(vertices)
     polydata.Modified()
 
     return polydata
 
-def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothingFactor=0.): #.1
+
+def smooth_polydata(poly, iteration=25, boundary=False,
+                    feature=False, smoothingFactor=0.):  # .1
     """
     This function smooths a vtk polydata
     Args:
@@ -694,7 +728,7 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothing
     """
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(poly)
-    smoother.SetPassBand(pow(10., -4. * smoothingFactor)) # -3
+    smoother.SetPassBand(pow(10., -4. * smoothingFactor))  # -3
     smoother.SetBoundarySmoothing(boundary)
     smoother.SetFeatureEdgeSmoothing(feature)
     smoother.SetNumberOfIterations(iteration)
@@ -702,11 +736,10 @@ def smooth_polydata(poly, iteration=25, boundary=False, feature=False, smoothing
     smoother.NormalizeCoordinatesOn()
     smoother.Update()
 
-
     smoothed = smoother.GetOutput()
 
-
     return smoothed
+
 
 def decimation(poly, rate):
     """
@@ -723,8 +756,9 @@ def decimation(poly, rate):
     decimate.VolumePreservationOff()
     decimate.Update()
     output = decimate.GetOutput()
-    #output = cleanPolyData(output, 0.)
+    # output = cleanPolyData(output, 0.)
     return output
+
 
 def vtkImageResample(image, spacing, opt):
     """
@@ -738,36 +772,38 @@ def vtkImageResample(image, spacing, opt):
     """
     reslicer = vtk.vtkImageReslice()
     reslicer.SetInputData(image)
-    if opt=='linear':
+    if opt == 'linear':
         reslicer.SetInterpolationModeToLinear()
-    elif opt=='NN':
+    elif opt == 'NN':
         reslicer.SetInterpolationModeToNearestNeighbor()
-    elif opt=='cubic':
+    elif opt == 'cubic':
         reslicer.SetInterpolationModeToCubic()
     else:
         raise ValueError("interpolation option not recognized")
 
-    #size = np.array(image.GetSpacing())*np.array(image.GetDimensions())
-    #new_spacing = size/np.array(dims)
+    # size = np.array(image.GetSpacing())*np.array(image.GetDimensions())
+    # new_spacing = size/np.array(dims)
 
     reslicer.SetOutputSpacing(*spacing)
     reslicer.Update()
 
     return reslicer.GetOutput()
 
-def evaluate_surface(ref_im, value = 1):
+
+def evaluate_surface(ref_im, value=1):
 
     ref_im, M = exportSitk2VTK(ref_im)
     r_s = vtk_marching_cube(ref_im, 0, value)
 
     return r_s
 
+
 def smooth_surface(polydata, smoothingIterations):
 
     if smoothingIterations == 0:
         return polydata
-    
-    passBand = 0.01 #0.001
+
+    passBand = 0.01  # 0.001
     # featureAngle = 120.0
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(polydata)
@@ -781,6 +817,7 @@ def smooth_surface(polydata, smoothingIterations):
     smoother.Update()
 
     return smoother.GetOutput()
+
 
 def get_largest_connected_polydata(poly):
 
@@ -810,7 +847,7 @@ def is_point_in_surface(surface, point):
     enclosed.Update()
 
     is_inside = enclosed.IsInside(0)
-    #print(str(is_inside))
+    # print(str(is_inside))
 
     if is_inside == 1:
         return True
@@ -820,7 +857,8 @@ def is_point_in_surface(surface, point):
         print("Error, output from VTK enclosed surface")
         return 0
 
-def process_cardiac_mesh(mesh_file, scale = 1):
+
+def process_cardiac_mesh(mesh_file, scale=1):
 
     mesh = read_geo(mesh_file).GetOutput()
 
@@ -834,7 +872,8 @@ def process_cardiac_mesh(mesh_file, scale = 1):
         mesh = normals.GetOutput()
 
     mesh_data = collect_arrays(mesh.GetPointData())
-    point_loc = v2n(mesh.GetPoints().GetData()) # point locations as numpy array
+    # point locations as numpy array
+    point_loc = v2n(mesh.GetPoints().GetData())
     region_id = mesh_data['RegionId']  # Region ID as numpy array
     # get ids of points in region 8
     region_8 = np.where(region_id == 8)[0]
@@ -847,15 +886,20 @@ def process_cardiac_mesh(mesh_file, scale = 1):
     region_3_center = np.mean(region_3_coords, axis=0)
     # calculate the normal vector of region 8
     region_8_normal = np.mean(mesh_data['Normals'][region_8, :], axis=0)
-    # check if the normal vector is pointing towards the center of mass of region 3
+    # check if the normal vector is pointing
+    # towards the center of mass of region 3
     if np.dot(region_8_normal, region_3_center - region_8_center) > 0:
         region_8_normal = -region_8_normal
 
     return region_8_center, region_8_normal, region_3_center
 
-def write_normals_centers(mesh_dir, region_8_center, region_8_normal, region_3_center):
 
-    # write the normal vector as vtk starting from the center of mass of region 8
+def write_normals_centers(mesh_dir, region_8_center,
+                          region_8_normal, region_3_center):
+
+    # write the normal vector as vtk starting
+    # from the center of mass of region 8
+
     # to the center of mass of region 3
     # create a vtkPolyData object
     line = vtk.vtkPolyData()
@@ -881,5 +925,3 @@ def write_normals_centers(mesh_dir, region_8_center, region_8_normal, region_3_c
     writer.SetFileName(os.path.join(mesh_dir, 'normal.vtp'))
     writer.SetInputData(line)
     writer.Write()
-
-    
