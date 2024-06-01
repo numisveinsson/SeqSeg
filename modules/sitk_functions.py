@@ -348,9 +348,10 @@ def is_point_in_image(assembly_image, location):
 
     try:
         vessel_value = assembly_image[index]
-        #print("Vessel value is: " + str(vessel_value))
+        # print("Vessel value is: " + str(vessel_value))
         is_inside = vessel_value > 0.5
-    except:
+    except Exception as e:
+        print(e)
         is_inside = False
 
     return is_inside
