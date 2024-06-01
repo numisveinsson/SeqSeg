@@ -135,7 +135,7 @@ def calc_branches(Centerlines):
     else:
         print("0 points in centerline")
         # cause error
-        print(error)
+        # print(error)
     print('Branch Extractor Executed')
 
     return calc_branch.Centerlines
