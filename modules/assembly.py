@@ -1,10 +1,11 @@
-from .sitk_functions import *
+from .sitk_functions import (read_image, create_new, sitk_to_numpy,
+                             numpy_to_sitk, keep_component_seeds)
 from .centerline import calc_centerline_fmm
-from .vtk_functions import is_point_in_image, write_vtk_polydata, points2polydata, appendPolyData
+from .vtk_functions import (is_point_in_image, write_vtk_polydata,
+                            points2polydata, appendPolyData)
 import numpy as np
 import SimpleITK as sitk
 import operator
-import time
 from datetime import datetime
 import sys
 sys.stdout.flush()
@@ -12,14 +13,21 @@ sys.stdout.flush()
 
 class Segmentation:
     """
-    Class to keep track of a global segmentation, and update it with new segmentations
+    Class to keep track of a global segmentation,
+    and update it with new segmentations
     """
 
-    def __init__(self, case = None, image_file = None, weighted = False, weight_type = None, image = None):
+    def __init__(self,
+                 case=None,
+                 image_file=None,
+                 weighted=False,
+                 weight_type=None,
+                 image=None):
         """
         Args:
             case: name of the case
-            image_file: image file to create the global segmentation in the same space
+            image_file: image file to create the global segmentation
+            in the same space
             weighted: whether to use a weighted average for the segmentation
             weight_type: type of weight to use for the weighted average
             image: image object to create the global segmentation
@@ -47,12 +55,17 @@ class Segmentation:
         if weighted:
             # also keep track of how many updates to pixels
             self.n_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
-            #print("Creating weighted segmentation")
+            # print("Creating weighted segmentation")
             assert weight_type, "Please provide a weight type"
-            assert weight_type in ['radius', 'gaussian'], "Weight type not recognized"
+            assert weight_type in ['radius', 'gaussian'], """Weight type
+            not recognized"""
             self.weight_type = weight_type
 
-    def add_segmentation(self, volume_seg, index_extract, size_extract, weight=None):
+    def add_segmentation(self,
+                         volume_seg,
+                         index_extract,
+                         size_extract,
+                         weight=None):
         """
         Function to add a new segmentation to the global assembly
         Args:
@@ -71,44 +84,73 @@ class Segmentation:
         index_extract = np.array(index_extract) + cut
 
         # Keep track of number of updates
-        curr_n = self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]]
+        curr_n = self.number_updates[index_extract[2]:edges[2],
+                                     index_extract[1]:edges[1],
+                                     index_extract[0]:edges[0]]
 
         # Isolate current subvolume of interest
-        curr_sub_section = np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]]
-        np_arr_add = np_arr_add[cut:size_extract[2]-cut, cut:size_extract[1]-cut, cut:size_extract[0]-cut]
+        curr_sub_section = np_arr[index_extract[2]:edges[2],
+                                  index_extract[1]:edges[1],
+                                  index_extract[0]:edges[0]]
+        np_arr_add = np_arr_add[cut:size_extract[2]-cut,
+                                cut:size_extract[1]-cut,
+                                cut:size_extract[0]-cut]
         # Find indexes where we need to average predictions
         ind = curr_n > 0
         # Where this is the first update, copy directly
         curr_sub_section[curr_n == 0] = np_arr_add[curr_n == 0]
 
-        if not self.weighted: # Then we do plain average
+        if not self.weighted:  # Then we do plain average
             # Update those values, calculating an average
-            curr_sub_section[ind] = 1/(curr_n[ind]+1)*( np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+            curr_sub_section[ind] = 1/(curr_n[ind]+1) * (
+                np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind])
             # Add to update counter for these voxels
-            self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
+            self.number_updates[index_extract[2]:edges[2],
+                                index_extract[1]:edges[1],
+                                index_extract[0]:edges[0]] += 1
 
         else:
             if self.weight_type == 'radius':
-                curr_sub_section[ind] = 1/(curr_n[ind]+weight)*( weight*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+                curr_sub_section[ind] = 1/(curr_n[ind]+weight)*(
+                    weight*np_arr_add[ind] + (
+                        curr_n[ind])*curr_sub_section[ind])
                 # Add to update weight sum for these voxels
-                self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight
-                self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
+                self.number_updates[index_extract[2]:edges[2],
+                                    index_extract[1]:edges[1],
+                                    index_extract[0]:edges[0]] += weight
+                self.n_updates[index_extract[2]:edges[2],
+                               index_extract[1]:edges[1],
+                               index_extract[0]:edges[0]] += 1
+
             elif self.weight_type == 'gaussian':
-                # now the weight varies with the distance to the center of the volume, and the distance to the border
+                # now the weight varies with the distance to the center of
+                # the volume, and the distance to the border
                 weight_array = self.calc_weight_array_gaussian(size_extract)
-                # print(f"weight array size: {weight_array.shape}, ind size: {ind.shape}")
+                # print(f"weight array size: {weight_array.shape},
+                # ind size: {ind.shape}")
                 # Update those values, calculating an average
-                curr_sub_section[ind] = 1/(curr_n[ind]+weight_array[ind])*( weight_array[ind]*np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind] )
+                curr_sub_section[ind] = 1/(
+                    curr_n[ind]+weight_array[ind])*(
+                        weight_array[ind]*np_arr_add[ind]
+                        + (curr_n[ind])*curr_sub_section[ind])
                 # Add to update weight sum for these voxels
-                self.number_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += weight_array
-                self.n_updates[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] += 1
+                self.number_updates[index_extract[2]:edges[2],
+                                    index_extract[1]:edges[1],
+                                    index_extract[0]:edges[0]] += weight_array
+                self.n_updates[index_extract[2]:edges[2],
+                               index_extract[1]:edges[1],
+                               index_extract[0]:edges[0]] += 1
 
         # Update the global volume
-        np_arr[index_extract[2]:edges[2], index_extract[1]:edges[1], index_extract[0]:edges[0]] = curr_sub_section
+        np_arr[index_extract[2]:edges[2],
+               index_extract[1]:edges[1],
+               index_extract[0]:edges[0]] = curr_sub_section
+
         self.assembly = numpy_to_sitk(np_arr, self.image_reader)
 
     def calc_weight_array_gaussian(self, size_extract):
-        "Function to calculate the weight array for a gaussian weighted segmentation"
+        """Function to calculate the weight array for
+        a gaussian weighted segmentation"""
         # have std so the weight is 0.1 at the border of the volume
         std = 0.1*np.array(size_extract)
         # create a grid of distances to the center of the volume
@@ -117,21 +159,24 @@ class Segmentation:
         z = np.linspace(-size_extract[2]/2, size_extract[2]/2, size_extract[2])
         x, y, z = np.meshgrid(z, y, x)
         # now transpose
-        x = x.transpose(1,0,2)
-        y = y.transpose(1,0,2)
-        z = z.transpose(1,0,2)
+        x = x.transpose(1, 0, 2)
+        y = y.transpose(1, 0, 2)
+        z = z.transpose(1, 0, 2)
         # calculate the weight array
-        weight_array = np.exp(-0.5*(x**2/std[0]**2 + y**2/std[1]**2 + z**2/std[2]**2))
+        weight_array = np.exp(-0.5*(x**2/std[0]**2
+                                    + y**2/std[1]**2
+                                    + z**2/std[2]**2))
         return weight_array
 
     def create_mask(self):
         "Function to create a global image mask of areas that were segmented"
         mask = (self.number_updates > 0).astype(int)
-        mask = numpy_to_sitk(mask,self.image_reader)
+        mask = numpy_to_sitk(mask, self.image_reader)
         self.mask = mask
 
         return mask
-    def upsample(self, template_size=[1000,1000,1000]):
+
+    def upsample(self, template_size=[1000, 1000, 1000]):
         from .prediction import centering
         or_im = sitk.GetImageFromArray(self.assembly)
         or_im.SetSpacing(self.image_resampled.GetSpacing())
@@ -139,18 +184,22 @@ class Segmentation:
         or_im.SetDirection(self.image_resampled.GetDirection())
         target_im = create_new(or_im)
         target_im.SetSize(template_size)
-        new_spacing = (np.array(or_im.GetSize())*np.array(or_im.GetSpacing()))/np.array(template_size)
+        new_spacing = (
+            np.array(or_im.GetSize())*np.array(
+                or_im.GetSpacing()))/np.array(template_size)
         target_im.SetSpacing(new_spacing)
 
         resampled = centering(or_im, target_im, order=0)
         return resampled
 
-    def upsample_sitk(self, template_size=[1000,1000,1000]):
+    def upsample_sitk(self, template_size=[1000, 1000, 1000]):
 
         from .prediction import resample_spacing
-        resampled, ref_im = resample_spacing(self.assembly, template_size=template_size)
+        resampled, _ = resample_spacing(self.assembly,
+                                        template_size=template_size)
         return resampled
-47
+
+
 class VesselTree:
 
     def __init__(self, case, image_file, init_step, pot_branches):
@@ -161,7 +210,7 @@ class VesselTree:
         self.steps = [init_step]
         if len(pot_branches) > 1:
             for i in range(len(pot_branches)-1):
-                pot_branches[i+1]['connection'] = [0,0]
+                pot_branches[i+1]['connection'] = [0, 0]
         self.potential_branches = pot_branches
         self.caps = []
 
@@ -185,7 +234,8 @@ class VesselTree:
         del self.bifurcations[-1]
 
     def sort_potential_radius(self):
-        self.potential_branches.sort(key=operator.itemgetter('radius'), reverse = True)
+        self.potential_branches.sort(key=operator.itemgetter('radius'),
+                                     reverse=True)
 
     def shuffle_potential(self):
         np.random.shuffle(self.potential_branches)
@@ -200,12 +250,18 @@ class VesselTree:
         while i < len(self.potential_branches):
             j = i + 1
             while j < len(self.potential_branches):
-                mult_r = 2 # within 2 radii
-                location_close =  np.linalg.norm(np.array(self.potential_branches[i]['point']) - np.array(self.potential_branches[j]['point'])) < mult_r* self.potential_branches[i]['radius']
-                angle_range = 0.5 # 30 degrees
+                mult_r = 2  # within 2 radii
+                location_close = (np.linalg.norm(
+                    np.array(self.potential_branches[i]['point']) - np.array(
+                        self.potential_branches[j]['point']))
+                        < mult_r * self.potential_branches[i]['radius'])
+                angle_range = 0.5  # 30 degrees
                 tangent_i = self.potential_branches[i]['tangent']
                 tangent_j = self.potential_branches[j]['tangent']
-                angle_close = np.arccos(np.dot(tangent_i, tangent_j))/(np.linalg.norm(tangent_i)*np.linalg.norm(tangent_j)) < angle_range
+                angle_close = (np.arccos(
+                    np.dot(tangent_i, tangent_j))/(np.linalg.norm(tangent_i)
+                                                   * np.linalg.norm(tangent_j))
+                    < angle_range)
                 if location_close and angle_close:
                     del self.potential_branches[j]
                 else:
@@ -220,7 +276,7 @@ class VesselTree:
             previous_n = branch0[-n:]
         else:
             # previous_n = branch0
-            previous_n = [bra for bra in branch0] #branch0
+            previous_n = [bra for bra in branch0]  # branch0
             # previous_n = previous_n[:]
             # conn = self.bifurcations[branch]
             # if conn != 0:
@@ -234,18 +290,21 @@ class VesselTree:
         # remove 0 from the list
         if 0 in previous_n and len(previous_n) > 1:
             previous_n.remove(0)
-            
+
         return previous_n
 
-    def get_previous_step(self,step_number):
+    def get_previous_step(self, step_number):
 
-        inds = [(i, colour.index(step_number)) for i, colour in enumerate(self.branches) if step_number in colour]
+        inds = [(i, colour.index(step_number))
+                for i, colour in enumerate(self.branches)
+                if step_number in colour]
 
         for ind in inds:
-            if ind[1] == 0: continue
+            if ind[1] == 0:
+                continue
             else:
                 ind_prev = self.branches[ind[0]][ind[1]-1]
-                
+
         return self.steps[ind_prev]
 
     def restart_branch(self, branch):
@@ -263,9 +322,9 @@ class VesselTree:
                 del self.potential_branches[i]
 
         print(f"Restarted branch {branch}")
-    
+
     def calc_ave_dice(self):
-        total_dice, count = 0,0
+        total_dice, count = 0, 0
         for step in self.steps[1:]:
             if step['dice']:
                 if not step['dice'] == 0:
@@ -277,7 +336,7 @@ class VesselTree:
         return ave_dice
 
     def calc_ave_time(self):
-        total_time, count = 0,0
+        total_time, count = 0, 0
         for step in self.steps[1:]:
             if step['time']:
                 count += 1
@@ -305,7 +364,7 @@ class VesselTree:
                 counter += 1
 
         for j in range(len(names)):
-            print('Average time for ' + names[j]+ ' : ', time_sum[j]/counter)
+            print('Average time for ' + names[j] + ' : ', time_sum[j]/counter)
         print(np.array(time_sum/counter).tolist())
 
     def calc_caps(self, global_assembly):
@@ -314,32 +373,24 @@ class VesselTree:
         for point in self.caps:
             if not is_point_in_image(global_assembly, point):
                 final_caps.append(point)
-            #else:
-                #print('Inside \n')
+            # else:
+                # print('Inside \n')
 
         print('Number of outlets: ' + str(len(final_caps)))
-        #final_caps = orient_caps(final_caps, init_step)
+        # final_caps = orient_caps(final_caps, init_step)
         return final_caps
 
     def get_end_points(self):
-        points = [self.steps[0]['point'] - self.steps[0]['tangent'] * 2 * self.steps[0]['radius']]
+        points = [self.steps[0]['point'] - self.steps[0]['tangent']
+                  * 2 * self.steps[0]['radius']]
         for branch in self.branches:
             id = branch[-1]
-            points.append(self.steps[id]['point'] + self.steps[id]['tangent'] * 1 * self.steps[id]['radius'])
+            points.append(self.steps[id]['point'] + self.steps[id]['tangent']
+                          * 1 * self.steps[id]['radius'])
         return points
-
-    def write_csv(self):
-        """
-        Function to write tree graph as a csv file
-        Each line will have: Node 1, Node 2 that are connected
-        and any attributes associated with the edge: Radius, Angle, etc
-        """
-        import csv
-
 
     def plot_graph(self):
         import networkx as nx
-        import matplotlib.pyplot as plt
 
         G = nx.DiGraph()
         G.add_edges_from(
@@ -349,19 +400,19 @@ class VesselTree:
         nx.draw(G)
 
         G = nx.Graph()
-        G.add_edge(1, 2, color='r' ,weight=3)
+        G.add_edge(1, 2, color='r', weight=3)
         G.add_edge(2, 3, color='b', weight=5)
         G.add_edge(3, 4, color='g', weight=7)
 
         pos = nx.circular_layout(G)
 
-        colors = nx.get_edge_attributes(G,'color').values()
-        weights = nx.get_edge_attributes(G,'weight').values()
+        colors = nx.get_edge_attributes(G, 'color').values()
+        weights = nx.get_edge_attributes(G, 'weight').values()
 
         nx.draw(G, pos, edge_color=colors, width=list(weights))
 
         # plt.show()
-    
+
     def create_tree_graph(self, dir_output):
         """
         Function to create a graph of the tree
@@ -385,9 +436,12 @@ class VesselTree:
         # pos = nx.spectral_layout(G)
         # pos = nx.multipartite_layout(G)
         # pos = nx.nx_agraph.graphviz_layout(G, prog="dot")
-        
-        # nx.draw(G, pos, with_labels=True, node_size=100, node_color='lightblue', font_weight='bold', font_size=1, edge_color='grey')
-        nx.draw(G, pos, with_labels=True, node_color='lightblue', font_weight='bold')
+
+        # nx.draw(G, pos, with_labels=True, node_size=100,
+        #         node_color='lightblue', font_weight='bold',
+        #         font_size=1, edge_color='grey')
+        nx.draw(G, pos, with_labels=True,
+                node_color='lightblue', font_weight='bold')
 
         # save the graph
         plt.savefig(dir_output+'/tree_graph.png')
@@ -422,7 +476,8 @@ class VesselTree:
         for i, step in enumerate(self.steps):
             # if i is node
             if i in G.nodes:
-                if len(list(G.successors(i))) == 1 and len(list(G.predecessors(i))) == 1:
+                if (len(list(G.successors(i))) == 1
+                   and len(list(G.predecessors(i))) == 1):
                     pred = list(G.predecessors(i))[0]
                     succ = list(G.successors(i))[0]
                     G.add_edge(pred, succ)
@@ -434,8 +489,11 @@ class VesselTree:
         # pos = nx.multipartite_layout(G)
         # pos = nx.nx_agraph.graphviz_layout(G, prog="dot")
 
-        # nx.draw(G, pos, with_labels=True, node_size=100, node_color='lightblue', font_weight='bold', font_size=1, edge_color='grey')
-        nx.draw(G, pos, with_labels=True, node_color='lightblue', font_weight='bold')
+        # nx.draw(G, pos, with_labels=True, node_size=100,
+        #         node_color='lightblue', font_weight='bold',
+        #         font_size=1, edge_color='grey')
+        nx.draw(G, pos, with_labels=True, node_color='lightblue',
+                font_weight='bold')
 
         # save the graph
         plt.savefig(dir_output+'/tree_graph_smaller.png')
@@ -446,8 +504,10 @@ class VesselTree:
         Function to create a polydata of the steps in the tree
         The function uses self.branches to know the connections between steps
         The actual points are in self.steps
-        An example of a branch is [0, 1, 2, 3] where 0 is the start of the branch
-        The next branch is [1, 4, 5, 6] where 1 is where the branch connects to another (previous) branch
+        An example of a branch is [0, 1, 2, 3]
+        where 0 is the start of the branch
+        The next branch is [1, 4, 5, 6] where 1 is where
+        the branch connects to another (previous) branch
         4, 5, 6 are the steps in the branch
         We use vtk.lines to connect the points in the branches so that:
             0 - 1 - 2 - 3 are connected
@@ -459,11 +519,11 @@ class VesselTree:
         """
         import vtk
 
-        print(f"\nCreating polydata of tree")
-        print(f"Branches are:")
+        print("\nCreating polydata of tree")
+        print("Branches are:")
         for branch in self.branches:
             print(branch)
-            
+
         # Create the polydata
         polydata = vtk.vtkPolyData()
         points = vtk.vtkPoints()
@@ -494,8 +554,10 @@ class VesselTree:
         Function to create a polydata of the steps in the tree
         The function uses self.branches to know the connections between steps
         The actual points are in self.steps
-        An example of a branch is [0, 1, 2, 3] where 0 is the start of the branch
-        The next branch is [1, 4, 5, 6] where 1 is where the branch connects to another (previous) branch
+        An example of a branch is [0, 1, 2, 3]
+        where 0 is the start of the branch
+        The next branch is [1, 4, 5, 6] where 1 is where
+        the branch connects to another (previous) branch
         4, 5, 6 are the steps in the branch
         We use vtk.lines to connect the points in the branches so that:
             0 - 1 - 2 - 3 are connected
@@ -580,7 +642,7 @@ class VesselTree:
         # add the lines
         for i in range(len(connections)):
             for j in range(len(connections)):
-                if connections[i,j] == 1:
+                if connections[i, j] == 1:
                     line = vtk.vtkLine()
                     line.GetPointIds().SetId(0, i)
                     line.GetPointIds().SetId(1, j)
@@ -607,12 +669,14 @@ class VesselTree:
         plt.close()
 
         # plot the radius across steps and have space betwwen steps on x axis
-        plt.figure(figsize=(25,5))
+        plt.figure(figsize=(25, 5))
         plt.plot(range(n_step), radii)
         plt.xlabel('Step')
         plt.ylabel('Radius')
         plt.title('Radius Change')
-        # plt.xticks(np.arange(min(range(n_step)), max(range(n_step))+1, max(range(n_step))//20))
+        # plt.xticks(np.arange(min(range(n_step)),
+        #                      max(range(n_step))+1,
+        #                      max(range(n_step))//20))
         # plt.tick_params(axis='x', which='major', labelsize=3)
         # plt.show()
         # save the graph
@@ -641,11 +705,12 @@ class VesselTreeParallel:
         self.potential_branches.extend(branch.children)
 
     def remove_potential(self, pot_branch):
-        self.potential_branches = [i for i in self.potential_branches if not (i['radius'] == pot_branch['radius'])]
+        self.potential_branches = [i for i in self.potential_branches
+                                   if not (i['radius'] == pot_branch['radius'])
+                                   ]
 
     def sort_potential(self):
         self.potential_branches.sort(key=operator.itemgetter('old radius'))
-
 
 
 class Branch:
@@ -663,7 +728,13 @@ class Branch:
         self.children.append(step)
 
 
-def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None, old_point_ref = None, centerline_poly=None):
+def print_error(output_folder,
+                i,
+                step_seg,
+                image=None,
+                predicted_vessel=None,
+                old_point_ref=None,
+                centerline_poly=None):
 
     now = datetime.now()
     dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
@@ -682,19 +753,26 @@ def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None, o
                 write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
 
                 if step_seg['centerline']:
-                    polydata_point = points2polydata([step_seg['old_point_ref'].tolist()])
-                    write_vtk_polydata(polydata_point, directory + 'old_point_ref.vtp')
-                
-                    write_vtk_polydata(centerline_poly, directory + 'cent.vtp')
+                    polydata_point = points2polydata(
+                        [step_seg['old_point_ref'].tolist()])
+                    write_vtk_polydata(polydata_point,
+                                       directory + 'old_point_ref.vtp')
+                    write_vtk_polydata(centerline_poly,
+                                       directory + 'cent.vtp')
 
 
-def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=None):
+def create_step_dict(old_point,
+                     old_radius,
+                     new_point,
+                     new_radius,
+                     angle_change=None):
 
     step_dict = {}
     step_dict['old point'] = old_point
     step_dict['point'] = new_point
     step_dict['old radius'] = old_radius
-    step_dict['tangent'] = (new_point - old_point)/np.linalg.norm(new_point - old_point)
+    step_dict['tangent'] = (new_point - old_point)/np.linalg.norm(
+                                                    new_point - old_point)
     step_dict['radius'] = new_radius
     step_dict['chances'] = 0
     step_dict['seg_file'] = None
@@ -714,7 +792,11 @@ def create_step_dict(old_point, old_radius, new_point, new_radius, angle_change=
     return step_dict
 
 
-def get_old_ref_point(vessel_tree, step_seg, i, mega_sub = False, mega_sub_N = 0):
+def get_old_ref_point(vessel_tree,
+                      step_seg,
+                      i,
+                      mega_sub=False,
+                      mega_sub_N=0):
 
     if not mega_sub:
         # return the old point
