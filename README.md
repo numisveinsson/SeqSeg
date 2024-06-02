@@ -3,14 +3,19 @@ Repository for Automatic Vascular Model Creation using localized 3D segmentation
 
 ## Set Up
 Main package dependencies (see environment.yml file for all):
-- nnU-Net
-- Pytorch
 - SITK
 - VTK
+and if using nnU-Net:
+- nnU-Net
+- Pytorch
+and if using VMTK:
 - VMTK
 
 ## Config file
-`config.yml`: File contains config parameters, default is set but can be changed depending on task
+`config/global.yml`: File contains config parameters, default is set but can be changed depending on task
+
+We recommend duplicating the file and changing the name to avoid overwriting the default values.
+If so, the config file must be passed as an argument when running the script: `config_name`
 
 ## Running
 `auto_centerline`: Main script to run.
@@ -21,7 +26,9 @@ Arguments:
 
 -`test_name`: This argument specifies the name of the nnUNet test to use. The default value is '3d_fullres'. Other possible values could be '2d', etc.
 
--`dataset`: This argument specifies the name of the dataset used to train the nnUNet model. For example, 'Dataset010_SEQCOROASOCACT'.
+-`train_dataset`: This argument specifies the name of the dataset used to train the nnUNet model. For example, 'Dataset010_SEQCOROASOCACT'.
+
+-'config_name': This argument specifies the name of the config file to use. The default value is 'global.yml'.
 
 -`fold`: This argument specifies which fold to use for the nnUNet model. The default value is 'all'.
 
@@ -33,7 +40,11 @@ Arguments:
 
 -`start`: This argument specifies where to start in the list of testing samples. The default value is 0.
 
--`stop`: This argument specifies where to stop in the list of testing samples. The default value is -1, which usually means to process all samples until the end of the list.
+-`stop`: This argument specifies where to stop in the list of testing samples. The default value is -1, which means to process all samples until the end of the list.
+
+-'max_n_steps': This argument specifies the maximum number of steps to run the algorithm. The default value is 1000.
+
+-'unit': This argument specifies the unit of the image data. The default value is 'cm'.
 
 Data directory: Assumes the following structure:
 - Directory
