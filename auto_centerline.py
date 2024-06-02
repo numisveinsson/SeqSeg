@@ -107,6 +107,10 @@ if __name__ == '__main__':
                         default='cm',
                         type=str,
                         help='Unit of medical image')
+    parser.add_argument('-config_name', '--config_name',
+                        default='global',
+                        type=str,
+                        help='Name of configuration file')
     args = parser.parse_args()
 
     print(args)
@@ -127,7 +131,7 @@ if __name__ == '__main__':
     #           '.nrrd', 1]
     #          ]
 
-    global_config = load_yaml("./config/global.yaml")
+    global_config = load_yaml("./config/"+args.config_name+".yaml")
 
     dir_output0 = args.outdir
 
