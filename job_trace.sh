@@ -40,7 +40,7 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -dataset Dataset005_SEQAORTANDFEMOMR \
+    -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
     -outdir output_aortas_june24mr/ \
