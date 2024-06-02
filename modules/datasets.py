@@ -100,7 +100,7 @@ def get_testing_samples(dataset, data_dir=None):
         if dataset == 'Dataset005_SEQAORTANDFEMOMR':
             testing_samples = [
 
-                ['0006_0001', 0, 0, 1, 'mr'],  # Aortofemoral MR
+                ['0006_0001', 0, 3, 5, 'mr'],  # Aortofemoral MR
                 ['0063_1001', 0, 10, 20, 'mr'],  # Aortic MR
                 ['0070_0001', 0, 10, 20, 'mr'],  # Aortic MR
                 ['0090_0001', 0, 0, 5, 'mr'],  # Aortic MR

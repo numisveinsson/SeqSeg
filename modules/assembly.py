@@ -1,7 +1,7 @@
 from .sitk_functions import (read_image, create_new, sitk_to_numpy,
-                             numpy_to_sitk, keep_component_seeds)
+                             numpy_to_sitk, keep_component_seeds, is_point_in_image)
 from .centerline import calc_centerline_fmm
-from .vtk_functions import (is_point_in_image, write_vtk_polydata,
+from .vtk_functions import (write_vtk_polydata,
                             points2polydata, appendPolyData)
 import numpy as np
 import SimpleITK as sitk
