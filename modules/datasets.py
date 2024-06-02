@@ -93,7 +93,8 @@ def get_testing_samples(dataset, data_dir=None):
             print('Json file not found')
             testing_samples = None
     else:
-        print('No data directory provided, using default dataset')
+        print('No data directory provided.')
+        print('Using default data directory based on training dataset.')
 
         directory = '/global/scratch/users/numi/vascular_data_3d/'
         if dataset == 'Dataset005_SEQAORTANDFEMOMR':
