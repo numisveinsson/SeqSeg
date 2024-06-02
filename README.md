@@ -5,9 +5,11 @@ Repository for Automatic Vascular Model Creation using localized 3D segmentation
 Main package dependencies (see environment.yml file for all):
 - SITK
 - VTK
+
 and if using nnU-Net:
 - nnU-Net
 - Pytorch
+
 and if using VMTK:
 - VMTK
 
