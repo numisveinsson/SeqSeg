@@ -6,7 +6,7 @@
 #SBATCH --account=fc_biome
 #
 # Partition:
-#SBATCH --partition=savio3_htc
+#SBATCH --partition=savio4_htc
 #
 # QoS:
 #SBATCH --qos=savio_normal
