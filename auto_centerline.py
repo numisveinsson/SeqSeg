@@ -134,6 +134,7 @@ if __name__ == '__main__':
     global_config = load_yaml("./config/"+args.config_name+".yaml")
 
     dir_output0 = args.outdir
+    data_dir = args.data_directory
 
     unit = args.unit
     max_step_size = args.max_n_steps
@@ -153,7 +154,7 @@ if __name__ == '__main__':
     # Weight directory
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
 
-    testing_samples, directory_data = get_testing_samples(dataset)
+    testing_samples, directory_data = get_testing_samples(dataset, data_dir)
     print("Testing samples about to run:")
     for sample in testing_samples:
         print(sample)
