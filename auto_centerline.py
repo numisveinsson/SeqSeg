@@ -70,7 +70,7 @@ if __name__ == '__main__':
                         default='3d_fullres',
                         type=str,
                         help='Name of nnUNet test to use, eg 3d_fullres/2d')
-    parser.add_argument('-dataset', '--dataset',
+    parser.add_argument('-train_dataset', '--train_dataset',
                         type=str,
                         help="""Name of dataset used to train nnUNet
                              , eg Dataset010_SEQCOROASOCACT""")
@@ -144,7 +144,7 @@ if __name__ == '__main__':
     # for test in tests:
     # print('\n test is: \n', test)
 
-    dataset = args.dataset      # test[1]
+    dataset = args.train_dataset      # test[1]
     fold = args.fold            # test[2]
     img_format = args.img_ext   # test[4]
     scale = args.scale          # test[5]
