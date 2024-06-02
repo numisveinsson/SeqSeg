@@ -10,6 +10,10 @@ from vtk.util.numpy_support import vtk_to_numpy as v2n
 sys.stdout.flush()
 
 
+class SkipThisStepError(Exception):
+    pass
+
+
 def get_smoothing_params(radius,
                          scale_unit,
                          mega_sub=False,
@@ -40,10 +44,6 @@ def get_smoothing_params(radius,
             num_iterations = 5
 
     return num_iterations
-
-
-class SkipThisStepError(Exception):
-    pass
 
 
 def get_next_points(centerline_poly,
