@@ -72,6 +72,7 @@ if __name__ == '__main__':
                         help='Name of nnUNet test to use, eg 3d_fullres/2d')
     parser.add_argument('-train_dataset', '--train_dataset',
                         type=str,
+                        default='Dataset010_SEQCOROASOCACT',
                         help="""Name of dataset used to train nnUNet
                              , eg Dataset010_SEQCOROASOCACT""")
     parser.add_argument('-fold', '--fold',
