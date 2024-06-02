@@ -1,3 +1,6 @@
+import os
+
+
 def vmr_directories(directory, model, dir_seg_exist=True, global_scale=None):
     """
     Function to return the directories of
@@ -72,68 +75,86 @@ def get_testing_samples_json(dir_json):
     return data
 
 
-def get_testing_samples(dataset):
-
-    directory = '/global/scratch/users/numi/vascular_data_3d/'
-    if dataset == 'Dataset005_SEQAORTANDFEMOMR':
-        testing_samples = [
-
-            ['0006_0001', 0, 0, 1, 'mr'],  # Aortofemoral MR
-            ['0063_1001', 0, 10, 20, 'mr'],  # Aortic MR
-            ['0070_0001', 0, 10, 20, 'mr'],  # Aortic MR
-            ['0090_0001', 0, 0, 5, 'mr'],  # Aortic MR
-            ['0131_0000', 0, 10, 20, 'mr'],  # Aortic MR
-            ['KDR12_aorta', 0, 20, 30, 'mr'],  # Aortic MR
-            ['KDR33_aorta', 3, -10, -20, 'mr'],  # Aortic MR
-
-        ]
-
-    elif dataset == 'Dataset006_SEQAORTANDFEMOCT':
-        directory = '/global/scratch/users/numi/vascular_data_3d/'
+def get_testing_samples(dataset, data_dir=None):
+    """
+    Get testing samples for a specific dataset
+    Returns:
+        testing_samples: list of testing sample dictionaries
+    """
+    if data_dir:
+        print('Data directory provided')
+        directory = data_dir
+        print('Checking for json file')
         dir_json = directory + 'test.json'
-        testing_samples = [  # get_testing_samples_json(dir_json)
-
-            ['0139_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
-            ['0141_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
-            ['0146_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
-            ['0174_0000', 0, 5, 10, 'ct'],  # Aorta CT
-            ['0176_0000', 0, 10, 15, 'ct'],  # Aorta CT
-            ['0188_0001_aorta', 5, -10, -20, 'ct'],  # Aorta CT
-            ['O150323_2009_aorta', 0, 10, 20, 'ct'],  # Aorta CT
-            ['O344211000_2006_aorta', 0, 20, 30, 'ct'],  # Aorta CT
-        ]
-
-    elif dataset == 'Dataset007_SEQPULMONARYMR':
-        testing_samples = [
-
-            ['0085_1001', 0, 0, 10, 'mr'],  # Pulmonary MR
-            # ['0085_1001',0,200,220,'mr'], # Pulmonary MR
-            # ['0085_1001',1,200,220,'mr'], # Pulmonary MR
-            ['0081_0001', 0, 20, 30, 'mr'],  # Pulmonary MR
-            # ['0081_0001',1,200,220,'mr'], # Pulmonary MR
-            # ['0081_0001',1,2000,220,'mr'], # Pulmonary MR
-        ]
-    elif dataset == 'Dataset009_SEQAORTASMICCT':
-
-        directory = '/global/scratch/users/numi/test_data/miccai_aortas/'
-        dir_json = directory + 'test.json'
-        testing_samples = get_testing_samples_json(dir_json)
-
-    elif dataset == 'Dataset010_SEQCOROASOCACT':
-
-        directory = '/global/scratch/users/numi/ASOCA_test/'
-        directory = '/global/scratch/users/numi/Karthik_test/'
-        dir_json = directory + 'test.json'
-        testing_samples = get_testing_samples_json(dir_json)
-
-    elif dataset == 'Dataset016_SEQPULMPARSECT':
-        directory = '/global/scratch/users/numi/PARSE_dataset/'
-        dir_asoca_json = directory + 'test.json'
-        testing_samples = get_testing_samples_json(dir_asoca_json)
-
+        if os.path.isfile(dir_json):
+            print('Json file found')
+            testing_samples = get_testing_samples_json(dir_json)
+        else:
+            print('Json file not found')
+            testing_samples = None
     else:
-        print('Dataset not found')
-        testing_samples = None
+        print('No data directory provided, using default dataset')
+
+        directory = '/global/scratch/users/numi/vascular_data_3d/'
+        if dataset == 'Dataset005_SEQAORTANDFEMOMR':
+            testing_samples = [
+
+                ['0006_0001', 0, 0, 1, 'mr'],  # Aortofemoral MR
+                ['0063_1001', 0, 10, 20, 'mr'],  # Aortic MR
+                ['0070_0001', 0, 10, 20, 'mr'],  # Aortic MR
+                ['0090_0001', 0, 0, 5, 'mr'],  # Aortic MR
+                ['0131_0000', 0, 10, 20, 'mr'],  # Aortic MR
+                ['KDR12_aorta', 0, 20, 30, 'mr'],  # Aortic MR
+                ['KDR33_aorta', 3, -10, -20, 'mr'],  # Aortic MR
+
+            ]
+
+        elif dataset == 'Dataset006_SEQAORTANDFEMOCT':
+            directory = '/global/scratch/users/numi/vascular_data_3d/'
+            dir_json = directory + 'test.json'
+            testing_samples = [  # get_testing_samples_json(dir_json)
+
+                ['0139_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
+                ['0141_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
+                ['0146_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
+                ['0174_0000', 0, 5, 10, 'ct'],  # Aorta CT
+                ['0176_0000', 0, 10, 15, 'ct'],  # Aorta CT
+                ['0188_0001_aorta', 5, -10, -20, 'ct'],  # Aorta CT
+                ['O150323_2009_aorta', 0, 10, 20, 'ct'],  # Aorta CT
+                ['O344211000_2006_aorta', 0, 20, 30, 'ct'],  # Aorta CT
+            ]
+
+        elif dataset == 'Dataset007_SEQPULMONARYMR':
+            testing_samples = [
+
+                ['0085_1001', 0, 0, 10, 'mr'],  # Pulmonary MR
+                # ['0085_1001',0,200,220,'mr'], # Pulmonary MR
+                # ['0085_1001',1,200,220,'mr'], # Pulmonary MR
+                ['0081_0001', 0, 20, 30, 'mr'],  # Pulmonary MR
+                # ['0081_0001',1,200,220,'mr'], # Pulmonary MR
+                # ['0081_0001',1,2000,220,'mr'], # Pulmonary MR
+            ]
+        elif dataset == 'Dataset009_SEQAORTASMICCT':
+
+            directory = '/global/scratch/users/numi/test_data/miccai_aortas/'
+            dir_json = directory + 'test.json'
+            testing_samples = get_testing_samples_json(dir_json)
+
+        elif dataset == 'Dataset010_SEQCOROASOCACT':
+
+            directory = '/global/scratch/users/numi/ASOCA_test/'
+            directory = '/global/scratch/users/numi/Karthik_test/'
+            dir_json = directory + 'test.json'
+            testing_samples = get_testing_samples_json(dir_json)
+
+        elif dataset == 'Dataset016_SEQPULMPARSECT':
+            directory = '/global/scratch/users/numi/PARSE_dataset/'
+            dir_asoca_json = directory + 'test.json'
+            testing_samples = get_testing_samples_json(dir_asoca_json)
+
+        else:
+            print('Dataset not found')
+            testing_samples = None
 
     #    ['0108_0001_aorta',4,-10,-20,'ct'],
     #    ['0183_1002_aorta',3,-10,-20,'ct'],
