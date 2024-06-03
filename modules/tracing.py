@@ -128,7 +128,7 @@ def trace_centerline(
             device=torch.device('cpu', 0),
             verbose=False,
             verbose_preprocessing=False,
-            allow_tqdm=True
+            allow_tqdm=False
         )
         print('About to load model')
         # initializes the network architecture, loads the checkpoint
