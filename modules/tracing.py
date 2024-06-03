@@ -2,6 +2,7 @@ import time
 import pdb
 import numpy as np
 import SimpleITK as sitk
+import sys
 
 from .sitk_functions import (import_image, is_point_in_image,
                              map_to_image, extract_volume, copy_settings,
@@ -25,6 +26,7 @@ from .tracing_functions import (SkipThisStepError, convert_seg_to_surfs,
 
 from .centerline import calc_centerline_fmm
 
+sys.stdout.flush()
 
 def trace_centerline(
     output_folder,
