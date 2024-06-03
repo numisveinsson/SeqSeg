@@ -95,10 +95,16 @@ def trace_centerline(
         print(f"""Seg data. size: {size_im},
                spacing: {spacing_im}, origin: {origin_im}""")
 
-    print(f"Reading in image file: {image_file}, scale: {scale}")
-    reader_im, origin_im, size_im, spacing_im = import_image(image_file)
-    print(f"""Image data. size: {size_im},
+    if not (seg_file and trace_seg):
+        print(f"Reading in image file: {image_file}, scale: {scale}")
+        reader_im, origin_im, size_im, spacing_im = import_image(image_file)
+        print(f"""Image data. size: {size_im},
            spacing: {spacing_im}, origin: {origin_im}""")
+    else:
+        print("""No need to read in image file,
+              we are using a given segmentation""")
+        image_file = seg_file
+        reader_im = reader_seg
 
     init_step = potential_branches[0]
     vessel_tree = VesselTree(case, image_file, init_step, potential_branches)
