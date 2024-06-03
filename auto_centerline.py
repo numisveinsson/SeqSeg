@@ -186,6 +186,7 @@ if __name__ == '__main__':
 
         # print to .txt file all outputs
         if not global_config['DEBUG']:
+            # write to file
             sys.stdout = open(dir_output+"/out.txt", "w")
         else:
             print("Start tracing with debug mode on")
@@ -293,6 +294,11 @@ if __name__ == '__main__':
             vf.write_vtk_polydata(final_inside_pts, dir_output + '/final_'
                                   + case + '_' + test_name + '_'+str(i)+'_'
                                   + str(n_steps_taken)+'_inside_points.vtp')
+
+        if not global_config['DEBUG']:
+            # close the file
+            sys.stdout.close()
+            sys.stdout = sys.__stdout__
 
     print("\nTotal calculation time is: "
           + str((time.time() - start_time)/60) + " min\n")

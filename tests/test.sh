@@ -17,4 +17,4 @@ python3 auto_centerline.py \
     -outdir /Users/numisveins/Documents/SeqSeg/tests/test_output/ \
     -start 0 \
     -stop 1 \
-    -max_n_steps 150 \
+    -max_n_steps 500 \
