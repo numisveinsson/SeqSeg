@@ -130,7 +130,7 @@ def trace_centerline(
             device=torch.device('cpu', 0),
             verbose=False,
             verbose_preprocessing=False,
-            allow_tqdm=False
+            allow_tqdm=True
         )
         print('About to load model')
         # initializes the network architecture, loads the checkpoint
@@ -694,7 +694,6 @@ def trace_centerline(
 
                 # If inside, then restart branch
                 if step_seg['is_inside'] and global_config['RESTART_BRANCH']:
-                    pdb.set_trace()
                     # If inside, then move on to next branch
                     # and remove allowed_steps
                     i -= allowed_steps
