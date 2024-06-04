@@ -732,30 +732,30 @@ def trace_centerline(
 
                     if take_time:
                         print("Branches are: ", vessel_tree.branches)
-                    if write_samples:
-                        final_surface = appendPolyData(list_surf_branch)
-                        final_centerline = appendPolyData(list_cent_branch)
-                        final_points = appendPolyData(list_pts_branch)
-                        write_vtk_polydata(final_pot,
-                                           output_folder
-                                           + '/assembly/potentials_'+case+'_'
-                                           + str(branch)+'_'+str(i)
-                                           + '_points.vtp')
-                        write_vtk_polydata(final_surface,
-                                           output_folder
-                                           + '/assembly/branch_'+case+'_'
-                                           + str(branch)+'_'+str(i)
-                                           + '_surfaces.vtp')
-                        write_vtk_polydata(final_centerline,
-                                           output_folder
-                                           + '/assembly/branch_'+case+'_'
-                                           + str(branch)+'_'+str(i)
-                                           + '_centerlines.vtp')
-                        write_vtk_polydata(final_points,
-                                           output_folder
-                                           + '/assembly/branch_'+case+'_'
-                                           + str(branch)+'_'+str(i)
-                                           + '_points.vtp')
+                    # if write_samples:
+                    final_surface = appendPolyData(list_surf_branch)
+                    final_centerline = appendPolyData(list_cent_branch)
+                    final_points = appendPolyData(list_pts_branch)
+                    write_vtk_polydata(final_pot,
+                                        output_folder
+                                        + '/assembly/potentials_'+case+'_'
+                                        + str(branch)+'_'+str(i)
+                                        + '_points.vtp')
+                    write_vtk_polydata(final_surface,
+                                        output_folder
+                                        + '/assembly/branch_'+case+'_'
+                                        + str(branch)+'_'+str(i)
+                                        + '_surfaces.vtp')
+                    write_vtk_polydata(final_centerline,
+                                        output_folder
+                                        + '/assembly/branch_'+case+'_'
+                                        + str(branch)+'_'+str(i)
+                                        + '_centerlines.vtp')
+                    write_vtk_polydata(final_points,
+                                        output_folder
+                                        + '/assembly/branch_'+case+'_'
+                                        + str(branch)+'_'+str(i)
+                                        + '_points.vtp')
 
                     vessel_tree.caps = (vessel_tree.caps
                                         + [step_seg['point']

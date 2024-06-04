@@ -40,14 +40,14 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -train_dataset Dataset005_SEQAORTANDFEMOMR \
+    -train_dataset Dataset006_SEQAORTANDFEMOCT \
     -fold all \
     -img_ext .mha \
-    -outdir output_test_5/ \
+    -outdir output_test_5ct/ \
     -scale 1 \
-    -start 6 \
+    -start 0 \
     -stop -1 \
-    -max_n_steps 250 \
+    -max_n_steps 500 \
     -unit cm \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
