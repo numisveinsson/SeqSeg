@@ -1137,7 +1137,7 @@ def backtracking_gradient(gradient, distance_map_surf_np,
         print("   Fail: Reached max number of points")
         success = False
     else:
-        print("   Success: {len(points)} points")
+        print(f"   Success: {len(points)} points")
 
     # Add seed point to path
     points.append(seed)
@@ -1342,6 +1342,9 @@ def create_centerline_polydata(points_list, distance_map_surf):
 
     # Iterate over all points
     for points_path in points_list:
+        # Remove any nan values
+        points_path = [point for point in points_path
+                       if not np.isnan(point).any()]
         # flip the list so that the seed is the first point
         points_path = points_path[::-1]
         line = vtk.vtkPolyLine()
@@ -1350,6 +1353,10 @@ def create_centerline_polydata(points_list, distance_map_surf):
             # Get index of point
             index = distance_map_surf.TransformPhysicalPointToIndex(
                 point.tolist())
+            # make sure index is within bounds
+            index = [max(0, min(index[0], distance_map_surf.GetSize()[0]-1)),
+                     max(0, min(index[1], distance_map_surf.GetSize()[1]-1)),
+                     max(0, min(index[2], distance_map_surf.GetSize()[2]-1))]
             # Get distance value at point
             radius = distance_map_surf.GetPixel(index)
             # Add point to points
