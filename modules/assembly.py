@@ -1,5 +1,6 @@
 from .sitk_functions import (read_image, create_new, sitk_to_numpy,
-                             numpy_to_sitk, keep_component_seeds, is_point_in_image)
+                             numpy_to_sitk, keep_component_seeds,
+                             is_point_in_image)
 from .centerline import calc_centerline_fmm
 from .vtk_functions import (write_vtk_polydata,
                             points2polydata, appendPolyData)
@@ -313,7 +314,8 @@ class VesselTree:
         end = self.branches[branch][-1]
         print(f"Removing steps {start+1} - {end}")
         del self.steps[start+1:]
-        self.branches[branch] = []
+        # remove the list at self.branches[branch]
+        self.branches.pop(branch)
         del self.bifurcations[-1]
 
         # remove potential branches that are in the branch

@@ -649,9 +649,11 @@ def trace_centerline(
             print("\n This location done: "
                   + str(time.time() - start_time_loc) + " s\n")
 
+        # This step failed for some reason
         except Exception as e:
             print(e)
 
+            # Print error
             if step_seg['centerline']:
                 print_error(output_folder, i, step_seg, cropped_volume,
                             predicted_vessel, old_point_ref, centerline_poly)
@@ -665,6 +667,7 @@ def trace_centerline(
                 print("Didnt work for first surface")
                 # break
 
+            # Allow for another chance, if not already given
             if (vessel_tree.steps[i]['chances'] < number_chances
                and not step_seg['is_inside']):
                 print("Giving chance for surface: " + str(i))
@@ -683,17 +686,21 @@ def trace_centerline(
                                                       ['tangent']))
                 vessel_tree.steps[i]['chances'] += 1
 
+            # If already given chance, then move on
             else:
 
                 print("\n*** Error for surface: \n" + str(i))
                 print("\n Moving onto another branch")
 
+                # If inside, then restart branch
                 if step_seg['is_inside'] and global_config['RESTART_BRANCH']:
+                    pdb.set_trace()
                     # If inside, then move on to next branch
                     # and remove allowed_steps
-                    # i -= allowed_steps
+                    i -= allowed_steps
                     print(f"Redoing this branch, i is now {i}")
-                    # vessel_tree.restart_branch(branch)
+                    vessel_tree.restart_branch(branch)
+                    branch -= 1
                 else:
 
                     if debug:
