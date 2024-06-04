@@ -211,8 +211,8 @@ if __name__ == '__main__':
                                                         scale,
                                                         dir_seg)
 
-        print("""\nTotal calculation time is: "
-              + str((time.time() - start_time)/60) + " min\n""")
+        print("\nTotal calculation time is:"
+              + str((time.time() - start_time)/60) + " min\n")
 
         if take_time:
             vessel_tree.time_analysis()
