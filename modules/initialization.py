@@ -85,6 +85,7 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, scale,
 
         init_step = create_step_dict(old_seed, old_radius, initial_seed,
                                      initial_radius, 0)
+        init_step['connection'] = [0, 0]
         print(f"Old seed: {old_seed}, {old_radius}")
         print(f"Initial seed: {initial_seed}, {initial_radius} ")
         initial_seeds.append(initial_seed)
