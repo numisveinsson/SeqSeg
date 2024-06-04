@@ -2,8 +2,8 @@
 # True if we have a segmentation, False if we are predicting
 SEGMENTATION: True # usually False
 
-DEBUG: False
-DEBUG_STEP: 63
+DEBUG: True
+DEBUG_STEP: 150
 
 WRITE_STEPS: False # if we want to write out each step
 ANIMATION: False # to write out animation files
@@ -44,4 +44,4 @@ STOP_PRE: True # whether to stop tracing prematurely, if True then options below
 STOP_RADIUS: 0.46 # (mm) 0.48 if radius goes below, stop tracing
 MAX_STEPS_BRANCH: 1000 # max num of steps per branch, stop when reached
 
-RESTART_BRANCH: False
+RESTART_BRANCH: True
