@@ -131,6 +131,7 @@ def initialize_dict(test_case, dir_output, dir_cent, write_samples=False):
                   points2polydata([old_seed.tolist()]))
     init_step = create_step_dict(old_seed, old_radius, initial_seed,
                                  initial_radius, 0)
+    init_step['connection'] = [0, 0]
     potential_branches = [init_step]
 
     return potential_branches, initial_seeds
