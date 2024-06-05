@@ -223,6 +223,11 @@ class VesselTree:
         self.steps.remove(step)
         self.branches[branch].remove(i)
 
+    def remove_previous_n(self, branch, n):
+        for i in range(n):
+            self.steps.pop(self.branches[branch][-1])
+            self.branches[branch].pop()
+
     def add_branch(self, connector, i):
         self.branches.append([connector, i])
         self.bifurcations.append(connector)
