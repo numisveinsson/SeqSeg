@@ -331,13 +331,18 @@ def check_seg_border(size_extract, index_extract,
     seg_np = sitk_to_numpy(predicted_vessel).transpose(2, 1, 0)
     border = False
     for face in faces:
-        if face < 3:
-            slice = seg_np[0, :, :]
-        else:
-            slice = seg_np[-1, :, :]
-        if np.sum(slice) > 0:
-            border = True
-            break
+        if face == 0:
+            border = np.any(seg_np[0, :, :])
+        elif face == 1:
+            border = np.any(seg_np[:, 0, :])
+        elif face == 2:
+            border = np.any(seg_np[:, :, 0])
+        elif face == 3:
+            border = np.any(seg_np[-1, :, :])
+        elif face == 4:
+            border = np.any(seg_np[:, -1, :])
+        elif face == 5:
+            border = np.any(seg_np[:, :, -1])
 
     return border
 
