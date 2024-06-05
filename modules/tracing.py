@@ -28,6 +28,7 @@ from .centerline import calc_centerline_fmm
 
 sys.stdout.flush()
 
+
 def trace_centerline(
     output_folder,
     image_file,
@@ -698,11 +699,21 @@ def trace_centerline(
                     # and remove allowed_steps
                     i -= allowed_steps
                     print(f"Redoing this branch, i is now {i}")
-                    vessel_tree.restart_branch(branch)
-                    branch -= 1
+
+                    # If this branch is inside, then restart branch
+                    if len(vessel_tree.branches[branch]) <= allowed_steps + 2:
+                        vessel_tree.restart_branch(branch)
+                        branch -= 1
+                    # If not the whole branch is inside
+                    # then remove allowed_steps
+                    else:
+                        vessel_tree.remove_previous_n(branch,
+                                                      n=allowed_steps)
+
                 else:
 
                     if debug:
+                        import pdb
                         pdb.set_trace()
 
                     del vessel_tree.branches[branch][-1]
@@ -736,20 +747,20 @@ def trace_centerline(
                     final_centerline = appendPolyData(list_cent_branch)
                     final_points = appendPolyData(list_pts_branch)
                     write_vtk_polydata(final_pot,
-                                        output_folder
-                                        + '/assembly/potentials_'+case+'_'
-                                        + str(branch)+'_'+str(i)
-                                        + '_points.vtp')
+                                       output_folder
+                                       + '/assembly/potentials_'+case+'_'
+                                       + str(branch)+'_'+str(i)
+                                       + '_points.vtp')
                     write_vtk_polydata(final_surface,
-                                        output_folder
-                                        + '/assembly/branch_'+case+'_'
-                                        + str(branch)+'_'+str(i)
-                                        + '_surfaces.vtp')
+                                       output_folder
+                                       + '/assembly/branch_'+case+'_'
+                                       + str(branch)+'_'+str(i)
+                                       + '_surfaces.vtp')
                     write_vtk_polydata(final_centerline,
-                                        output_folder
-                                        + '/assembly/branch_'+case+'_'
-                                        + str(branch)+'_'+str(i)
-                                        + '_centerlines.vtp')
+                                       output_folder
+                                       + '/assembly/branch_'+case+'_'
+                                       + str(branch)+'_'+str(i)
+                                       + '_centerlines.vtp')
                     write_vtk_polydata(final_points,
                                         output_folder
                                         + '/assembly/branch_'+case+'_'
@@ -790,13 +801,13 @@ def trace_centerline(
                 vessel_tree.add_branch(next_step['connection'][1], i)
                 vessel_tree.steps[i] = next_step
                 num_steps_direction = 0
-                if take_time:
-                    print("Post Branches are: ", vessel_tree.branches)
-                    print("Number of steps are: ", len(vessel_tree.steps))
-                    print("Connections of branches are: ",
-                          vessel_tree.bifurcations)
-                    print("Number of potentials left are: ",
-                          len(vessel_tree.potential_branches))
+
+                print("Post Branches are: ", vessel_tree.branches)
+                print("Number of steps are: ", len(vessel_tree.steps))
+                print("Connections of branches are: ",
+                      vessel_tree.bifurcations)
+                print("Number of potentials left are: ",
+                      len(vessel_tree.potential_branches))
 
     if len(vessel_tree.potential_branches) > 0:
         print('Printing potentials')
