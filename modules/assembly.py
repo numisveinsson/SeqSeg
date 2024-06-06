@@ -224,9 +224,15 @@ class VesselTree:
         self.branches[branch].remove(i)
 
     def remove_previous_n(self, branch, n):
-        for i in range(n):
-            self.steps.pop(self.branches[branch][-1])
-            self.branches[branch].pop()
+        print(f'Removing last {n} steps on branch {branch}')
+        print(f'Branches are: {self.branches} before')
+        print(f'Nr steps before: {len(self.steps)}')
+        for i in range(n-1):
+            self.steps.pop(-1)
+            self.branches[branch].pop(-1)
+        self.branches[branch].pop(-1)  # once more for branches
+        print(f'Nr steps after: {len(self.steps)}')
+        print(f'Branches are: {self.branches} after')
 
     def add_branch(self, connector, i):
         self.branches.append([connector, i])
