@@ -133,6 +133,7 @@ if __name__ == '__main__':
     #          ]
 
     global_config = load_yaml("./config/"+args.config_name+".yaml")
+    print(f"Using config file: {args.config_name}")
 
     dir_output0 = args.outdir
     data_dir = args.data_directory
