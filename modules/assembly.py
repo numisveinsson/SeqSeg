@@ -321,6 +321,18 @@ class VesselTree:
 
     def restart_branch(self, branch):
         "Function to restart a branch from beginning"
+
+        # change potential branches that originated in the branch
+        for pot_branch in self.potential_branches:
+            if pot_branch['connection'][0] == branch:
+                # change the connection to first step in branch
+                first_step = self.branches[branch][0]
+                # find which branch the first step is in
+                for j, br in enumerate(self.branches):
+                    if first_step in br:
+                        pot_branch['connection'] = [j, first_step]
+                        break
+
         start = self.branches[branch][1]
         end = self.branches[branch][-1]
         print(f"Removing steps {start+1} - {end}")
@@ -328,11 +340,6 @@ class VesselTree:
         # remove the list at self.branches[branch]
         self.branches.pop(branch)
         del self.bifurcations[-1]
-
-        # remove potential branches that are in the branch
-        for i, pot_branch in enumerate(self.potential_branches):
-            if pot_branch['connection'][0] == branch:
-                del self.potential_branches[i]
 
         print(f"Restarted branch {branch}")
 
