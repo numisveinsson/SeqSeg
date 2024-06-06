@@ -41,12 +41,13 @@ python3 auto_centerline.py \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
-    -outdir output_test_5/ \
+    -outdir output_test_4_5_noradmomentum/ \
     -scale 1 \
-    -start 4 \
-    -stop 5 \
+    -start 0 \
+    -stop -1 \
     -max_n_steps 500 \
     -unit cm \
+    -config_name global_4_5 \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 
