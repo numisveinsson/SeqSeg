@@ -101,10 +101,10 @@ def trace_centerline(
     if not (seg_file and trace_seg):
         print(f"Reading in image file: {image_file}, scale: {scale}")
         reader_im, origin_im, size_im, spacing_im = import_image(image_file)
-        print(f"""Image data. size: {size_im},
-           spacing: {spacing_im}, origin: {origin_im}""")
+        print(f"""Image data. size: {size_im},\n
+           spacing: {spacing_im},\n origin: {origin_im}""")
     else:
-        print("""No need to read in image file,
+        print("""No need to read in image file,\n
               we are using a given segmentation""")
         image_file = seg_file
         reader_im = reader_seg
@@ -697,18 +697,20 @@ def trace_centerline(
                 if step_seg['is_inside'] and global_config['RESTART_BRANCH']:
                     # If inside, then move on to next branch
                     # and remove allowed_steps
-                    i -= allowed_steps
-                    print(f"Redoing this branch, i is now {i}")
 
                     # If this branch is inside, then restart branch
-                    if len(vessel_tree.branches[branch]) <= allowed_steps + 2:
-                        vessel_tree.restart_branch(branch)
-                        branch -= 1
+                    # if len(vessel_tree.branches[branch]) <= allowed_steps + 2:
+                    print('Branch inside, restarting branch')
+                    vessel_tree.restart_branch(branch)
+                    branch -= 1
                     # If not the whole branch is inside
                     # then remove allowed_steps
-                    else:
-                        vessel_tree.remove_previous_n(branch,
-                                                      n=allowed_steps)
+                    # else:
+                    #     print('Part inside, removing last n steps')
+                    #     vessel_tree.remove_previous_n(branch,
+                    #                                   n=allowed_steps-1)
+                    i = vessel_tree.branches[-1][-1] + 1
+                    print(f"i is now {i}")
 
                 else:
 
@@ -726,9 +728,9 @@ def trace_centerline(
                                                  ['centerline']))
                         list_pts_branch.append((vessel_tree.steps[id]
                                                 ['point_pd']))
-                        del vessel_tree.steps[id]['surface']
-                        del vessel_tree.steps[id]['centerline']
-                        del vessel_tree.steps[id]['point_pd']
+                        vessel_tree.steps[id]['surface'] = None
+                        vessel_tree.steps[id]['centerline'] = None
+                        vessel_tree.steps[id]['point_pd'] = None
                     list_centerlines.extend(list_cent_branch)
                     list_surfaces.extend(list_surf_branch)
                     list_points.extend(list_pts_branch)
@@ -802,7 +804,9 @@ def trace_centerline(
                 vessel_tree.steps[i] = next_step
                 num_steps_direction = 0
 
-                print("Post Branches are: ", vessel_tree.branches)
+                print("Post Branches are: ")
+                for print_branch in vessel_tree.branches:
+                    print(print_branch)
                 print("Number of steps are: ", len(vessel_tree.steps))
                 print("Connections of branches are: ",
                       vessel_tree.bifurcations)
