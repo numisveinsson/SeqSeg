@@ -41,13 +41,13 @@ python3 auto_centerline.py \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
-    -outdir output_test_5_noradmomentum/ \
+    -outdir output_aortas_forceful_radmom_mr/ \
     -scale 1 \
-    -start 3 \
-    -stop -1 \
+    -start 6 \
+    -stop 7 \
     -max_n_steps 500 \
     -unit cm \
-    -config_name global_5 \
+    -config_name global \
 
 #     -data_dir global/scratch/users/numi/ASOCA_test/  \
 
