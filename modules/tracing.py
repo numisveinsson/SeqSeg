@@ -610,7 +610,13 @@ def trace_centerline(
                                              point_tree[0],
                                              radius_tree[0],
                                              angle_change[0])
-
+                
+                if len(radius_tree) > 1 and forceful_sidebranch:
+                    print('Forceful sidebranch -  adding vector')
+                    next_step['point'] += next_step['radius']*next_step['tangent']
+                    next_step['radius'] = (next_step['radius']
+                                      * forceful_sidebranch_magnify)
+                
                 print("Next radius is: " + str(radius_tree[0]))
                 vessel_tree.add_step(i, next_step, branch)
 
