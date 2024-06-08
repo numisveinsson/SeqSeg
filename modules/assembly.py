@@ -765,23 +765,26 @@ def print_error(output_folder,
     polydata_point = points2polydata([step_seg['point'].tolist()])
     write_vtk_polydata(polydata_point, directory + 'point.vtp')
 
-    if step_seg['img_file'] and not step_seg['is_inside']:
-        sitk.WriteImage(image, directory + 'img.vtk')
+    try:
+        if step_seg['img_file'] and not step_seg['is_inside']:
+            sitk.WriteImage(image, directory + 'img.vtk')
 
-        if step_seg['seg_file']:
-            sitk.WriteImage(predicted_vessel, directory + 'seg.vtk')
+            if step_seg['seg_file']:
+                sitk.WriteImage(predicted_vessel, directory + 'seg.vtk')
 
-            if step_seg['surf_file']:
-                write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
+                if step_seg['surf_file']:
+                    write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
 
-                if step_seg['centerline']:
-                    polydata_point = points2polydata(
-                        [step_seg['old_point_ref'].tolist()])
-                    write_vtk_polydata(polydata_point,
-                                       directory + 'old_point_ref.vtp')
-                    write_vtk_polydata(centerline_poly,
-                                       directory + 'cent.vtp')
-
+                    if step_seg['centerline']:
+                        polydata_point = points2polydata(
+                            [step_seg['old_point_ref'].tolist()])
+                        write_vtk_polydata(polydata_point,
+                                        directory + 'old_point_ref.vtp')
+                        write_vtk_polydata(centerline_poly,
+                                        directory + 'cent.vtp')
+    except Exception as e:
+        print('Didnt work to save error')
+        print(e)
 
 def create_step_dict(old_point,
                      old_radius,
