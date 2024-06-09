@@ -167,6 +167,8 @@ class Segmentation:
         weight_array = np.exp(-0.5*(x**2/std[0]**2
                                     + y**2/std[1]**2
                                     + z**2/std[2]**2))
+        print(f"Max weight: {np.max(weight_array)}")
+        print(f"Min weight: {np.min(weight_array)}")
         return weight_array
 
     def create_mask(self):

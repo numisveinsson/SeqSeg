@@ -322,10 +322,10 @@ if __name__=='__main__':
 
     print_case_names = True
 
-    #input folder of segmentation results
-    pred_folder = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_aortas_may24/'
+    # input folder of segmentation results
+    pred_folder = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_aortas_june24/'
     pred_folders = os.listdir(pred_folder)
-    #only keep folders and ignore hidden files
+    # only keep folders and ignore hidden files
     pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder and 'gt' not in folder]
     pred_folders.sort()
     print(f"Prediction folders: {pred_folders}")
@@ -417,9 +417,14 @@ if __name__=='__main__':
                 for i in range(len(scores.keys())-1):
                     for j in range(i+1, len(scores.keys())):
                         t, p = ttest_ind(scores[list(scores.keys())[i]], scores[list(scores.keys())[j]])
-                        print(f"unpaired p-value between {list(scores.keys())[i]} and {list(scores.keys())[j]}: {p}")
+                        # print(f"unpaired p-value between {list(scores.keys())[i]} and {list(scores.keys())[j]}: {p}")
                         t, p = ttest_rel(scores[list(scores.keys())[i]], scores[list(scores.keys())[j]])
-                        print(f"paired p-value between {list(scores.keys())[i]} and {list(scores.keys())[j]}: {p}")
+                        print(f"\n {p}: paired p-value between {list(scores.keys())[i]} and {list(scores.keys())[j]}")
+                        # if p < 0.05, then print
+                        if p < 0.05:
+                            print(f"***DING DING*** Significant difference between {list(scores.keys())[i]} and {list(scores.keys())[j]}\n")
+                        else:
+                            print(f"No significant difference between {list(scores.keys())[i]} and {list(scores.keys())[j]}\n")
 
             # Make box plot for modality
             import matplotlib.pyplot as plt
