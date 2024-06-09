@@ -41,10 +41,10 @@ python3 auto_centerline.py \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
-    -outdir output_aortas_forceful_radmom_mr/ \
+    -outdir output_debug/ \
     -scale 1 \
-    -start 6 \
-    -stop 7 \
+    -start 4 \
+    -stop 5 \
     -max_n_steps 500 \
     -unit cm \
     -config_name global \
