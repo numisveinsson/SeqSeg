@@ -153,15 +153,15 @@ class Segmentation:
         """Function to calculate the weight array for
         a gaussian weighted segmentation"""
         # define std as 10% of the size of the volume
-        std = 0.2*np.array(size_extract)  # 0.1
+        std = 0.5*np.ones_like(size_extract)  # 0.1
         # create a grid of distances to the center of the volume
         x = np.linspace(-size_extract[0]/2, size_extract[0]/2, size_extract[0])
         y = np.linspace(-size_extract[1]/2, size_extract[1]/2, size_extract[1])
         z = np.linspace(-size_extract[2]/2, size_extract[2]/2, size_extract[2])
         # normalize
-        x = x/size_extract[0]
-        y = y/size_extract[1]
-        z = z/size_extract[2]
+        x = x/(size_extract[0]/2)
+        y = y/(size_extract[1]/2)
+        z = z/(size_extract[2]/2)
         # create a meshgrid
         x, y, z = np.meshgrid(z, y, x)
         # now transpose
