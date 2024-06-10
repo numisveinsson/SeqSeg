@@ -315,15 +315,17 @@ def get_metric_name(metric):
 if __name__=='__main__':
 
     name_graph = 'Comparison'
-    save_name = 'test_nokeep'
+    save_name = 'test_keep'
     preprocess_pred = True
     masked = True
     write_postprocessed = True
 
     print_case_names = True
 
+    keep_largest_label_benchmark = True
+
     # input folder of segmentation results
-    pred_folder = '/Users/numisveins/Library/Mobile Documents/com~apple~CloudDocs/Documents/Berkeley/Research/Papers_In_Writing/SeqSeg_paper/results/preds_aortas_june24/'
+    pred_folder = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/'
     pred_folders = os.listdir(pred_folder)
     # only keep folders and ignore hidden files
     pred_folders = [folder for folder in pred_folders if '.' not in folder and 'old' not in folder and 'gt' not in folder]
@@ -385,6 +387,9 @@ if __name__=='__main__':
 
                     if preprocess_pred and 'segseg' in folder:
                         pred = pre_process(pred, write_postprocessed)
+                    elif preprocess_pred and keep_largest_label_benchmark:
+                        pred = pre_process(pred, write_postprocessed)
+
                     if write_postprocessed:
                         # marching cubes
                         from modules import vtk_functions as vf
