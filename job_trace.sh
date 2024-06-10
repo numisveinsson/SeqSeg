@@ -38,13 +38,13 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -train_dataset Dataset005_SEQAORTANDFEMOMR \
+    -train_dataset Dataset006_SEQAORTANDFEMOCT \
     -fold all \
     -img_ext .mha \
-    -outdir output_debug/ \
+    -outdir output_aortas_new_ass_ct/ \
     -scale 1 \
-    -start 4 \
-    -stop 5 \
+    -start 7 \
+    -stop 8 \
     -max_n_steps 500 \
     -unit cm \
     -config_name global \
