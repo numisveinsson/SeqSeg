@@ -98,7 +98,7 @@ def get_next_points(centerline_poly,
         if not mega_sub:
             # used to not want to use last point for vector
             id_along_cent = len(locs) - 1  # *9//10
-            id_along_cent_save = len(locs)*3//4
+            id_along_cent_save = len(locs)*9//10  # 3//4
         else:
             # used to not want to use last point for vector
             id_along_cent = len(locs) - 1  # *9//10
