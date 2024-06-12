@@ -164,7 +164,7 @@ def get_testing_samples(dataset, data_dir=None):
         elif dataset == 'Dataset010_SEQCOROASOCACT':
 
             directory = '/global/scratch/users/numi/ASOCA_test/'
-            directory = '/global/scratch/users/numi/Karthik_test/'
+            # directory = '/global/scratch/users/numi/Karthik_test/'
             dir_json = directory + 'test.json'
             testing_samples = get_testing_samples_json(dir_json)
 
