@@ -1146,7 +1146,7 @@ def backtracking_gradient(gradient, distance_map_surf_np,
 
 
 def calc_centerline_fmm(segmentation, seed=None, targets=None,
-                        min_res=300, out_dir=None):
+                        min_res=300, out_dir=None, write_files=False):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1198,7 +1198,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     distance_map_surf = distance_map_surf * -1
     distance_map_surf_np = sitk.GetArrayFromImage(
         distance_map_surf).transpose(2, 1, 0)
-    if out_dir:
+    if out_dir and write_files:
         sitk.WriteImage(distance_map_surf,
                         os.path.join(out_dir, 'distance_map_surf.mha'))
 
@@ -1206,7 +1206,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     if seed is None and targets is None:
         seed, targets, output = cluster_map(segmentation,
                                             return_wave_distance_map=True,
-                                            out_dir=out_dir)
+                                            out_dir=out_dir,
+                                            write_files=write_files)
 
     elif seed is None:
         max_surf = distance_map_surf_np.max()
@@ -1267,7 +1268,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     output_mask = sitk.Mask(output, segmentation)
     print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}")
     print(f"Min: {sitk.GetArrayFromImage(output_mask).min()}")
-    if out_dir:
+    if out_dir and write_files:
         sitk.WriteImage(output_mask,
                         os.path.join(out_dir, 'masked_out_fmm.mha'))
     # Get gradient of distance map
@@ -1564,7 +1565,7 @@ def find_end_clusters(cluster_map_img):
     return end_clusters
 
 
-def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
+def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None, write_files=False):
     """
     Function to cluster a distance map of a segmentation into integer values.
 
@@ -1643,7 +1644,7 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     wave_distance_map = sitk.Mask(wave_distance_map_output, segmentation)
     # Convert wave distance map to integers
     wave_distance_map = sitk.Cast(wave_distance_map, sitk.sitkInt32)
-    if out_dir:
+    if out_dir and write_files:
         sitk.WriteImage(wave_distance_map,
                         os.path.join(out_dir, 'wave_distance_map.mha'))
 
@@ -1704,7 +1705,7 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
     print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
 
     # Write image
-    if out_dir:
+    if out_dir and write_files:
         sitk.WriteImage(cluster_map_img, os.path.join(out_dir,
                                                       'cluster_map_img.mha'))
 
@@ -1725,7 +1726,7 @@ def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None):
         end_point.tolist()) for end_point in end_points]
 
     # Create vtk polydata for points
-    if out_dir:
+    if out_dir and write_files:
         polydata_point = points2polydata(end_points_phys)
         write_geo(os.path.join(out_dir, 'end_points.vtp'), polydata_point)
 
@@ -1909,7 +1910,7 @@ if __name__ == '__main__':
     sitk.WriteImage(segmentation, os.path.join(out_dir,
                                                'segmentation_cluster.mha'))
     time_start = time.time()
-    centerline = calc_centerline_fmm(segmentation, out_dir=out_dir)
+    centerline = calc_centerline_fmm(segmentation, out_dir=out_dir, write_files=False)
     print(f"Time in seconds: {time.time() - time_start:0.3f}")
     name = seg_file.split('/')[-1].split('.')[0]
     pfn = os.path.join(out_dir, 'centerline_fmm_'+name+'.vtp')
