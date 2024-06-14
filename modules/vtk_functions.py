@@ -582,6 +582,26 @@ import SimpleITK as sitk
     return imageData, vtkmatrix
 
 
+def exportVTK2Sitk(vtkIm):
+    """
+    This function creates a simple itk image from a vtk image
+    Args:
+        vtkIm: vtk image
+    Returns:
+        sitkIm: simple itk image
+    """
+    import SimpleITK as sitk
+    # vtkIm = vtkIm.GetOutput()
+    vtkIm.GetPointData().GetScalars().SetName('Scalars_')
+    vtkArray = v2n(vtkIm.GetPointData().GetScalars())
+    vtkArray = np.reshape(vtkArray, vtkIm.GetDimensions(), order='F')
+    vtkArray = np.transpose(vtkArray, (2, 1, 0))
+    sitkIm = sitk.GetImageFromArray(vtkArray)
+    sitkIm.SetSpacing(vtkIm.GetSpacing())
+    sitkIm.SetOrigin(vtkIm.GetOrigin())
+    return sitkIm
+
+
 def build_transform_matrix(image):
     matrix = np.eye(4)
     matrix[:-1, :-1] = np.matmul(np.reshape(image.GetDirection(),
