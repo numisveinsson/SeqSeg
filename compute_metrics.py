@@ -1,8 +1,10 @@
 import os
 import SimpleITK as sitk
+import vtk
 import numpy as np
 from modules import vtk_functions as vf
 from vtk.util.numpy_support import vtk_to_numpy as v2n
+from vtk.util.numpy_support import numpy_to_vtk as n2v
 
 from scipy.stats import ttest_ind, ttest_rel
 
@@ -26,21 +28,21 @@ def dice(pred, truth):
         true_c = true == num_class[i]
         dice_out[i] = np.sum(pred_c*true_c)*2.0 / (np.sum(pred_c) + np.sum(true_c))
 
-    mask =( pred > 0 )+ (true > 0)
+    mask = (pred > 0) + (true > 0)
     dice_out[0] = np.sum((pred==true)[mask]) * 2. / (np.sum(pred>0) + np.sum(true>0))
-    
+
     return dice_out[0]
 
 
 def masked_dice(self, masked_dir):
-        mask = sitk.ReadImage(masked_dir)
-        filter = sitk.GetArrayFromImage(mask)
-        pred = sitk.GetArrayFromImage(self.seg_pred)
-        pred[filter == 0] = 0
+    mask = sitk.ReadImage(masked_dir)
+    filter = sitk.GetArrayFromImage(mask)
+    pred = sitk.GetArrayFromImage(self.seg_pred)
+    pred[filter == 0] = 0
 
-        dice = dice_score(pred, self.seg_truth)[0]
+    dice = dice_score(pred, self.seg_truth)[0]
 
-        return dice
+    return dice
 
 
 def hausdorff(pred, truth):
@@ -73,7 +75,7 @@ def percent_centerline_length(pred, cent_truth):
     cent_length_init = 0
     # check if cells are within pred
     for i in range(num_cells):
-    
+
             cell = cent_truth.GetCell(i)
             num_points = cell.GetNumberOfPoints()
             points = cell.GetPoints()
@@ -93,11 +95,12 @@ def percent_centerline_length(pred, cent_truth):
             try:
                 if pred[index1] == 1 and pred[index2] == 1:
                     cent_length_init += length
-            except:
+            except Exception as e:
+                print(f"Error: {e}")
                 # print('Index out of bounds')
                 # if location is not within boundary, remove point
                 centerline_length -= length
-    
+
     return cent_length_init/centerline_length
 
 
@@ -108,7 +111,7 @@ def percent_centerline_points(pred, cent_truth):
         cent_truth = vf.read_geo(cent_truth).GetOutput()
 
     num_points = cent_truth.GetNumberOfPoints()   # number of points in centerline
-    cent_data = vf.collect_arrays(cent_truth.GetPointData())
+    # cent_data = vf.collect_arrays(cent_truth.GetPointData())
     c_loc = v2n(cent_truth.GetPoints().GetData())             # point locations as numpy array    
 
     num_points_init = num_points
@@ -124,7 +127,8 @@ def percent_centerline_points(pred, cent_truth):
             if pred[index] == 0:
                 num_points_init -= 1
 
-        except:
+        except Exception as e:
+            print(f"Error: {e}")
             # if location is not within boundary, remove point
             num_points -= 1
             num_points_init -= 1
@@ -133,7 +137,7 @@ def percent_centerline_points(pred, cent_truth):
 
 
 def only_keep_mask(pred0, mask):
-    
+
     filter_mask = sitk.GetArrayFromImage(mask)
     pred = sitk.GetArrayFromImage(pred0)
     pred[filter_mask == 0] = 0
@@ -142,6 +146,7 @@ def only_keep_mask(pred0, mask):
     pred = sf.numpy_to_sitk(pred, pred0)
 
     return pred
+
 
 def process_case_name(case_name):
 
@@ -229,11 +234,10 @@ def keep_largest_label(pred_binary, num_labels=1):
         return labelImage
 
 
-def pre_process(pred, folder, case, write_postprocessed):
+def pre_process(pred, folder, case, write_postprocessed, cap=False, centerline=None):
 
     if write_postprocessed:
         # marching cubes
-        from modules import vtk_functions as vf
         surface = vf.evaluate_surface(pred, 0.5) # Marching cubes
         # surface_smooth = vf.smooth_surface(surface, 12) # Smooth marching cubes
         vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'.vtp', surface)
@@ -242,13 +246,22 @@ def pre_process(pred, folder, case, write_postprocessed):
     if pred.GetPixelID() != sitk.sitkUInt8:
 
         pred = from_prob_to_binary(pred)
-    #else:
-        #print("Prediction is already binary")
+    # else:
+        # print("Prediction is already binary")
 
-    labelImage = keep_largest_label(pred)
+    if not cap:
+        labelImage = keep_largest_label(pred)
+
+    elif cap and centerline is not None:
+        labelImage = cap_and_keep_largest(pred, centerline, case,
+                                          pred_folder+folder+'/postprocessed/')
+    else:
+        print("No centerline provided for clipping")
 
     if write_postprocessed:
         sitk.WriteImage(labelImage, pred_folder+folder+'/postprocessed/'+case+'.mha')
+        surface = vf.evaluate_surface(labelImage, 0.5)
+        vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'_clipped.vtp', surface)
 
     # print np array of label image
     # labelImageArray = sitk.GetArrayFromImage(labelImage)
@@ -256,11 +269,12 @@ def pre_process(pred, folder, case, write_postprocessed):
 
     return labelImage
 
+
 def get_case_names(folder, pred_folder):
-    
+
     segs = os.listdir(pred_folder+folder)
     print(f"Segs: {segs}")
-    #only keep segmentation files and ignore hidden files
+    # only keep segmentation files and ignore hidden files
     segs = [seg for seg in segs if '.' not in seg[0]]
     # only keep files not folders
     segs = [seg for seg in segs if '.' in seg]
@@ -296,7 +310,7 @@ def get_names_folders(list_folders):
 
     names = []
 
-    for i,folder in enumerate(list_folders):
+    for i, folder in enumerate(list_folders):
 
         if 'pred_seqseg' in folder: 
 
@@ -311,7 +325,8 @@ def get_names_folders(list_folders):
             names.append('3D Global\nnnU-Net')
 
         else:
-            names.append(folder)
+            # keep first 6 characters
+            names.append(folder[:6]+'...')
 
     return names
 
@@ -327,11 +342,225 @@ def get_metric_name(metric):
         return metric
 
 
+def bryan_get_clipping_parameters(clpd):
+    """ get all three parameters """
+    points = v2n(clpd.GetPoints().GetData())
+    CenterlineID_for_each_point = v2n(clpd.GetPointData().GetArray('CenterlineId'))
+    radii = v2n(clpd.GetPointData().GetArray('MaximumInscribedSphereRadius'))
+    n_keys = len(CenterlineID_for_each_point[0])
+    line_dict = {}
+
+    # create dict with keys line0, line1, line2, etc
+    for i in range(n_keys):
+        key = f"line{i}"  
+        line_dict[key] = []
+
+    for i in range(len(points)):
+        for j in range(n_keys):
+            if CenterlineID_for_each_point[i][j] == 1:
+                key = f"line{j}"
+                line_dict[key].append(points[i])
+
+    for i in range(n_keys):
+        key = f"line{i}"  
+        line_dict[key] = np.array(line_dict[key])
+    # Done with spliting centerliens into dictioanry
+
+    # find the end points of each line
+    lst_of_end_pts = []
+    # append the very first point
+    lst_of_end_pts.append(line_dict["line0"][0])
+    # append the rest of the end points
+    for i in range(n_keys):
+        key = f"line{i}"
+        lst_of_end_pts.append(line_dict[key][-1])
+    nplst_of_endpts = np.array(lst_of_end_pts)  # convert to numpy array
+
+    # find the radii at the end points
+    radii_at_caps = []
+    for i in lst_of_end_pts:
+        for j in range(len(points)):
+            if np.array_equal(i, points[j]):
+                radii_at_caps.append(radii[j])
+    nplst_radii_at_caps = np.array(radii_at_caps)  # convert to numpy array
+
+    # find the unit tangent vectors at the end points
+    unit_tangent_vectors = []
+    # compute the unit tangent vector of the first point of the first line
+    key = "line0"
+    line = line_dict[key]
+    tangent_vector = line[0] - line[1]
+    unit_tangent_vector = tangent_vector / np.linalg.norm(tangent_vector)
+    unit_tangent_vectors.append(unit_tangent_vector)
+    # compute the unit tangent vector of the last point of each line
+    for i in range(len(line_dict)):
+        key = f"line{i}"
+        line = line_dict[key]
+        tangent_vector = line[-1] - line[-2]
+        unit_tangent_vector = tangent_vector / np.linalg.norm(tangent_vector)
+        unit_tangent_vectors.append(unit_tangent_vector)
+
+    return nplst_of_endpts, nplst_radii_at_caps, unit_tangent_vectors
+
+
+def bryan_generate_oriented_boxes(endpts, unit_tan_vectors, radius,
+                                  output_file, outdir, box_scale=3):
+
+    box_surfaces = vtk.vtkAppendPolyData()
+    # Convert the input center_points to a list, in case it is a NumPy array
+    endpts = np.array(endpts).tolist()
+    centerpts = []
+    pd_lst = []
+    for i in range(len(endpts)):
+        compute_x = endpts[i][0]+0.5*box_scale*radius[i]*unit_tan_vectors[i][0]
+        compute_y = endpts[i][1]+0.5*box_scale*radius[i]*unit_tan_vectors[i][1]
+        compute_z = endpts[i][2]+0.5*box_scale*radius[i]*unit_tan_vectors[i][2] 
+        centerpts.append([compute_x, compute_y, compute_z])
+
+    box_surfaces = vtk.vtkAppendPolyData()
+
+    for i in range(len(centerpts)):
+        # Create an initial vtkCubeSource for the box
+        box = vtk.vtkCubeSource()
+        box.SetXLength(box_scale*radius[i])
+        box.SetYLength(box_scale*radius[i])
+        box.SetZLength(box_scale*radius[i])
+        box.Update()
+
+        # Compute the rotation axis by taking the cross product of the unit_vector and the z-axis
+        rotation_axis = np.cross(np.array([0, 0, 1]), unit_tan_vectors[i])
+
+        # Compute the rotation angle in degrees between the unit_vector and the z-axis
+        rotation_angle = np.degrees(np.arccos(np.dot(unit_tan_vectors[i], np.array([0, 0, 1]))))
+        transform = vtk.vtkTransform()
+        transform.Translate(centerpts[i])
+        transform.RotateWXYZ(rotation_angle, rotation_axis)
+
+        # Apply the transform to the box
+        box_transform = vtk.vtkTransformPolyDataFilter()
+        box_transform.SetInputConnection(box.GetOutputPort())
+        box_transform.SetTransform(transform)
+        box_transform.Update()
+
+        pd_lst.append(box_transform.GetOutput())
+        box_surfaces.AddInputData(box_transform.GetOutput())
+
+    box_surfaces.Update()
+
+    # Write the oriented box to a .vtp file
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetFileName(outdir+output_file+'.vtp')
+    writer.SetInputData(box_surfaces.GetOutput())
+    writer.Write()
+    return box_surfaces.GetOutput(), pd_lst
+
+
+def bryan_clip_surface(surf1, surf2):
+    # Create an implicit function from surf2
+    implicit_function = vtk.vtkImplicitPolyDataDistance()
+    implicit_function.SetInput(surf2)
+
+    # Create a vtkClipPolyData filter and set the input and implicit function
+    clipper = vtk.vtkClipPolyData()
+    clipper.SetInputData(surf1)
+    clipper.SetClipFunction(implicit_function)
+    clipper.InsideOutOff()  # keep the part of surf1 outside of surf2
+    clipper.Update()
+
+    # Get the output polyData with the part enclosed by surf2 clipped away
+    clipped_surf1 = clipper.GetOutput()
+
+    return clipped_surf1
+
+
+def keep_largest_surface(polyData):
+    # Create a connectivity filter to label the regions
+    connectivity = vtk.vtkConnectivityFilter()
+    connectivity.SetInputData(polyData)
+    connectivity.SetExtractionModeToAllRegions()
+    connectivity.ColorRegionsOn()
+    connectivity.Update()
+
+    # Get the output of the connectivity filter
+    connectedPolyData = connectivity.GetOutput()
+
+    # Get the region labels
+    regionLabels = connectedPolyData.GetPointData().GetArray('RegionId')
+
+    # Convert region labels to numpy array
+    regionLabels_np = vtk.util.numpy_support.vtk_to_numpy(regionLabels)
+
+    # Find the unique region labels and their counts
+    uniqueLabels, counts = np.unique(regionLabels_np, return_counts=True)
+
+    # Find the label of the largest region
+    largestRegionLabel = uniqueLabels[np.argmax(counts)]
+
+    # Create a threshold filter to extract the largest region
+    threshold = vtk.vtkThreshold()
+    threshold.SetInputData(connectedPolyData)
+    threshold.ThresholdBetween(largestRegionLabel, largestRegionLabel)
+    threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, 'RegionId')
+    threshold.Update()
+
+    # Convert the output of the threshold filter to vtkPolyData
+    largestRegionPolyData = vtk.vtkGeometryFilter()
+    largestRegionPolyData.SetInputData(threshold.GetOutput())
+    largestRegionPolyData.Update()
+
+    return largestRegionPolyData.GetOutput()
+
+
+def convertPolyDataToImageData(poly, ref_im):
+    """
+    Convert the vtk polydata to imagedata
+    Args:
+        poly: vtkPolyData
+        ref_im: reference vtkImage to match the polydata with
+    Returns:
+        output: resulted vtkImageData
+    """
+
+    ref_im.GetPointData().SetScalars(n2v(np.zeros(v2n(ref_im.GetPointData().GetScalars()).shape)))
+    ply2im = vtk.vtkPolyDataToImageStencil()
+    ply2im.SetTolerance(0.05)
+    ply2im.SetInputData(poly)
+    ply2im.SetOutputSpacing(ref_im.GetSpacing())
+    ply2im.SetInformationInput(ref_im)
+    ply2im.Update()
+
+    stencil = vtk.vtkImageStencil()
+    stencil.SetInputData(ref_im)
+    stencil.ReverseStencilOn()
+    stencil.SetStencilData(ply2im.GetOutput())
+    stencil.Update()
+    output = stencil.GetOutput()
+
+    return output
+
+
+def cap_and_keep_largest(pred, centerline, file_name, outdir):
+
+    predpd = vf.evaluate_surface(pred, 0.5)
+    endpts, radii, unit_vecs = bryan_get_clipping_parameters(centerline)
+    boxpd, boxpdlst = bryan_generate_oriented_boxes(endpts, unit_vecs, radii,
+                                                    file_name+'_boxclips',
+                                                    outdir, 4)
+    clippedpd = bryan_clip_surface(predpd, boxpd)
+    largest = keep_largest_surface(clippedpd)
+    # convert to sitk image
+    img_vtk = vf.exportSitk2VTK(pred)[0]
+    seg_vtk = convertPolyDataToImageData(largest, img_vtk)
+    seg = vf.exportVTK2Sitk(seg_vtk)
+
+    return seg
+
+
 def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                          mask_folder, output_folder, modalities, metrics,
                          save_name, preprocess_pred, masked,
                          write_postprocessed, print_case_names,
-                         keep_largest_label_benchmark):
+                         keep_largest_label_benchmark, cap=False):
     """
     Calculate metrics for all folders in pred_folders
 
@@ -399,6 +628,10 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
 
                 for i, seg in enumerate(segs):
 
+                    # if modality == 'mr' and i == 2:
+                    #     # skip first case for MR
+                    #     continue
+
                     if 'seqseg' in folder:
                         case = process_case_name(seg)
                     else:
@@ -408,12 +641,20 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                     pred = read_seg(pred_folder+folder+'/', seg)
                     truth = read_truth(case, truth_folder)
 
-                    if preprocess_pred and 'segseg' in folder:
+                    if metric == 'centerline overlap' or cap:
+                        from modules import vtk_functions as vf
+                        centerline = vf.read_geo(cent_folder+'/' + case + '.vtp').GetOutput()
+                    else:
+                        centerline = None
+
+                    if preprocess_pred and 'seqseg' in folder:
                         pred = pre_process(pred, folder, case,
-                                           write_postprocessed)
+                                           write_postprocessed, cap,
+                                           centerline)
                     elif preprocess_pred and keep_largest_label_benchmark:
                         pred = pre_process(pred, folder, case,
-                                           write_postprocessed)
+                                           write_postprocessed, cap,
+                                           centerline)
 
                     if write_postprocessed:
                         # marching cubes
@@ -430,13 +671,8 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                     else:
                         mask = None
 
-                    if metric == 'centerline overlap':
-                        centerline = vf.read_geo(cent_folder+'/'
-                                                 + case + '.vtp').GetOutput()
-                    else:
-                        centerline = None
-
-                    score = calc_metric(metric, pred, truth, mask, centerline)
+                    score = calc_metric(metric, pred, truth,
+                                        mask, centerline)
 
                     scores[folder].append(score)
                     if print_case_names:
@@ -489,7 +725,7 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
             # set y axis lower limit to 0
             if 'hausdorff' in metric:
                 plt.ylim(bottom=0)
-                plt.ylim(top=0.5)
+                # plt.ylim(top=0.5)
             plt.ylabel(f'{get_metric_name(metric)}')
             # plt.xlabel('Method')
             if 'dice' in metric:
@@ -509,20 +745,15 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
             if len(scores.keys()) > 1:
                 for i in range(len(scores.keys())-1):
                     for j in range(i+1, len(scores.keys())):
-                        t, p = ttest_ind(scores[list(scores.keys())[i]],
+                        t, p = ttest_rel(scores[list(scores.keys())[i]],
                                          scores[list(scores.keys())[j]])
                         if p < 0.05:
-                            plt.text(i+1.5, 0.5, '*', fontsize=20,
-                                     horizontalalignment='center',
-                                     verticalalignment='center')
-                        if p < 0.01:
-                            plt.text(i+1.5, 0.4, '**', fontsize=20,
-                                     horizontalalignment='center',
-                                     verticalalignment='center')
-                        if p < 0.001:
-                            plt.text(i+1.5, 0.3, '***', fontsize=20,
-                                     horizontalalignment='center',
-                                     verticalalignment='center')
+                            # add horizontal line that connects means
+                            # of two groups with significant difference
+                            plt.plot([i+1, j+1], [means[i], means[j]], 'k-')
+                            # add p-value
+                            plt.text((i+1+j+1)/2, max(means[i], means[j])+0.05,
+                                     f'p={p:.3f}', ha='center')
 
             # add horizontal lines at means with same color as boxplot
             # for mean, color in zip(means, colors):
@@ -631,13 +862,14 @@ def average_seg(pred_img, num_segs):
 if __name__=='__main__':
 
     name_graph = 'Comparison'
-    save_name = 'test_keep'
+    save_name = 'test_keep_clip'
     preprocess_pred = True
     masked = True
     write_postprocessed = True
 
     print_case_names = True
 
+    cap = True
     keep_largest_label_benchmark = True
 
     # input folder of segmentation results
@@ -665,7 +897,8 @@ if __name__=='__main__':
                          mask_folder, output_folder, modalities, metrics,
                          save_name, preprocess_pred, masked,
                          write_postprocessed, print_case_names,
-                         keep_largest_label_benchmark)
+                         keep_largest_label_benchmark, cap)
 
+    import pdb; pdb.set_trace()
     # combine segmentations
     combine_segs(pred_folder, modalities)
