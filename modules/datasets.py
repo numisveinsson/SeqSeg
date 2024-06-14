@@ -90,8 +90,28 @@ def get_testing_samples(dataset, data_dir=None):
             print('Json file found')
             testing_samples = get_testing_samples_json(dir_json)
         else:
-            print('Json file not found')
-            testing_samples = None
+            print('Json file not found, trying image and centerline folders')
+            testing_samples = os.listdir(directory + 'images/')
+            # no hidden files
+            testing_samples = [s for s in testing_samples if s[0] != '.']
+            print('Image extensions:', testing_samples[0].split('.')[-1])
+            # remove extension
+            testing_samples = [s.split('.')[0] for s in testing_samples]
+            print('Number of testing samples:', len(testing_samples))
+
+            # testing samples centerlines
+            testing_samples_cent = os.listdir(directory + 'centerlines/')
+            # no hidden files
+            testing_samples_cent = [s for s in testing_samples_cent if s[0] != '.']
+            # remove extension
+            testing_samples_cent = [s.split('.')[0] for s in testing_samples_cent]
+            print('Number of testing samples centerlines:', len(testing_samples_cent))
+
+            # only keep images that have centerlines
+            testing_samples = [s for s in testing_samples if s in testing_samples_cent]
+            print('Number of testing samples with centerlines:', len(testing_samples))
+
+            testing_samples = [[s, 0, 0, 10] for s in testing_samples]
     else:
         print('No data directory provided.')
         print('Using default data directory based on training dataset.')
