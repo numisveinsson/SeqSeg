@@ -40,16 +40,15 @@ python3 auto_centerline.py \
     -test_name 3d_fullres \
     -train_dataset Dataset006_SEQAORTANDFEMOCT \
     -fold all \
-    -img_ext .mha \
-    -outdir output_aortas_new_ass_ct/ \
-    -scale 1 \
-    -start 7 \
-    -stop 8 \
+    -img_ext .nrrd \
+    -outdir output_aortas_mic_data_ct/ \
+    -scale 0.1 \
+    -start 0 \
+    -stop 1 \
     -max_n_steps 500 \
-    -unit cm \
-    -config_name global \
-
-#     -data_dir global/scratch/users/numi/ASOCA_test/  \
+    -unit mm \
+    -config_name global_coro \
+    -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 
