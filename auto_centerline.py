@@ -87,7 +87,7 @@ if __name__ == '__main__':
                         help='Output directory')
     parser.add_argument('-scale', '--scale',
                         default=1,
-                        type=int,
+                        type=float,
                         help="""Whether to scale image data,
                              needed if units for nnUNet model
                              and testing data are different""")
