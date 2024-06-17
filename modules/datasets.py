@@ -1,31 +1,31 @@
 import os
 
 
-def vmr_directories(directory, model, dir_seg_exist=True, global_scale=None):
-    """
-    Function to return the directories of
-        Image Volume
-        Segmentation Volume
-        Centerline VTP
-        Surface Mesh VTP
-    for a specific model in the
-    Vascular Model Repository
-    """
+# def vmr_directories(directory, model, dir_seg_exist=True, global_scale=None):
+#     """
+#     Function to return the directories of
+#         Image Volume
+#         Segmentation Volume
+#         Centerline VTP
+#         Surface Mesh VTP
+#     for a specific model in the
+#     Vascular Model Repository
+#     """
 
-    dir_image = directory + 'images/'+model+'.mha'
-    dir_seg = directory + 'truths/'+model+'.mha'
+#     dir_image = directory + 'images/'+model+'.mha'
+#     dir_seg = directory + 'truths/'+model+'.mha'
 
-    # if global_scale:
-    #     dir_image = directory + \
-    #         'scaled_images/'+model.replace('_aorta', '')+'.vtk'
+#     # if global_scale:
+#     #     dir_image = directory + \
+#     #         'scaled_images/'+model.replace('_aorta', '')+'.vtk'
 
-    if not dir_seg_exist:
-        dir_seg = None
+#     if not dir_seg_exist:
+#         dir_seg = None
 
-    dir_cent = directory + 'centerlines/'+model+'.vtp'
-    dir_surf = directory + 'surfaces/'+model+'.vtp'
+#     dir_cent = directory + 'centerlines/'+model+'.vtp'
+#     dir_surf = directory + 'surfaces/'+model+'.vtp'
 
-    return dir_image, dir_seg, dir_cent, dir_surf
+#     return dir_image, dir_seg, dir_cent, dir_surf
 
 
 def get_directories(directory_data, case, img_ext, dir_seg=True):
@@ -110,8 +110,8 @@ def get_testing_samples(dataset, data_dir=None):
             # only keep images that have centerlines
             testing_samples = [s for s in testing_samples if s in testing_samples_cent]
             print('Number of testing samples with centerlines:', len(testing_samples))
-
-            testing_samples = [[s, 0, 0, 10] for s in testing_samples]
+            testing_samples.sort()
+            testing_samples = [[s, 0, 70, 80] for s in testing_samples]
     else:
         print('No data directory provided.')
         print('Using default data directory based on training dataset.')

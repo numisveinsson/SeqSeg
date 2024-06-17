@@ -1,7 +1,7 @@
 from .vtk_functions import write_geo, points2polydata
 from .tracing_functions import get_seed
 from .assembly import create_step_dict
-from .datasets import get_directories, vmr_directories
+from .datasets import get_directories  #, vmr_directories
 import os
 import numpy as np
 
@@ -30,8 +30,12 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
 
         print(test_case)
 
-        dir_image, dir_seg, dir_cent, _ = vmr_directories(directory_data,
+        # dir_image, dir_seg, dir_cent, _ = vmr_directories(directory_data,
+        #                                                   case,
+        #                                                   dir_seg)
+        dir_image, dir_seg, dir_cent, _ = get_directories(directory_data,
                                                           case,
+                                                          img_format,
                                                           dir_seg)
         dir_output = dir_output0 + test + '_'+case+'_'+str(i)+'/'
 
