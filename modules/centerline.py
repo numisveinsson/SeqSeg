@@ -1565,7 +1565,8 @@ def find_end_clusters(cluster_map_img):
     return end_clusters
 
 
-def cluster_map(segmentation, return_wave_distance_map=False, out_dir=None, write_files=False):
+def cluster_map(segmentation, return_wave_distance_map=False,
+                out_dir=None, write_files=False):
     """
     Function to cluster a distance map of a segmentation into integer values.
 
@@ -1910,7 +1911,9 @@ if __name__ == '__main__':
     sitk.WriteImage(segmentation, os.path.join(out_dir,
                                                'segmentation_cluster.mha'))
     time_start = time.time()
-    centerline = calc_centerline_fmm(segmentation, out_dir=out_dir, write_files=False)
+    centerline = calc_centerline_fmm(segmentation,
+                                     out_dir=out_dir,
+                                     write_files=False)
     print(f"Time in seconds: {time.time() - time_start:0.3f}")
     name = seg_file.split('/')[-1].split('.')[0]
     pfn = os.path.join(out_dir, 'centerline_fmm_'+name+'.vtp')

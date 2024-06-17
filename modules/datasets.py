@@ -102,14 +102,19 @@ def get_testing_samples(dataset, data_dir=None):
             # testing samples centerlines
             testing_samples_cent = os.listdir(directory + 'centerlines/')
             # no hidden files
-            testing_samples_cent = [s for s in testing_samples_cent if s[0] != '.']
+            testing_samples_cent = [s for s in testing_samples_cent
+                                    if s[0] != '.']
             # remove extension
-            testing_samples_cent = [s.split('.')[0] for s in testing_samples_cent]
-            print('Number of testing samples centerlines:', len(testing_samples_cent))
+            testing_samples_cent = [s.split('.')[0]
+                                    for s in testing_samples_cent]
+            print('Number of testing samples centerlines:',
+                  len(testing_samples_cent))
 
             # only keep images that have centerlines
-            testing_samples = [s for s in testing_samples if s in testing_samples_cent]
-            print('Number of testing samples with centerlines:', len(testing_samples))
+            testing_samples = [s for s in testing_samples
+                               if s in testing_samples_cent]
+            print('Number of testing samples with centerlines:',
+                  len(testing_samples))
             testing_samples.sort()
             testing_samples = [[s, 0, 70, 80] for s in testing_samples]
     else:

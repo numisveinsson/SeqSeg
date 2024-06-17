@@ -613,9 +613,10 @@ def trace_centerline(
                 
                 if len(radius_tree) > 1 and forceful_sidebranch:
                     print('Forceful sidebranch -  adding vector')
-                    next_step['point'] += next_step['radius']*next_step['tangent']
+                    next_step['point'] += (next_step['radius']
+                                           * next_step['tangent'])
                     next_step['radius'] = (next_step['radius']
-                                      * forceful_sidebranch_magnify)
+                                           * forceful_sidebranch_magnify)
                 
                 print("Next radius is: " + str(radius_tree[0]))
                 vessel_tree.add_step(i, next_step, branch)
@@ -697,17 +698,19 @@ def trace_centerline(
             else:
 
                 print("\n*** Error for surface: \n" + str(i))
+                print("Length of branch: ", len(vessel_tree.branches[branch]))
                 print("\n Moving onto another branch")
 
                 # If inside, then restart branch
                 if ((step_seg['is_inside'] and global_config['RESTART_BRANCH'])
-                    or len(vessel_tree.branches[branch]) <= 1):
+                   or len(vessel_tree.branches[branch]) <= 2):
                     # If inside, then move on to next branch
                     # and remove allowed_steps
 
-                    if len(vessel_tree.branches[branch]) <= 1:
+                    if len(vessel_tree.branches[branch]) <= 2:
                         print("Branch length is 1 or 0, so restarting")
-                    elif (step_seg['is_inside'] and global_config['RESTART_BRANCH']):
+                    elif (step_seg['is_inside']
+                          and global_config['RESTART_BRANCH']):
                         print('Branch inside, restarting branch')
 
                     # If this branch is inside, then restart branch
@@ -775,10 +778,10 @@ def trace_centerline(
                                        + str(branch)+'_'+str(i)
                                        + '_centerlines.vtp')
                     write_vtk_polydata(final_points,
-                                        output_folder
-                                        + '/assembly/branch_'+case+'_'
-                                        + str(branch)+'_'+str(i)
-                                        + '_points.vtp')
+                                       output_folder
+                                       + '/assembly/branch_'+case+'_'
+                                       + str(branch)+'_'+str(i)
+                                       + '_points.vtp')
 
                     vessel_tree.caps = (vessel_tree.caps
                                         + [step_seg['point']
