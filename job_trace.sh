@@ -41,14 +41,14 @@ python3 auto_centerline.py \
     -train_dataset Dataset006_SEQAORTANDFEMOCT \
     -fold all \
     -img_ext .nrrd \
-    -outdir output_aortas_mic_data_ct/ \
+    -outdir output_aortas_mic_data_further_ct/ \
     -scale 0.1 \
-    -start 0 \
-    -stop 1 \
+    -start 12 \
+    -stop 13 \
     -max_n_steps 500 \
     -unit mm \
-    -config_name global_coro \
     -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
+    -config_name global_aorta \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 
