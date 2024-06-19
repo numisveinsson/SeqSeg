@@ -707,7 +707,7 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
             # set font to Times New Roman
             plt.rcParams["font.family"] = "Times New Roman"
             # set font size to 14
-            plt.rcParams.update({'font.size': 20})
+            plt.rcParams.update({'font.size': 10})
 
             # create boxplot with colors
             colors = ['pink', 'lightblue', 'lightgreen', 'orange', 'purple',
@@ -751,6 +751,13 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                             # add horizontal line that connects means
                             # of two groups with significant difference
                             plt.plot([i+1, j+1], [means[i], means[j]], 'k-')
+                            # add p-value
+                            plt.text((i+1+j+1)/2, max(means[i], means[j])+0.05,
+                                     f'p={p:.3f}', ha='center')
+                        elif p < 0.1:
+                            # add horizontal dashed line that connects means
+                            # of two groups with significant difference
+                            plt.plot([i+1, j+1], [means[i], means[j]], 'k--')
                             # add p-value
                             plt.text((i+1+j+1)/2, max(means[i], means[j])+0.05,
                                      f'p={p:.3f}', ha='center')
@@ -886,7 +893,7 @@ if __name__=='__main__':
     mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
 
     # output folder for plots
-    output_folder = '/Users/numisveins/Documents/data_seqseg_paper/output_pred_aortas_june24_3/'
+    output_folder = '/Users/numisveins/Documents/data_seqseg_paper/fresh_graphs/'
 
     # modalities
     modalities = ['mr', 'ct']
