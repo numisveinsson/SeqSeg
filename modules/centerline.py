@@ -1653,6 +1653,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     unique_values = np.unique(
         sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0))
     print(f"Unique values: {unique_values}")
+    # Remove values above threshold 100 thousand
+    unique_values = unique_values[unique_values < 100000]
     # Create new image with same size as wave distance map
     cluster_map_img = sitk.Image(wave_distance_map.GetSize(), sitk.sitkInt32)
     cluster_map_img.CopyInformation(wave_distance_map)
