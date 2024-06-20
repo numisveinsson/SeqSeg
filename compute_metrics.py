@@ -725,7 +725,7 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
             # set y axis lower limit to 0
             if 'hausdorff' in metric:
                 plt.ylim(bottom=0)
-                # plt.ylim(top=0.5)
+                plt.ylim(top=0.5)
             plt.ylabel(f'{get_metric_name(metric)}')
             # plt.xlabel('Method')
             if 'dice' in metric:
