@@ -144,6 +144,7 @@ if __name__ == '__main__':
 
     unit = args.unit
     max_step_size = args.max_n_steps
+    max_n_branches = args.max_n_branches
     write_samples = global_config['WRITE_STEPS']
     take_time = global_config['TIME_ANALYSIS']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
@@ -211,6 +212,7 @@ if __name__ == '__main__':
                                                         fold,
                                                         potential_branches,
                                                         max_step_size,
+                                                        max_n_branches,
                                                         global_config,
                                                         unit,
                                                         scale,
