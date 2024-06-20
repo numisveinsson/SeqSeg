@@ -135,6 +135,7 @@ def trace_centerline(
             allow_tqdm=True
         )
         print('About to load model')
+        print('Model folder:', model_folder)
         # initializes the network architecture, loads the checkpoint
         predictor.initialize_from_trained_model_folder(
             join(nnUNet_results, model_folder),
