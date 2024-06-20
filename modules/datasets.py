@@ -122,7 +122,7 @@ def get_testing_samples(dataset, data_dir=None):
         print('Using default data directory based on training dataset.')
 
         directory = '/global/scratch/users/numi/vascular_data_3d/'
-        if dataset == 'Dataset005_SEQAORTANDFEMOMR':
+        if dataset == 'Dataset005_SEQAORTANDFEMOMR' or dataset == 'Dataset018_SEQAORTASONEMR':
             testing_samples = [
 
                 ['0006_0001', 0, 3, 5, 'mr'],  # Aortofemoral MR
@@ -135,7 +135,7 @@ def get_testing_samples(dataset, data_dir=None):
 
             ]
 
-        elif dataset == 'Dataset006_SEQAORTANDFEMOCT':
+        elif dataset == 'Dataset006_SEQAORTANDFEMOCT' or dataset == 'Dataset017_SEQAORTASONECT':
             directory = '/global/scratch/users/numi/vascular_data_3d/'
             dir_json = directory + 'test.json'
             testing_samples = [  # get_testing_samples_json(dir_json)
