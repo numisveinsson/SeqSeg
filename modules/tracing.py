@@ -37,6 +37,7 @@ def trace_centerline(
     fold,
     potential_branches,
     max_step_size,
+    max_n_branches,
     global_config,
     unit='cm',
     scale=1,
@@ -610,14 +611,14 @@ def trace_centerline(
                                              point_tree[0],
                                              radius_tree[0],
                                              angle_change[0])
-                
+
                 if len(radius_tree) > 1 and forceful_sidebranch:
                     print('Forceful sidebranch -  adding vector')
                     next_step['point'] += (next_step['radius']
                                            * next_step['tangent'])
                     next_step['radius'] = (next_step['radius']
                                            * forceful_sidebranch_magnify)
-                
+
                 print("Next radius is: " + str(radius_tree[0]))
                 vessel_tree.add_step(i, next_step, branch)
 
@@ -826,6 +827,11 @@ def trace_centerline(
                       vessel_tree.bifurcations)
                 print("Number of potentials left are: ",
                       len(vessel_tree.potential_branches))
+
+                # Check if end prematurely
+                if len(vessel_tree.branches) > max_n_branches:
+                    print(f"Max number of branches reached: {max_n_branches}")
+                    break
 
     if len(vessel_tree.potential_branches) > 0:
         print('Printing potentials')
