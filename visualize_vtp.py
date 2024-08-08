@@ -40,7 +40,7 @@ def visualize_and_save_combined_image(mesh_files, output_file):
     # Save the plotter view to an image file
     plotter.show(screenshot=output_file)
 
-def visualize_and_save_screenshot(mesh_file, output_folder):
+def visualize_and_save_screenshot(mesh_file, output_folder, add_name):
     # Load the mesh
     mesh = pv.read(mesh_file)
 
@@ -53,7 +53,7 @@ def visualize_and_save_screenshot(mesh_file, output_folder):
 
         # Set up the camera and style (adjust as needed)
         plotter.camera_position = position
-        
+
         # zoom in
         plotter.camera.zoom(0.9)
         # set background to white
@@ -62,13 +62,20 @@ def visualize_and_save_screenshot(mesh_file, output_folder):
         plotter.show_axes = False
 
         # Save screenshot as SVG
-        screenshot_file = os.path.join(output_folder, os.path.splitext(os.path.basename(mesh_file))[0] + '_' + position + '.png')
+        screenshot_file = os.path.join(output_folder, os.path.splitext(os.path.basename(mesh_file))[0] + '_' + add_name + '_' + position + '.png')
         plotter.show(screenshot=screenshot_file)
+
+        # Close the plotter
+        plotter.close()
+
 
 if __name__ == "__main__":
 
     main_dir = '/Users/numisveins/Downloads/preds_new_aortas/'
-
+    main_dir = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/'
+    # main_dir = '/Users/numisveins/Documents/data_seqseg_paper/pred_mic_aortas_june24/results/'
+    # main_dir = '//Users/numisveins/Documents/MICCAI_Challenge23_Aorta_Tree_Data/'
+    add_name = ''
     dir_list = os.listdir(main_dir)
     dir_list.sort()
     dir_list = [x for x in dir_list if 'pred' in x and 'old' not in x]
@@ -87,11 +94,11 @@ if __name__ == "__main__":
         mesh_files = glob.glob(os.path.join(meshes_directory, '*.vtp'))
 
         # Specify the output file for the final image
-        output_file = os.path.join(output_folder, 'screenshot.png')
+        output_file = os.path.join(output_folder, 'screenshots.png')
         #visualize_and_save_combined_image(mesh_files, output_file)
 
         # Visualize the meshes and save screenshots
         for mesh_file in mesh_files:
-            visualize_and_save_screenshot(mesh_file, output_folder)
+            visualize_and_save_screenshot(mesh_file, output_folder, add_name)
 
         print("Screenshots saved successfully.")
