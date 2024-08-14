@@ -116,6 +116,11 @@ if __name__ == '__main__':
                         default='global',
                         type=str,
                         help='Name of configuration file')
+    parser.add_argument('-gpu',
+                        '--gpu',
+                        default=False,
+                        type=bool,
+                        help='Use GPU for nn')
     args = parser.parse_args()
 
     print(args)
@@ -145,6 +150,7 @@ if __name__ == '__main__':
     unit = args.unit
     max_step_size = args.max_n_steps
     max_n_branches = args.max_n_branches
+    gpu_avail = args.gpu
     write_samples = global_config['WRITE_STEPS']
     take_time = global_config['TIME_ANALYSIS']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
@@ -216,7 +222,8 @@ if __name__ == '__main__':
                                                         global_config,
                                                         unit,
                                                         scale,
-                                                        dir_seg)
+                                                        dir_seg,
+                                                        gpu_avail)
 
         print("\nTotal calculation time is:"
               + str((time.time() - start_time)/60) + " min\n")

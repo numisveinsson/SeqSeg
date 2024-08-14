@@ -41,7 +41,8 @@ def trace_centerline(
     global_config,
     unit='cm',
     scale=1,
-    seg_file=None
+    seg_file=None,
+    gpu_avail=False
 ):
 
     if unit == 'cm':
@@ -128,7 +129,7 @@ def trace_centerline(
             tile_step_size=0.5,
             use_gaussian=True,
             use_mirroring=True,
-            perform_everything_on_gpu=False,
+            perform_everything_on_gpu=gpu_avail,
             device=torch.device('cpu', 0),
             verbose=False,
             verbose_preprocessing=False,
