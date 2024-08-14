@@ -43,14 +43,14 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
 
 
 def initialization(json_file_present, test_case, dir_output, dir_cent,
-                   dir_data, scale=1, write_samples=False):
+                   dir_data, unit='mm', write_samples=False):
 
     if json_file_present:
         potential_branches, initial_seeds = initialize_json(test_case,
                                                             dir_output,
                                                             dir_cent,
                                                             dir_data,
-                                                            scale,
+                                                            unit,
                                                             write_samples)
     else:
         potential_branches, initial_seeds = initialize_dict(test_case,
@@ -61,7 +61,7 @@ def initialization(json_file_present, test_case, dir_output, dir_cent,
     return potential_branches, initial_seeds
 
 
-def initialize_json(test_case, dir_output, dir_cent, dir_data, scale,
+def initialize_json(test_case, dir_output, dir_cent, dir_data, unit,
                     write_samples=False):
     """
     Initialize the potential branches and initial seeds for the
@@ -79,7 +79,7 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, scale,
              initial_seed,
              initial_radius) = get_seeds_cardiac_mesh(dir_data,
                                                       test_case['name'],
-                                                      scale)
+                                                      unit)
         else:
             print("""No seed given,
                   trying to get one from centerline ground truth""")
@@ -158,10 +158,11 @@ def get_seeds_cardiac_mesh(mesh_dir, name, unit):
     # list_meshes = os.listdir(mesh_dir)
     mesh_dir += '/cardiac_meshes/'
 
+    # Scale is 1 (assume same unit for image and mesh)
     (region_8_center,
      region_8_normal,
      region_3_center) = process_cardiac_mesh(
-         os.path.join(mesh_dir, name+'.vtp'), unit
+         os.path.join(mesh_dir, name+'.vtp'), scale=1
          )
 
     write_normals_centers(mesh_dir, region_8_center,

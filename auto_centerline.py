@@ -187,7 +187,7 @@ if __name__ == '__main__':
         (potential_branches,
          initial_seeds) = init.initialization(json_file_present,
                                               test_case, dir_output, dir_cent,
-                                              directory_data, scale,
+                                              directory_data, unit,
                                               write_samples)
 
         # print to .txt file all outputs
