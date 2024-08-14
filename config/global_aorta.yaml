@@ -14,7 +14,7 @@ RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
 TREE_ANALYSIS: False
 
-VOLUME_SIZE_RATIO: 5 # default 5, 5.5 for coronaries, 4 for segs
+VOLUME_SIZE_RATIO: 4.9 # default 5, 5.5 for coronaries, 4 for segs
 MAGN_RADIUS: 1
 MAX_PERC_ENLARGE: 0.3 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
 MIN_RADIUS: 0.3 # mm (keep in mm)
@@ -22,7 +22,7 @@ MIN_RES: 6
 CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
 TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
-NR_CHANCES: 2
+NR_CHANCES: 3
 NR_ALLOW_RETRACE_STEPS: 5
 PREVENT_RETRACE: True
 SORT_NEXT: True
