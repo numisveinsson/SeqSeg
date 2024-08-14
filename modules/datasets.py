@@ -116,7 +116,7 @@ def get_testing_samples(dataset, data_dir=None):
             print('Number of testing samples with centerlines:',
                   len(testing_samples))
             testing_samples.sort()
-            testing_samples = [[s, 0, 70, 80] for s in testing_samples]
+            testing_samples = [[s, 0, 50, 60] for s in testing_samples]
     else:
         print('No data directory provided.')
         print('Using default data directory based on training dataset.')
@@ -147,7 +147,7 @@ def get_testing_samples(dataset, data_dir=None):
                 ['0176_0000', 0, 50, 60, 'ct'],  # Aorta CT
                 ['0188_0001_aorta', 5, -10, -20, 'ct'],  # Aorta CT
                 ['O150323_2009_aorta', 0, 10, 20, 'ct'],  # Aorta CT
-                ['O344211000_2006_aorta', 0, 20, 30, 'ct'],  # Aorta CT
+                ['O344211000_2006_aorta', 0, 5, 10, 'ct'],  # Aorta CT
             ]
 
         elif dataset == 'Dataset007_SEQPULMONARYMR':
