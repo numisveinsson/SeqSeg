@@ -5,6 +5,8 @@ import time
 import vtk
 import SimpleITK as sitk
 import numpy as np
+# from numba import jit
+sys.path.insert(0, './')
 from modules.sitk_functions import create_new, distance_map_from_seg
 from modules.vtk_functions import (calc_caps, evaluate_surface, 
                                    points2polydata, write_geo)
@@ -1204,12 +1206,14 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
 
     # If seed and targets are not defined, use create using cluster map
     if seed is None and targets is None:
+        print("Need to create seed and targets")
         seed, targets, output = cluster_map(segmentation,
                                             return_wave_distance_map=True,
                                             out_dir=out_dir,
                                             write_files=write_files)
 
     elif seed is None:
+        print("Need to create seed, targets given")
         max_surf = distance_map_surf_np.max()
         index = np.where(distance_map_surf_np == max_surf)
         # have same format as targets
@@ -1220,6 +1224,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
             # else list of indices
             seed = list(index)
     elif targets is None:
+        print("Need to create targets, seed given")
         _, targets, output = cluster_map(segmentation)
         # have same format as seed
         if isinstance(seed, list):
@@ -1449,6 +1454,7 @@ def check_border(seed, seg_size):
     return seed
 
 
+# @jit(nopython=True)
 def get_neighbors(index, cluster_map_shape):
     """
     Function to get the neighbors of a voxel.
@@ -1501,7 +1507,29 @@ def get_neighbors_diag(index, cluster_map_shape):
     return neighbors
 
 
-def find_end_clusters(cluster_map_img):
+# @jit(nopython=True)
+def check_connections(value, connections, values_connected,
+                      neighbors, cluster_map):
+    for neighbor in neighbors:
+        # If neighbor is not in the current cluster
+        if (cluster_map[neighbor[0], neighbor[1], neighbor[2]] != value
+           and cluster_map[neighbor[0], neighbor[1], neighbor[2]] != 0
+           and cluster_map[neighbor[0], neighbor[1], neighbor[2]]
+           not in values_connected):
+            # Increment number of connections
+            connections += 1
+            # Add value of connected cluster
+            values_connected.append(cluster_map[neighbor[0],
+                                                neighbor[1],
+                                                neighbor[2]])
+            # If more than one connection, break
+            if connections > 1:
+                break
+    return connections, values_connected
+
+
+# @jit(nopython=True, parallel=True)
+def find_end_clusters(cluster_map):
     """
     Function to find the end clusters of a cluster map.
     The end clusters are the clusters that only connect to one other cluster.
@@ -1515,15 +1543,13 @@ def find_end_clusters(cluster_map_img):
 
     Parameters
     ----------
-    cluster_map_img : sitk image
+    cluster_map_img : image np array
         Cluster map. Each cluster has a unique integer value.
 
     Returns
     -------
     end_clusters : list of int
     """
-    # Get array from cluster map
-    cluster_map = sitk.GetArrayFromImage(cluster_map_img).transpose(2, 1, 0)
     # Get unique values
     unique_values = np.unique(cluster_map)
     # Initialize end clusters
@@ -1542,18 +1568,11 @@ def find_end_clusters(cluster_map_img):
             # Get neighboring indices
             neighbors = get_neighbors(index, cluster_map.shape)
             # Iterate over all neighbors
-            for neighbor in neighbors:
-                # If neighbor is not in the current cluster
-                if (cluster_map[tuple(neighbor)] != value
-                   and cluster_map[tuple(neighbor)] != 0
-                   and cluster_map[tuple(neighbor)] not in values_connected):
-                    # Increment number of connections
-                    connections += 1
-                    # Add value of connected cluster
-                    values_connected.append(cluster_map[tuple(neighbor)])
-                    # If more than one connection, break
-                    if connections > 1:
-                        break
+            connections, values_connected = check_connections(value,
+                                                              connections,
+                                                              values_connected,
+                                                              neighbors,
+                                                              cluster_map)
             # If more than one connection, break
             if connections > 1:
                 break
@@ -1713,7 +1732,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
                                                       'cluster_map_img.mha'))
 
     time_start = time.time()
-    end_clusters = find_end_clusters(cluster_map_img)
+    end_clusters = find_end_clusters(sitk.GetArrayFromImage(
+        cluster_map_img).transpose(2, 1, 0))
     print(f"Time to find end clusters: {time.time() - time_start:0.2f}")
     print(f"End clusters: {end_clusters}")
     print(f"Number of end clusters: {len(end_clusters)}")
@@ -1905,17 +1925,23 @@ if __name__ == '__main__':
     #     'PA000005.nii.gz'
     # seg_file = '/Users/numisveins/Documents/Automatic_Tracing_Data/'\
     #     'train_version_5_all_surfaces/ct_train_masks/0188_0001_16_2.nii.gz'
-    seg_file = '/Users/numisveins/Documents/aortaseg24/process_binary/' \
-        'binary_segs/subject044.mha'
-    out_dir = '/Users/numisveins/Documents/aortaseg24/process_binary/' \
-        'centerlines/'
+    seg_file = '/Users/numisveins/Documents/aortaseg24/aortaseg24_processed/binary_segs/subject044.mha'
+    out_dir = '/Users/numisveins/Documents/aortaseg24/aortaseg24_processed/test/'
+    seg_file = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/pred_4_5_noforce_pred_seqseg_ct/0176_0000_seg_rem_3d_fullres_0.mha'
+    out_dir = '/Users/numisveins/Documents/colabs/BryanSVwork/output/'
     segmentation = sitk.ReadImage(seg_file)
     sitk.WriteImage(segmentation, os.path.join(out_dir,
                                                'segmentation_cluster.mha'))
     time_start = time.time()
-    centerline = calc_centerline_fmm(segmentation,
-                                     out_dir=out_dir,
-                                     write_files=False)
+    centerline, success_overall = calc_centerline_fmm(segmentation,
+                                                      seed=np.array([ -0.46373877,   4.407714,   -12.3038225 ]),
+                                                      targets=[np.array([ -2.1865149,   -0.40539312, -28.213629  ]),
+                                                      np.array([ -2.2226558,    4.1264877,    1.055979  ]),
+                                                      np.array([  3.0784054,    1.9332024,   -1.655019  ]),
+                                                      np.array([  2.3460042,    3.6916065,    0.30776787]),
+                                                      np.array([ -4.056656,     2.5299969,   -0.3061099 ])],
+                                                      out_dir=out_dir,
+                                                      write_files=False)
     print(f"Time in seconds: {time.time() - time_start:0.3f}")
     name = seg_file.split('/')[-1].split('.')[0]
     pfn = os.path.join(out_dir, 'centerline_fmm_'+name+'.vtp')
