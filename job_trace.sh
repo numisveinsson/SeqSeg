@@ -38,21 +38,21 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -train_dataset Dataset017_SEQAORTASONECT \
-    -fold 0 \
+    -train_dataset Dataset006_SEQAORTANDFEMOCT \
+    -fold all \
     -img_ext .mha \
-    -outdir output_aortas_one_ct/ \
+    -outdir output_aortas_4_5_noforce_ct/ \
     -scale 1 \
     -start 7 \
     -stop 8 \
     -max_n_steps 500 \
+    -max_n_branches 50 \
     -unit cm \
     -config_name global_aorta \
-
-#     -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
+    # -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
-# Dataset018_SEQAORTASONEMR
+# Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT
 # module load gcc
 # module load cuda/10.0
 # module load cudnn/7.5
