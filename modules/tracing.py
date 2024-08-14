@@ -123,6 +123,16 @@ def trace_centerline(
         from batchgenerators.utilities.file_and_folder_operations import join
         from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
+        # check device
+        if gpu_avail:
+            # check if GPU is available
+            if torch.cuda.is_available():
+                device_use = torch.device('cuda', 0)
+            else:
+                print('GPU not available, using CPU')
+                device_use = torch.device
+        else:
+            device_use = torch.device('cpu', 0),
         print('About to load predictor object')
         # instantiate the nnUNetPredictor
         predictor = nnUNetPredictor(
@@ -130,7 +140,7 @@ def trace_centerline(
             use_gaussian=True,
             use_mirroring=True,
             perform_everything_on_gpu=gpu_avail,
-            device=torch.device('cpu', 0),
+            device=device_use,
             verbose=False,
             verbose_preprocessing=False,
             allow_tqdm=True
