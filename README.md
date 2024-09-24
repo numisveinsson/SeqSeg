@@ -1,7 +1,8 @@
 # SeqSeg: Automatic Tracing and Segmentation of Blood Vessels
-Repository for Automatic Vascular Model Creation using localized 3D segmentation for tracing.
 
-Here is a gif showing the output of the algorithm on a 3D MR image of the descending aorta:
+See paper [here](https://link.springer.com/article/10.1007/s10439-024-03611-z#citeas).
+
+Below is an example output of the algorithm on a 3D MR image of the descending aorta:
 
 ![](assets/mr_model_tracing_fast_shorter.gif)
 
@@ -64,3 +65,20 @@ SeqSeg requires a seed point for initialization. This can be given by either:
 - centerline: if centerlines are given, we initialize using the first points of the centerline
 - cardiac mesh: then the aortic valve must be labeled as Region 8 and LV 7
 
+## Citation
+If SeqSeg is used, please cite the following paper:
+    
+```
+@Article{SveinssonCepero2024,
+author={Sveinsson Cepero, Numi
+and Shadden, Shawn C.},
+title={SeqSeg: Learning Local Segments for Automatic Vascular Model Construction},
+journal={Annals of Biomedical Engineering},
+year={2024},
+month={Sep},
+day={18},
+issn={1573-9686},
+doi={10.1007/s10439-024-03611-z},
+url={https://doi.org/10.1007/s10439-024-03611-z},
+}
+```
