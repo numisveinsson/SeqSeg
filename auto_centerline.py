@@ -314,5 +314,4 @@ if __name__ == '__main__':
             sys.stdout.close()
             sys.stdout = sys.__stdout__
 
-    print("\nTotal calculation time is: "
-          + str((time.time() - start_time)/60) + " min\n")
+    print(f"\nTotal calculation time is: {((time.time() - start_time)/60):.2f} min\n")
