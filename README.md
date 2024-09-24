@@ -10,12 +10,15 @@ Below is an example output of the algorithm on a 3D MR image of the descending a
 Main package dependencies (see environment.yml file for all):
 - SITK
 - VTK
+- Numpy
+- Matplotlib
+- Pyyaml
 
 and if using nnU-Net:
 - nnU-Net
 - Pytorch
 
-and if using VMTK:
+and if using VMTK (not required):
 - VMTK
 
 ## Config file
