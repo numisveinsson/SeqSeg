@@ -1294,7 +1294,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         success_list.append(success)
 
     # Create vtk polydata for points
-    centerline = create_centerline_polydata(points_list, distance_map_surf)
+    centerline = create_centerline_polydata(points_list, success_list, distance_map_surf)
     centerline = post_process_centerline(centerline)
 
     print(f"""Centerline calculated, success ratio:
@@ -1309,7 +1309,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     return centerline, success_overall
 
 
-def create_centerline_polydata(points_list, distance_map_surf):
+def create_centerline_polydata(points_list, success_list, distance_map_surf):
     """
     Function to create a vtk polydata from a list of points.
     Each list of points is a path from seed to target and is stored as a line.
@@ -1347,7 +1347,7 @@ def create_centerline_polydata(points_list, distance_map_surf):
     global_node_id.SetName("GlobalNodeID")
 
     # Iterate over all points
-    for points_path in points_list:
+    for ind, points_path in enumerate(points_list):
         # Remove any nan values
         points_path = [point for point in points_path
                        if not np.isnan(point).any()]
@@ -1373,8 +1373,9 @@ def create_centerline_polydata(points_list, distance_map_surf):
             # Add global node id
             global_node_id.InsertNextValue(i)
 
-        # Add line to lines
-        lines.InsertNextCell(line)
+        # Add line to lines if was successful
+        if success_list[ind]:
+            lines.InsertNextCell(line)
 
     # Add points, lines and radii to polydata
     centerline.SetPoints(points)
@@ -1388,7 +1389,7 @@ def create_centerline_polydata(points_list, distance_map_surf):
 def post_process_centerline(centerline):
     """
     Function to post process the centerline using vtk functionalities.
-    
+
     1. Remove duplicate points.
     2. Smooth centerline.
 
@@ -1406,7 +1407,7 @@ def post_process_centerline(centerline):
     # Remove duplicate points
     cleaner = vtk.vtkCleanPolyData()
     cleaner.SetInputData(centerline)
-    cleaner.SetTolerance(0.01)
+    cleaner.SetTolerance(0.001)
     cleaner.Update()
     centerline = cleaner.GetOutput()
 
@@ -1929,19 +1930,24 @@ if __name__ == '__main__':
     out_dir = '/Users/numisveins/Documents/aortaseg24/aortaseg24_processed/test/'
     seg_file = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/pred_4_5_noforce_pred_seqseg_ct/0176_0000_seg_rem_3d_fullres_0.mha'
     out_dir = '/Users/numisveins/Documents/colabs/BryanSVwork/output/'
+    seg_file = '/Users/numisveins/Documents/vascular_data_3d/truths/0084_0001.mha'
+    out_dir = '/Users/numisveins/Documents/colabs/GalaCenterlinework/'
     segmentation = sitk.ReadImage(seg_file)
     sitk.WriteImage(segmentation, os.path.join(out_dir,
                                                'segmentation_cluster.mha'))
     time_start = time.time()
     centerline, success_overall = calc_centerline_fmm(segmentation,
-                                                      seed=np.array([ -0.46373877,   4.407714,   -12.3038225 ]),
-                                                      targets=[np.array([ -2.1865149,   -0.40539312, -28.213629  ]),
-                                                      np.array([ -2.2226558,    4.1264877,    1.055979  ]),
-                                                      np.array([  3.0784054,    1.9332024,   -1.655019  ]),
-                                                      np.array([  2.3460042,    3.6916065,    0.30776787]),
-                                                      np.array([ -4.056656,     2.5299969,   -0.3061099 ])],
                                                       out_dir=out_dir,
                                                       write_files=False)
+    # centerline, success_overall = calc_centerline_fmm(segmentation,
+    #                                                   seed=np.array([ -0.46373877,   4.407714,   -12.3038225 ]),
+    #                                                   targets=[np.array([ -2.1865149,   -0.40539312, -28.213629  ]),
+    #                                                   np.array([ -2.2226558,    4.1264877,    1.055979  ]),
+    #                                                   np.array([  3.0784054,    1.9332024,   -1.655019  ]),
+    #                                                   np.array([  2.3460042,    3.6916065,    0.30776787]),
+    #                                                   np.array([ -4.056656,     2.5299969,   -0.3061099 ])],
+    #                                                   out_dir=out_dir,
+    #                                                   write_files=False)
     print(f"Time in seconds: {time.time() - time_start:0.3f}")
     name = seg_file.split('/')[-1].split('.')[0]
     pfn = os.path.join(out_dir, 'centerline_fmm_'+name+'.vtp')
