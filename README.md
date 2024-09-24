@@ -1,8 +1,7 @@
 # SeqSeg: Automatic Tracing and Segmentation of Blood Vessels
 Repository for Automatic Vascular Model Creation using localized 3D segmentation for tracing.
 
-Here is a gif showing the output of the algorithm on a 3D image of the aorta:
-mr_model_tracing_fast_shorter.gif
+Here is a gif showing the output of the algorithm on a 3D MR image of the descending aorta:
 
 ![](assets/mr_model_tracing_fast_shorter.gif)
 
