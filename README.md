@@ -1,6 +1,6 @@
 # SeqSeg: Automatic Tracing and Segmentation of Blood Vessels
 
-See paper [here](https://link.springer.com/article/10.1007/s10439-024-03611-z#citeas).
+See paper [here](https://rdcu.be/dU0wy).
 
 Below is an example output of the algorithm on a 3D MR image of the descending aorta:
 
