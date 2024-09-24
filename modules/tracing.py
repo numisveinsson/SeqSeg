@@ -94,11 +94,13 @@ def trace_centerline(
     weight_type = global_config['WEIGHT_TYPE']
 
     if (seg_file and trace_seg):
-        print("We are tracing a segmented vasculature!No need for prediction.")
+        print("\nWe are tracing a segmented vasculature! No need for prediction.")
         print(f"Reading in seg file: {seg_file}")
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
-        print(f"""Seg data. size: {size_im},
-               spacing: {spacing_im}, origin: {origin_im}""")
+        print(f"""Seg data.
+            size: {size_im},
+            spacing: {spacing_im},
+            origin: {origin_im}""")
 
     if not (seg_file and trace_seg):
         print(f"Reading in image file: {image_file}, scale: {scale}")
@@ -106,8 +108,8 @@ def trace_centerline(
         print(f"""Image data. size: {size_im},\n
            spacing: {spacing_im},\n origin: {origin_im}""")
     else:
-        print("""No need to read in image file,\n
-              we are using a given segmentation""")
+        print("No need to read in image file,")
+        print("we are using a given segmentation")
         image_file = seg_file
         reader_im = reader_seg
 
