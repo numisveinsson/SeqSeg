@@ -4,7 +4,7 @@
 echo "Running tests..."
 
 # Activate virtual environment
-conda activate ml_data
+conda activate seqseg
 
 # CD to the directory of the script /Users/numisveins/Documents/SeqSeg
 cd /Users/numisveins/Documents/SeqSeg
