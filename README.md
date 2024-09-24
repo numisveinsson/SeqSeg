@@ -48,9 +48,9 @@ Arguments:
 
 -`stop`: This argument specifies where to stop in the list of testing samples. The default value is -1, which means to process all samples until the end of the list.
 
--'max_n_steps': This argument specifies the maximum number of steps to run the algorithm. The default value is 1000.
+-`max_n_steps`: This argument specifies the maximum number of steps to run the algorithm. The default value is 1000.
 
--'unit': This argument specifies the unit of the image data. The default value is 'cm'.
+-`unit`: This argument specifies the unit of the image data. The default value is 'cm'.
 
 Data directory: Assumes the following structure:
 - Directory
