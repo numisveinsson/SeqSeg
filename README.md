@@ -69,7 +69,7 @@ SeqSeg requires a seed point for initialization. This can be given by either:
 - cardiac mesh: then the aortic valve must be labeled as Region 8 and LV 7
 
 ## Citation
-If SeqSeg is used, please cite the following paper:
+When using SeqSeg, please cite the following paper:
     
 ```
 @Article{SveinssonCepero2024,
