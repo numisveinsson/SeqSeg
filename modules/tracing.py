@@ -129,6 +129,7 @@ def trace_centerline(
         if gpu_avail:
             # check if GPU is available
             if torch.cuda.is_available():
+                print('GPU available, using GPU')
                 device_use = torch.device('cuda', 0)
             else:
                 print('GPU not available, using CPU')
