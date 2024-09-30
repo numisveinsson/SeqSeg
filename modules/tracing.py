@@ -133,9 +133,9 @@ def trace_centerline(
                 device_use = torch.device('cuda', 0)
             else:
                 print('GPU not available, using CPU')
-                device_use = torch.device
+                device_use = torch.device('cpu', 0)
         else:
-            device_use = torch.device('cpu', 0),
+            device_use = torch.device('cpu', 0)
         print('About to load predictor object')
         # instantiate the nnUNetPredictor
         predictor = nnUNetPredictor(
