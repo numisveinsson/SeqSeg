@@ -155,14 +155,11 @@ if __name__ == '__main__':
     take_time = global_config['TIME_ANALYSIS']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
 
-    # for test in tests:
-    # print('\n test is: \n', test)
-
-    dataset = args.train_dataset      # test[1]
-    fold = args.fold            # test[2]
-    img_format = args.img_ext   # test[4]
-    scale = args.scale          # test[5]
-    test_name = args.test_name  # test[0]
+    dataset = args.train_dataset 
+    fold = args.fold            
+    img_format = args.img_ext   
+    scale = args.scale          
+    test_name = args.test_name  
 
     # Weight directory
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
