@@ -24,13 +24,16 @@ jobs:
       with:
         python-version: "3.10"
     - name: Install dependencies via conda-forge
-      uses: conda-incubator/setup-miniconda@v3
+      uses: conda-incubator/setup-miniforge@v1
       with:
           miniforge-version: latest
           activate-environment: seqseg
           python-version: "3.10"
           channels: conda-forge
           environment-file: environment_new.yml
+    # Create the Conda environment from environment.yml
+    - name: Create conda environment
+      run: conda env create -f environment_new.yml
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
