@@ -26,11 +26,10 @@ jobs:
     - name: Install dependencies via conda-forge
       uses: conda-incubator/setup-miniconda@v3
       with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
-          activate-environment: CGx
+          activate-environment: seqseg
           python-version: "3.10"
-          use-mamba: true
+          channels: conda-forge
           environment-file: environment_new.yml
     - name: Lint with flake8
       run: |
@@ -40,4 +39,6 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
+        conda info
+        conda list
         sh tests/test.sh
