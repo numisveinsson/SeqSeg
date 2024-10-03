@@ -30,9 +30,7 @@ jobs:
           channels: conda-forge
           environment-file: environment_new.yml
           channel-priority: flexible
-    # Create the Conda environment from environment.yml
-    - name: Create conda environment
-      run: conda env create -f environment_new.yml
+    # Test python script
     - name: Test with pytest
       run: |
         conda info
