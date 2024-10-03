@@ -7,27 +7,48 @@ Below is an example output of the algorithm on a 3D MR image of the descending a
 ![](assets/mr_model_tracing_fast_shorter.gif)
 
 ## Set Up
+SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the medical image volumes. You will need model weights to run the algorithm. After training the nnU-Net model, the weights will be saved in the `nnUNet_results` folder. Before running you must set a global environment variable to say where that folder is, for example:
+
+```bash
+export nnUNet_results="/path/to/model/weights/nnUnet/nnUNet_results"
+```
+
 Main package dependencies (see environment.yml file for all):
+
+Machine Learning:
+- nnU-Net
+- Pytorch
+
+Image and Data Processing:
 - SITK
 - VTK
 - Numpy
 - Matplotlib
 - Pyyaml
 
-and if using nnU-Net:
-- nnU-Net
-- Pytorch
-
 and if using VMTK (not required):
 - VMTK
 
-## Config file
-`config/global.yml`: File contains config parameters, default is set but can be changed depending on task
-
-We recommend duplicating the file and changing the name to avoid overwriting the default values.
-If so, the config file must be passed as an argument when running the script: `config_name`
 
 ## Running
+
+### Set weights directory
+```bash
+export nnUNet_results="/path/to/model/weights/nnUnet/nnUNet_results"
+```
+
+### Activate environment (eg. conda)
+```bash
+conda activate seqseg
+```
+
+### Run
+```bash
+python3 auto_centerline.py --data_dir data --test_name 3d_fullres --train_dataset Dataset001_AORTAS --config_name global.yml --fold all --img_ext .nii.gz --outdir output --scale 1 --start 0 --stop -1 --max_n_steps 1000 --unit cm
+```
+
+### Details
+
 `auto_centerline`: Main script to run.
 
 Arguments:
@@ -67,6 +88,12 @@ SeqSeg requires a seed point for initialization. This can be given by either:
 - test.json file: located in data directory (see sample under data)
 - centerline: if centerlines are given, we initialize using the first points of the centerline
 - cardiac mesh: then the aortic valve must be labeled as Region 8 and LV 7
+
+## Config file
+`config/global.yml`: File contains config parameters, default is set but can be changed depending on task
+
+We recommend duplicating the file and changing the name to avoid overwriting the default values.
+If so, the config file must be passed as an argument when running the script: `config_name`
 
 ## Citation
 When using SeqSeg, please cite the following paper:
