@@ -30,6 +30,7 @@ jobs:
           channels: conda-forge
           environment-file: environment_new.yml
           channel-priority: flexible
+          auto-activate-base: false
     # Test python script
     - name: Test auto_centerline
       run: |
