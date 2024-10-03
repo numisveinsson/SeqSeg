@@ -34,6 +34,8 @@ jobs:
     # Test python script
     - name: Test auto_centerline
       run: |
+        conda info
+        conda list
         python3 auto_centerline.py \
         -data_dir tests/test_data/ \
         -config_name global_test \
