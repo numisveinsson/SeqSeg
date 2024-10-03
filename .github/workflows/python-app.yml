@@ -31,6 +31,7 @@ jobs:
           environment-file: environment_new.yml
           channel-priority: flexible
           auto-activate-base: false
+          activate-environment: environment_new
     # Test python script
     - name: Test auto_centerline
       run: |
