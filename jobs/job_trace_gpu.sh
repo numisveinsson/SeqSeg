@@ -41,10 +41,10 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 auto_centerline.py \
     -test_name 3d_fullres \
-    -train_dataset Dataset023_SEQAORTAS025CT \
+    -train_dataset Dataset027_SEQAORTAS075CT \
     -fold 0 \
     -img_ext .mha \
-    -outdir output_datasizestudy/ct/025/ \
+    -outdir output_datasizestudy/ct/075/ \
     -scale 1 \
     -start 0 \
     -stop -1 \
