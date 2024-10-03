@@ -30,6 +30,9 @@
 
 source activate /global/scratch/users/numi/environments/seqseg2
 
+conda info
+conda list
+
 export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
