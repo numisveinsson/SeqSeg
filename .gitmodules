@@ -1,6 +1,3 @@
-[submodule "vmtk"]
-	path = vmtk
-	url = https://github.com/numisveinsson/vmtk.git
 [submodule "nnUNet"]
 	path = nnUNet
 	url = https://github.com/numisveinsson/nnUNet.git
