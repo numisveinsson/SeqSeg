@@ -1294,7 +1294,9 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         success_list.append(success)
 
     # Create vtk polydata for points
-    centerline = create_centerline_polydata(points_list, success_list, distance_map_surf)
+    centerline = create_centerline_polydata(points_list,
+                                            success_list,
+                                            distance_map_surf)
     centerline = post_process_centerline(centerline)
 
     print(f"""Centerline calculated, success ratio:
