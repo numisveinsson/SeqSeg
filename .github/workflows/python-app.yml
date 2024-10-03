@@ -14,7 +14,7 @@ defaults:
     shell: bash -el {0}
 
 jobs:
-  build:
+  test_scripts:
 
     runs-on: macos-latest
 
