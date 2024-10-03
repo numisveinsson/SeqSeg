@@ -98,7 +98,7 @@ We recommend duplicating the file and changing the name to avoid overwriting the
 If so, the config file must be passed as an argument when running the script: `config_name`
 
 ## Citation
-When using SeqSeg, please cite the following paper:
+When using SeqSeg, please cite the following [paper](https://rdcu.be/dU0wy):
     
 ```
 @Article{SveinssonCepero2024,
