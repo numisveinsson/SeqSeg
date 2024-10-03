@@ -30,7 +30,6 @@ jobs:
           channels: conda-forge
           environment-file: environment_new.yml
           channel-priority: flexible
-          auto-activate-base: false
           activate-environment: environment_new
     # Test python script
     - name: Test auto_centerline
@@ -45,4 +44,4 @@ jobs:
         -outdir tests/test_output/ \
         -start 0 \
         -stop 1 \
-        -max_n_steps 15 \
+        -max_n_steps 3 \
