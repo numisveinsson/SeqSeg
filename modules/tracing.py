@@ -94,7 +94,8 @@ def trace_centerline(
     weight_type = global_config['WEIGHT_TYPE']
 
     if (seg_file and trace_seg):
-        print("\nWe are tracing a segmented vasculature! No need for prediction.")
+        print("\nWe are tracing a segmented vasculature!")
+        print("No need for prediction.")
         print(f"Reading in seg file: {seg_file}")
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
         print(f"""Seg data.
@@ -730,7 +731,7 @@ def trace_centerline(
                         print('Branch inside, restarting branch')
 
                     # If this branch is inside, then restart branch
-                    # if len(vessel_tree.branches[branch]) <= allowed_steps + 2:
+                    # if len(vessel_tree.branches[branch]) <= allowed_steps+2:
                     vessel_tree.restart_branch(branch)
                     branch -= 1
                     # If not the whole branch is inside
