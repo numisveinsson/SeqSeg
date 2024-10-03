@@ -34,7 +34,6 @@ jobs:
     # Test python script
     - name: Test auto_centerline
       run: |
-        conda activate test
         conda info
         conda list
         python3 auto_centerline.py \
