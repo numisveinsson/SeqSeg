@@ -26,7 +26,6 @@ jobs:
     - name: Install dependencies via conda-forge
       uses: conda-incubator/setup-miniconda@v3
       with:
-          miniforge-version: Miniforge3
           python-version: "3.10"
           channels: conda-forge
           environment-file: environment_new.yml
