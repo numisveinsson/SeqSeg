@@ -4,7 +4,7 @@
 
 See paper [here](https://rdcu.be/dU0wy).
 
-Below is an example output of the algorithm on a 3D MR image of the descending aorta:
+Below is an example output of the algorithm on a 3D MR image of the abdominal aorta:
 
 ![](assets/mr_model_tracing_fast_shorter.gif)
 
