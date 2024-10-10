@@ -31,6 +31,12 @@ Image and Data Processing:
 and if using VMTK (not required):
 - VMTK
 
+Current workflow:
+1. Create conda environment using environment_new.yml
+2. Test this environment using the test script tests/test.sh
+3. Install nnunet and pytorch using the instructions [here](https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/installation_instructions.md).
+4. Try the full installation according to details below
+
 
 ## Running
 
