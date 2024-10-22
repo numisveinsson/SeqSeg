@@ -83,7 +83,6 @@ def dice(pred, truth):
         true = true // true.max()
 
     num_class = np.unique(true)
-
     # change to one hot
     dice_out = [None]*len(num_class)
     for i in range(1, len(num_class)):
@@ -328,8 +327,10 @@ def pre_process(pred, folder, case, write_postprocessed,
         # marching cubes
         surface = vf.evaluate_surface(pred, 0.5)
         # Smooth marching cubes
-        # surface_smooth = vf.smooth_surface(surface, 12)
+        surface_smooth = vf.smooth_surface(surface, 18)
         vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'.vtp', surface)
+        vf.write_geo(pred_folder+folder+'/postprocessed/'+case+'_smooth.vtp',
+                     surface_smooth)
 
     # only change to binary if prediction is probability map
     if pred.GetPixelID() != sitk.sitkUInt8:
@@ -655,6 +656,8 @@ def cap_and_keep_largest(pred, centerline, file_name, outdir):
                                                     outdir, 4)
     clippedpd = bryan_clip_surface(predpd, boxpd)
     largest = keep_largest_surface(clippedpd)
+    # write clipped surface
+    vf.write_geo(outdir+file_name+'_clippeddd.vtp', largest)
     # convert to sitk image
     img_vtk = vf.exportSitk2VTK(pred)[0]
     seg_vtk = convertPolyDataToImageData(largest, img_vtk)
@@ -752,6 +755,26 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
 
                     pred = read_seg(pred_folder+folder+'/', seg)
                     truth = read_truth(case, truth_folder)
+
+                    # check origin and make same
+                    if pred.GetOrigin() != truth.GetOrigin():
+                        pred.SetOrigin(truth.GetOrigin())
+
+                        if write_postprocessed:
+                            sitk.WriteImage(pred, pred_folder+folder+'/postprocessed/'
+                                            + case + '_origin.mha')
+                            sitk.WriteImage(truth, pred_folder+folder+'/postprocessed/'
+                                            + case + '_origin_truth.mha')
+                    
+                    # check transform matrix and make same
+                    if pred.GetDirection() != truth.GetDirection():
+                        pred.SetDirection(truth.GetDirection())
+
+                        if write_postprocessed:
+                            sitk.WriteImage(pred, pred_folder+folder+'/postprocessed/'
+                                            + case + '_direction.mha')
+                            sitk.WriteImage(truth, pred_folder+folder+'/postprocessed/'
+                                            + case + '_direction_truth.mha')
 
                     if metric == 'centerline overlap' or cap:
                         from modules import vtk_functions as vf
@@ -1072,7 +1095,6 @@ def barplot_annotate_brackets(num1, num2, data, center, height, yerr=None,
     :param fs: font size
     :param maxasterix: maximum number of asterixes to write (for very small p-values)
     """
-    # import pdb; pdb.set_trace()
     if type(data) is str:
         text = data
     else:
@@ -1175,7 +1197,6 @@ def combine_segs(pred_folder,
                 case_names_folder = [case for case in case_names_folder if case[0] != '.']
                 case_names_folder.sort()
                 print(f"Reading in pred {case_names_folder[i]} from {folder}")
-                # import pdb; pdb.set_trace()
                 pred = add_seg(pred, read_seg(pred_folder+folder+'/', case_names_folder[i]))
 
             pred = average_seg(pred, len(folders))
@@ -1217,12 +1238,12 @@ if __name__ == '__main__':
     # save_name = 'test_keep_noclip_unpaired_ttest_skipfirst'
     save_name = 'test_all'
     preprocess_pred = True
-    masked = True
-    write_postprocessed = False
+    masked = False
+    write_postprocessed = True
 
     print_case_names = True
 
-    cap = False
+    cap = True
     keep_largest_label_benchmark = False
     paired_ttest = False
     mecnemar = False
@@ -1236,10 +1257,13 @@ if __name__ == '__main__':
     output_folder = '/Users/numisveins/Documents/data_seqseg_paper/pred_mic_aortas_june24/graphs/'
 
     # pred_folder = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/'
-    # truth_folder = '/Users/numisveins/Documents/vascular_data_3d/truths/'
-    # cent_folder = '/Users/numisveins/Documents/vascular_data_3d/centerlines/'
+    truth_folder = '/Users/numisveins/Documents/vascular_data_3d/truths/'
+    cent_folder = '/Users/numisveins/Documents/vascular_data_3d/centerlines/'
     # mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
     # output_folder = '/Users/numisveins/Documents/data_seqseg_paper/fresh_graphs/'
+
+    pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/pred_seqseg_ct/new_format/'
+    output_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/graphs/'
 
     # get all folders in pred_folder
     pred_folders = os.listdir(pred_folder)
@@ -1250,7 +1274,7 @@ if __name__ == '__main__':
     # pred_folders = [folder for folder in pred_folders if '3d' not in folder]
 
     # modalities
-    modalities = ['ct', 'mr']
+    modalities = ['ct']
     # metrics
     metrics = ['dice', 'hausdorff', 'centerline overlap']  # 
 

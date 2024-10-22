@@ -22,7 +22,7 @@ if __name__=='__main__':
     #                       checkpoint_name='checkpoint_final.pth',
     #                       num_processes_preprocessing=3,
     #                       num_processes_segmentation_export=3)
-    
+
     print('About to load predictor object')
     # instantiate the nnUNetPredictor
     predictor = nnUNetPredictor(
