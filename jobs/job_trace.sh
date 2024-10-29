@@ -33,8 +33,8 @@ source activate /global/scratch/users/numi/environments/seqseg2
 conda info
 conda list
 
-export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
-export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
+# export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
+# export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/
@@ -52,7 +52,7 @@ python3 auto_centerline.py \
     -max_n_branches 50 \
     -unit cm \
     -config_name global_aorta \
-    # -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
+    -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 # Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT
