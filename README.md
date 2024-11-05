@@ -1,6 +1,6 @@
 ![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/python-app.yml/badge.svg)
 
-# SeqSeg: Automatic Tracing and Segmentation of Blood Vessels
+# SeqSeg: Automatic TracKing and Segmentation of Blood Vessels
 
 See paper [here](https://rdcu.be/dU0wy).
 
