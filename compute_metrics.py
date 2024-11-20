@@ -382,6 +382,25 @@ def get_case_names(folder, pred_folder):
     return segs
 
 
+def get_case_names_basic(folder, pred_folder):
+
+    segs = os.listdir(pred_folder+folder)
+    # only keep segmentation files and ignore hidden files
+    segs = [seg for seg in segs if '.' not in seg[0]]
+    # only keep files not folders
+    segs = [seg for seg in segs if '.' in seg]
+    # remove image extension
+    segs = [seg.replace('.nii.gz', '') for seg in segs]
+    # sort
+    import natsort
+    segs = natsort.natsorted(segs)
+    # segs.sort()
+
+    print(f"Segs: {segs}")
+
+    return segs
+
+
 def calc_metric(metric, pred, truth, mask=None, centerline=None):
 
     if mask is not None:
@@ -671,7 +690,9 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                          save_name, preprocess_pred, masked,
                          write_postprocessed, print_case_names,
                          keep_largest_label_benchmark, cap=False,
-                         paired_ttest=True, mecnemar=False, wilcoxon_bool=False):
+                         paired_ttest=True, mecnemar=False,
+                         wilcoxon_bool=False,
+                         process_names=False):
     """
     Calculate metrics for all folders in pred_folders
 
@@ -716,8 +737,11 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
 
             folders_mod = [folder for folder in pred_folders
                            if modality in folder]
-            case_names = get_case_names([fo for fo in folders_mod
-                                         if 'seqseg' in fo][0], pred_folder)
+            if process_names:
+                case_names = get_case_names([fo for fo in folders_mod
+                                            if 'seqseg' in fo][0], pred_folder)
+            else:
+                case_names = get_case_names_basic(folders_mod[0], pred_folder)
             print(f"Case names: {case_names}")
             for folder in folders_mod:
 
@@ -1236,14 +1260,15 @@ if __name__ == '__main__':
 
     name_graph = 'Comparison'
     # save_name = 'test_keep_noclip_unpaired_ttest_skipfirst'
-    save_name = 'test_all'
-    preprocess_pred = True
+    save_name = 'test_cardiac'
+    preprocess_pred = False
     masked = False
     write_postprocessed = True
 
     print_case_names = True
+    process_names = False
 
-    cap = True
+    cap = False
     keep_largest_label_benchmark = False
     paired_ttest = False
     mecnemar = False
@@ -1262,8 +1287,13 @@ if __name__ == '__main__':
     # mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
     # output_folder = '/Users/numisveins/Documents/data_seqseg_paper/fresh_graphs/'
 
+    # vascular data
     pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/pred_seqseg_ct/new_format/'
     output_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/graphs/'
+
+    # cardiac data
+    pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/meshes/'
+    truth_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/Ground truth cardiac segmentations/'
 
     # get all folders in pred_folder
     pred_folders = os.listdir(pred_folder)
@@ -1276,14 +1306,14 @@ if __name__ == '__main__':
     # modalities
     modalities = ['ct']
     # metrics
-    metrics = ['dice', 'hausdorff', 'centerline overlap']  # 
+    metrics = ['dice', 'hausdorff']  # , 'centerline overlap']
 
     calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                          mask_folder, output_folder, modalities, metrics,
                          save_name, preprocess_pred, masked,
                          write_postprocessed, print_case_names,
                          keep_largest_label_benchmark, cap, paired_ttest,
-                         mecnemar, wilcoxon_bool)
+                         mecnemar, wilcoxon_bool, process_names)
 
     import pdb; pdb.set_trace()
     # combine segmentations

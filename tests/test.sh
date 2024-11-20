@@ -6,8 +6,8 @@ echo "Running tests..."
 # Activate virtual environment
 conda activate seqseg
 
-# CD to the directory of the script /Users/numisveins/Documents/SeqSeg
-cd /Users/numisveins/Documents/SeqSeg
+# CD to the directory of the script if you need
+# cd /Users/numisveins/Documents/SeqSeg
 
 # Run the tests
 python3 auto_centerline.py \

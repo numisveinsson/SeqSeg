@@ -17,6 +17,9 @@ export nnUNet_results="/path/to/model/weights/nnUnet/nnUNet_results"
 
 Main package dependencies (see environment.yml file for all):
 
+Basic:
+- Python 3.10.5
+
 Machine Learning:
 - nnU-Net
 - Pytorch
