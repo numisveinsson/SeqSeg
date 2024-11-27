@@ -93,7 +93,7 @@ Data directory: Assumes the following structure:
     - images
     - centerlines (if applicable)
     - truths (if applicable)
-    - test_data.json (if applicable)
+    - test.json (if applicable)
 
 SeqSeg requires a seed point for initialization. This can be given by either:
 - test.json file: located in data directory (see sample under data)
