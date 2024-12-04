@@ -35,6 +35,8 @@ conda list
 
 # export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 # export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
+
+# Define path to model weights
 export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/

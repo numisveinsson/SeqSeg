@@ -1864,94 +1864,33 @@ def test_centerline_fmm(directory, out_dir):
 if __name__ == '__main__':
 
     # Out directory
-    out_dir = '/Users/numisveins/Downloads/debug_centerline/'
+    out_dir = '/Users/numisveins/Documents/vascular_data_3d/fmm_centerlines/'
 
     # Path to segmentation
-    path_seg = '/Users/numisveins/Documents/Automatic_Tracing_Data' \
-               '/train_version_5_all_surfaces/ct_train_masks' \
-               '/0188_0001_16_2.nii.gz'
-    name = path_seg.split('/')[-1].split('.')[0]
-    # Load segmentation
-    segmentation = sitk.ReadImage(path_seg)
-    # sitk.WriteImage(segmentation, os.path.join(out_dir, 'segmentation.mha'))
+    path_segs = '/Users/numisveins/Documents/vascular_data_3d/truths/'
 
-    # # # Frangi filter
-    # # frangi = frangi_filter(segmentation)
-    # # sitk.WriteImage(frangi, os.path.join(out_dir, 'frangi.mha'))
+    # List of segmentations
+    segs = [f for f in os.listdir(path_segs) if f.endswith('.mha')]
 
-    # # Create surface mesh
-    # surface = evaluate_surface(segmentation)
-    # pfn = os.path.join(out_dir, 'surface.vtp')
-    # write_geo(pfn, surface)
+    # Loop through all segmentations
+    for seg in segs[29:]:
+        print(f"\n\nCalculating centerline for: {seg}\n\n")
+        path_seg = os.path.join(path_segs, seg)
+        name = path_seg.split('/')[-1].split('.')[0]
+        # Load segmentation
+        name = path_seg.split('/')[-1].split('.')[0]
+        # Load segmentation
+        segmentation = sitk.ReadImage(path_seg)
+        # Write segmentation
+        # sitk.WriteImage(segmentation, os.path.join(out_dir,
+        #                 'segmentation_'+name+'.mha'))
+        time_start = time.time()
+        centerline, success_overall = calc_centerline_fmm(
+            segmentation,
+            out_dir=out_dir,
+            write_files=False)
 
-    # # # Calculate centerline using gradient descent
-    # # centerline = calculate_centerline_gradient(segmentation)
-    # # pfn = os.path.join(out_dir, 'centerline.vtp')
-    # # write_geo(pfn, centerline)
-
-    # # Calculate caps
-    # caps = calc_caps(surface)
-    # polydata_point = points2polydata(caps)
-    # pfn = os.path.join(out_dir, 'caps.vtp')
-    # write_geo(pfn, polydata_point)
-
-    # # Calculate distance map
-    # distance = distance_map_from_seg(segmentation)
-    # sitk.WriteImage(distance, os.path.join(out_dir, 'distance.mha'))
-
-    # # Use FMM to calculate path
-    # path = fast_marching_method_seg_dist(segmentation, distance, caps[0])
-    # sitk.WriteImage(path, os.path.join(out_dir, 'path_fmm.mha'))
-
-    # Use upwind FMM to calculate path
-    # path = upwind_fast_marching_method(
-    #     sitk.RescaleIntensity(distance, 1, 255), caps[1])
-    # sitk.WriteImage(path, os.path.join(out_dir, 'path_upwind.mha'))
-
-    # Test centerline calculation using FMM
-    # directory = '/Users/numisveins/Documents/Automatic_Tracing_Data/' \
-    #     'train_version_5_all_surfaces/ct_train_masks/'
-    # test_centerline_fmm(directory, out_dir)
-
-    # Calculate centerline using FMM
-    # time_start = time.time()
-    # source = 0
-    # centerline = calc_centerline_fmm(
-    #     segmentation, caps[source], [cap for i, cap in enumerate(caps)
-    #                                  if i != source], min_res=30)
-    # # print(f"Time in seconds: {time.time() - time_start}")
-    # pfn = os.path.join(out_dir, 'centerline_fm_'+name+'_'+str(source)+'.vtp')
-    # write_geo(pfn, centerline)
-
-    # Calculate cluster map
-    # seg_file = '/Users/numisveins/Documents/PARSE_dataset/ct_train_masks/'\
-    #     'PA000005.nii.gz'
-    # seg_file = '/Users/numisveins/Documents/Automatic_Tracing_Data/'\
-    #     'train_version_5_all_surfaces/ct_train_masks/0188_0001_16_2.nii.gz'
-    seg_file = '/Users/numisveins/Documents/aortaseg24/aortaseg24_processed/binary_segs/subject044.mha'
-    out_dir = '/Users/numisveins/Documents/aortaseg24/aortaseg24_processed/test/'
-    seg_file = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/pred_4_5_noforce_pred_seqseg_ct/0176_0000_seg_rem_3d_fullres_0.mha'
-    out_dir = '/Users/numisveins/Documents/colabs/BryanSVwork/output/'
-    seg_file = '/Users/numisveins/Documents/vascular_data_3d/truths/0084_0001.mha'
-    out_dir = '/Users/numisveins/Documents/colabs/GalaCenterlinework/'
-    segmentation = sitk.ReadImage(seg_file)
-    sitk.WriteImage(segmentation, os.path.join(out_dir,
-                                               'segmentation_cluster.mha'))
-    time_start = time.time()
-    centerline, success_overall = calc_centerline_fmm(segmentation,
-                                                      out_dir=out_dir,
-                                                      write_files=False)
-    # centerline, success_overall = calc_centerline_fmm(segmentation,
-    #                                                   seed=np.array([ -0.46373877,   4.407714,   -12.3038225 ]),
-    #                                                   targets=[np.array([ -2.1865149,   -0.40539312, -28.213629  ]),
-    #                                                   np.array([ -2.2226558,    4.1264877,    1.055979  ]),
-    #                                                   np.array([  3.0784054,    1.9332024,   -1.655019  ]),
-    #                                                   np.array([  2.3460042,    3.6916065,    0.30776787]),
-    #                                                   np.array([ -4.056656,     2.5299969,   -0.3061099 ])],
-    #                                                   out_dir=out_dir,
-    #                                                   write_files=False)
-    print(f"Time in seconds: {time.time() - time_start:0.3f}")
-    name = seg_file.split('/')[-1].split('.')[0]
-    pfn = os.path.join(out_dir, 'centerline_fmm_'+name+'.vtp')
-    write_geo(pfn, centerline)
-    print(f"Centerline written to: {pfn}")
+        print(f"Time in seconds: {time.time() - time_start:0.3f}")
+        pfn = os.path.join(out_dir, name+'.vtp')
+        write_geo(pfn, centerline)
+        print(f"Centerline written to: {pfn}")

@@ -2,11 +2,22 @@
 
 # SeqSeg: Automatic Tracking and Segmentation of Blood Vessels
 
-See paper [here](https://rdcu.be/dU0wy).
+See paper [here](https://rdcu.be/dU0wy) for citation.
 
 Below is an example output of the algorithm on a 3D MR image of the abdominal aorta:
 
 ![](assets/mr_model_tracing_fast_shorter.gif)
+
+## How it works
+SeqSeg is a method for automatic segmentation of blood vessels in medical images. The algorithm uses a neural network to segment the image and then uses a tracking algorithm to take steps along the centerline of the segmented vessel.
+
+Here is the workflow of the algorithm:
+
+![](assets/seqseg.png)
+
+where the neural network was trained on local subvolume patches of the image:
+
+![](assets/seqseg_training.png)
 
 ## Set Up
 SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the medical image volumes. You will need model weights to run the algorithm. After training the nnU-Net model, the weights will be saved in the `nnUNet_results` folder. Before running you must set a global environment variable to say where that folder is, for example:
