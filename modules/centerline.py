@@ -1864,16 +1864,43 @@ def test_centerline_fmm(directory, out_dir):
 if __name__ == '__main__':
 
     # Out directory
-    out_dir = '/Users/numisveins/Documents/vascular_data_3d/fmm_centerlines/'
+    out_dir = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/centerlines_fmm/'
 
     # Path to segmentation
     path_segs = '/Users/numisveins/Documents/vascular_data_3d/truths/'
+    path_segs = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/truths/'
+
+    # Start index
+    start = 1
+
+    # Path to spacing file
+    if_spacing_file = True
+    spacing_file = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/meta.csv'
 
     # List of segmentations
-    segs = [f for f in os.listdir(path_segs) if f.endswith('.mha')]
+    segs = [f for f in os.listdir(path_segs) if f.endswith('.nii.gz')]
+    segs = sorted(segs)
+
+    if if_spacing_file:
+        import pandas as pd
+        spacing_df = pd.read_csv(spacing_file)
+        # only keep 'spacing', they are sorted
+        spacing_values = spacing_df['spacing'].values
+        # read as tuples
+        spacing_values = [tuple(map(float, x[1:-1].split(','))) for x in spacing_values]
 
     # Loop through all segmentations
-    for seg in segs[29:]:
+    for seg in segs[start:]:
+
+        # skip if already done
+        if os.path.exists(os.path.join(out_dir, 'done.txt')):
+            with open(os.path.join(out_dir, 'done.txt'), 'r') as f:
+                done = f.read().splitlines()
+                f.close()
+            if seg in done:
+                print(f"Already done with: {seg}")
+                continue
+
         print(f"\n\nCalculating centerline for: {seg}\n\n")
         path_seg = os.path.join(path_segs, seg)
         name = path_seg.split('/')[-1].split('.')[0]
@@ -1881,9 +1908,13 @@ if __name__ == '__main__':
         name = path_seg.split('/')[-1].split('.')[0]
         # Load segmentation
         segmentation = sitk.ReadImage(path_seg)
+
+        if if_spacing_file:
+            # set the spacing
+            segmentation.SetSpacing(spacing_values[segs.index(seg)])
         # Write segmentation
-        # sitk.WriteImage(segmentation, os.path.join(out_dir,
-        #                 'segmentation_'+name+'.mha'))
+        sitk.WriteImage(segmentation, os.path.join(out_dir,
+                        'seg_'+name+'.mha'))
         time_start = time.time()
         centerline, success_overall = calc_centerline_fmm(
             segmentation,
@@ -1894,3 +1925,10 @@ if __name__ == '__main__':
         pfn = os.path.join(out_dir, name+'.vtp')
         write_geo(pfn, centerline)
         print(f"Centerline written to: {pfn}")
+        print(f"Success: {success_overall}")
+
+        # write to done.txt
+        with open(os.path.join(out_dir, 'done.txt'), 'a') as f:
+            f.write(name+'\n')
+            f.close()
+        print(f"Done with: {name}")

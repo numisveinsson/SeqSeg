@@ -737,6 +737,9 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
 
             folders_mod = [folder for folder in pred_folders
                            if modality in folder]
+            # only keep if 'seqseg' in name
+            folders_mod = [folder for folder in folders_mod if 'seqseg' in folder]
+
             if process_names:
                 case_names = get_case_names([fo for fo in folders_mod
                                             if 'seqseg' in fo][0], pred_folder)
@@ -1260,16 +1263,16 @@ if __name__ == '__main__':
 
     name_graph = 'Comparison'
     # save_name = 'test_keep_noclip_unpaired_ttest_skipfirst'
-    save_name = 'test_cardiac'
-    preprocess_pred = False
+    save_name = 'test_seqseg_keep_clip_wilcoxon'
+    preprocess_pred = True  # if cap or keep largest label
     masked = False
-    write_postprocessed = True
+    write_postprocessed = False
 
     print_case_names = True
-    process_names = False
+    process_names = True  # if we want to process case names, like seqseg paper
 
-    cap = False
-    keep_largest_label_benchmark = False
+    cap = True
+    keep_largest_label_benchmark = True
     paired_ttest = False
     mecnemar = False
     wilcoxon_bool = True
@@ -1281,19 +1284,19 @@ if __name__ == '__main__':
     mask_folder = '/Users/numisveins/Documents/MICCAI_Challenge23_Aorta_Tree_Data/global_masks/'
     output_folder = '/Users/numisveins/Documents/data_seqseg_paper/pred_mic_aortas_june24/graphs/'
 
-    # pred_folder = '/Users/numisveins/Documents/data_seqseg_paper/pred_aortas_june24_3/'
-    truth_folder = '/Users/numisveins/Documents/vascular_data_3d/truths/'
-    cent_folder = '/Users/numisveins/Documents/vascular_data_3d/centerlines/'
+    pred_folder = '/Users/numisveins/Documents/data_papers/data_seqseg_paper/pred_aortas_june24_3/'
+    truth_folder = '/Users/numisveins/Documents/datasets/vascular_data_3d/truths/'
+    cent_folder = '/Users/numisveins/Documents/datasets/vascular_data_3d/centerlines/'
     # mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
-    # output_folder = '/Users/numisveins/Documents/data_seqseg_paper/fresh_graphs/'
+    output_folder = '/Users/numisveins/Documents/data_papers/data_seqseg_paper/graphs_miros_capped/'
 
-    # vascular data
-    pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/pred_seqseg_ct/new_format/'
-    output_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/graphs/'
+    # # vascular data
+    # pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/pred_seqseg_ct/new_format/'
+    # output_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/graphs/'
 
-    # cardiac data
-    pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/meshes/'
-    truth_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/Ground truth cardiac segmentations/'
+    # # cardiac data
+    # pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/meshes/'
+    # truth_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/Ground truth cardiac segmentations/'
 
     # get all folders in pred_folder
     pred_folders = os.listdir(pred_folder)
@@ -1304,9 +1307,9 @@ if __name__ == '__main__':
     # pred_folders = [folder for folder in pred_folders if '3d' not in folder]
 
     # modalities
-    modalities = ['ct']
+    modalities = ['mr', 'ct']
     # metrics
-    metrics = ['dice', 'hausdorff']  # , 'centerline overlap']
+    metrics = ['dice', 'hausdorff', 'centerline overlap']
 
     calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                          mask_folder, output_folder, modalities, metrics,
