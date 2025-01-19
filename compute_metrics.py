@@ -4,6 +4,9 @@ import vtk
 import numpy as np
 import matplotlib.pyplot as plt
 from modules import vtk_functions as vf
+from modules.capping import (bryan_get_clipping_parameters,
+                             bryan_generate_oriented_boxes,
+                             bryan_clip_surface)
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 from vtk.util.numpy_support import numpy_to_vtk as n2v
 
@@ -153,7 +156,7 @@ def percent_centerline_length(pred, cent_truth):
                 if pred[index1] == 1 and pred[index2] == 1:
                     length_in += np.linalg.norm(np.array(p1)-np.array(p2))
             except Exception as e:
-                # print(f"Error: {e}")
+                print(f"Error: {e}")
                 # print('Index out of bounds')
                 # if location is not within boundary, remove point
                 length -= np.linalg.norm(np.array(p1)-np.array(p2))
@@ -462,139 +465,6 @@ def get_metric_name(metric):
         return 'Centerline Overlap'
     else:
         return metric
-
-
-def bryan_get_clipping_parameters(clpd):
-    """ get all three parameters """
-    points = v2n(clpd.GetPoints().GetData())
-    CenterlineID_for_each_point = v2n(clpd.GetPointData().GetArray(
-                                      'CenterlineId'))
-    radii = v2n(clpd.GetPointData().GetArray('MaximumInscribedSphereRadius'))
-    n_keys = len(CenterlineID_for_each_point[0])
-    line_dict = {}
-
-    # create dict with keys line0, line1, line2, etc
-    for i in range(n_keys):
-        key = f"line{i}"
-        line_dict[key] = []
-
-    for i in range(len(points)):
-        for j in range(n_keys):
-            if CenterlineID_for_each_point[i][j] == 1:
-                key = f"line{j}"
-                line_dict[key].append(points[i])
-
-    for i in range(n_keys):
-        key = f"line{i}"
-        line_dict[key] = np.array(line_dict[key])
-    # Done with spliting centerliens into dictioanry
-
-    # find the end points of each line
-    lst_of_end_pts = []
-    # append the very first point
-    lst_of_end_pts.append(line_dict["line0"][0])
-    # append the rest of the end points
-    for i in range(n_keys):
-        key = f"line{i}"
-        lst_of_end_pts.append(line_dict[key][-1])
-    nplst_of_endpts = np.array(lst_of_end_pts)  # convert to numpy array
-
-    # find the radii at the end points
-    radii_at_caps = []
-    for i in lst_of_end_pts:
-        for j in range(len(points)):
-            if np.array_equal(i, points[j]):
-                radii_at_caps.append(radii[j])
-    nplst_radii_at_caps = np.array(radii_at_caps)  # convert to numpy array
-
-    # find the unit tangent vectors at the end points
-    unit_tangent_vectors = []
-    # compute the unit tangent vector of the first point of the first line
-    key = "line0"
-    line = line_dict[key]
-    tangent_vector = line[0] - line[1]
-    unit_tangent_vector = tangent_vector / np.linalg.norm(tangent_vector)
-    unit_tangent_vectors.append(unit_tangent_vector)
-    # compute the unit tangent vector of the last point of each line
-    for i in range(len(line_dict)):
-        key = f"line{i}"
-        line = line_dict[key]
-        tangent_vector = line[-1] - line[-2]
-        unit_tangent_vector = tangent_vector / np.linalg.norm(tangent_vector)
-        unit_tangent_vectors.append(unit_tangent_vector)
-
-    return nplst_of_endpts, nplst_radii_at_caps, unit_tangent_vectors
-
-
-def bryan_generate_oriented_boxes(endpts, unit_tan_vectors, radius,
-                                  output_file, outdir, box_scale=3):
-
-    box_surfaces = vtk.vtkAppendPolyData()
-    # Convert the input center_points to a list, in case it is a NumPy array
-    endpts = np.array(endpts).tolist()
-    centerpts = []
-    pd_lst = []
-    for i in range(len(endpts)):
-        compute_x = endpts[i][0]+0.5*box_scale*radius[i]*unit_tan_vectors[i][0]
-        compute_y = endpts[i][1]+0.5*box_scale*radius[i]*unit_tan_vectors[i][1]
-        compute_z = endpts[i][2]+0.5*box_scale*radius[i]*unit_tan_vectors[i][2]
-        centerpts.append([compute_x, compute_y, compute_z])
-
-    box_surfaces = vtk.vtkAppendPolyData()
-
-    for i in range(len(centerpts)):
-        # Create an initial vtkCubeSource for the box
-        box = vtk.vtkCubeSource()
-        box.SetXLength(box_scale*radius[i])
-        box.SetYLength(box_scale*radius[i])
-        box.SetZLength(box_scale*radius[i])
-        box.Update()
-
-        # Compute the rotation axis by taking the cross product of the unit_vector and the z-axis
-        rotation_axis = np.cross(np.array([0, 0, 1]), unit_tan_vectors[i])
-
-        # Compute the rotation angle in degrees between the unit_vector and the z-axis
-        rotation_angle = np.degrees(np.arccos(np.dot(unit_tan_vectors[i],
-                                                     np.array([0, 0, 1]))))
-        transform = vtk.vtkTransform()
-        transform.Translate(centerpts[i])
-        transform.RotateWXYZ(rotation_angle, rotation_axis)
-
-        # Apply the transform to the box
-        box_transform = vtk.vtkTransformPolyDataFilter()
-        box_transform.SetInputConnection(box.GetOutputPort())
-        box_transform.SetTransform(transform)
-        box_transform.Update()
-
-        pd_lst.append(box_transform.GetOutput())
-        box_surfaces.AddInputData(box_transform.GetOutput())
-
-    box_surfaces.Update()
-
-    # Write the oriented box to a .vtp file
-    writer = vtk.vtkXMLPolyDataWriter()
-    writer.SetFileName(outdir+output_file+'.vtp')
-    writer.SetInputData(box_surfaces.GetOutput())
-    writer.Write()
-    return box_surfaces.GetOutput(), pd_lst
-
-
-def bryan_clip_surface(surf1, surf2):
-    # Create an implicit function from surf2
-    implicit_function = vtk.vtkImplicitPolyDataDistance()
-    implicit_function.SetInput(surf2)
-
-    # Create a vtkClipPolyData filter and set the input and implicit function
-    clipper = vtk.vtkClipPolyData()
-    clipper.SetInputData(surf1)
-    clipper.SetClipFunction(implicit_function)
-    clipper.InsideOutOff()  # keep the part of surf1 outside of surf2
-    clipper.Update()
-
-    # Get the output polyData with the part enclosed by surf2 clipped away
-    clipped_surf1 = clipper.GetOutput()
-
-    return clipped_surf1
 
 
 def keep_largest_surface(polyData):

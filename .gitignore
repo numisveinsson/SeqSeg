@@ -2,7 +2,7 @@
 
 # Test files
 test_output/*
-
+tests/test_out/*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

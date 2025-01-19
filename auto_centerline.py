@@ -13,6 +13,7 @@ from modules.assembly import calc_centerline_global
 from modules.tracing import trace_centerline
 from modules.datasets import get_testing_samples
 from modules.params import load_yaml
+from modules.capping import cap_surface
 
 sys.stdout.flush()
 start_time = time.time()
@@ -293,12 +294,28 @@ if __name__ == '__main__':
                               + '_points.vtp')
         if calc_global_centerline:
             # Calculate global centerline
-            global_centerline = calc_centerline_global(assembly_binary,
-                                                       initial_seeds)
+            global_centerline, targets = calc_centerline_global(
+                assembly_binary,
+                initial_seeds)
             vf.write_vtk_polydata(global_centerline, dir_output+'/final_'
                                   + case + '_' + test_name + '_'+str(i)+'_'
                                   + str(n_steps_taken)
                                   + '_global_centerline.vtp')
+            # write targets
+            targets_pd = vf.points2polydata([target.tolist() for target in targets])
+            vf.write_vtk_polydata(targets_pd, dir_output+'/final_'
+                                    + case + '_' + test_name + '_'+str(i)+'_'
+                                    + str(n_steps_taken)
+                                    + '_targets.vtp')
+
+            capped_surface = cap_surface(pred_surface=assembly_surface,
+                                         centerline=global_centerline,
+                                         file_name=case,
+                                         outdir=dir_output,
+                                         targets=targets,)
+            vf.write_vtk_polydata(capped_surface, dir_output+'/final_'
+                                    + case + '_' + test_name + '_'+str(i)+'_'
+                                    + str(n_steps_taken)+'_capped_surface.vtp')
 
         if global_config['PREVENT_RETRACE']:
             final_inside_pts = vf.appendPolyData(inside_pts)

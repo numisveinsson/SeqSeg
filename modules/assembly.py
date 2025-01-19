@@ -874,9 +874,12 @@ def calc_centerline_global(predicted_vessels, initial_seeds):
         # keep the component with the seed
         predicted_vessel = keep_component_seeds(predicted_vessels, [seed])
         # calculate the centerline
-        centerline_poly.append(calc_centerline_fmm(predicted_vessel, seed))
+        cent, success, targets = calc_centerline_fmm(predicted_vessel,
+                                                     seed,
+                                                     return_target=True)
+        centerline_poly.append(cent)
 
     # append the centerline polydata list to a single polydata
     centerline_poly = appendPolyData(centerline_poly)
 
-    return centerline_poly
+    return centerline_poly, targets

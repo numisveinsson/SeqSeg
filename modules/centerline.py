@@ -1051,7 +1051,7 @@ def interpolate_gradient(gradient, current, seg_img):
 
 
 def backtracking_gradient(gradient, distance_map_surf_np,
-                          seg_img, seed, target):
+                          seg_img, seed, target, relax_factor=1):
     """
     Function to backtrack from a target point to
     a seed point using the gradient.
@@ -1068,6 +1068,8 @@ def backtracking_gradient(gradient, distance_map_surf_np,
         Seed point
     target : np.array
         Target point
+    relax_factor : float
+        Factor to relax the tolerance
 
     Returns
     -------
@@ -1096,7 +1098,7 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     # print(f"Tolerance: {tol}")
 
     # Backtrack until we reach the seed point
-    while (np.linalg.norm(current - seed) > tol/1
+    while (np.linalg.norm(current - seed) > tol*relax_factor
            and len(points) < max_number_points):
         # print(f"""Current: {current},
         #       Seed: {seed},
@@ -1138,7 +1140,7 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     if len(points) == max_number_points:
         print("   Fail: Reached max number of points")
         success = False
-    else:
+    elif success:
         print(f"   Success: {len(points)} points")
 
     # Add seed point to path
@@ -1148,7 +1150,9 @@ def backtracking_gradient(gradient, distance_map_surf_np,
 
 
 def calc_centerline_fmm(segmentation, seed=None, targets=None,
-                        min_res=300, out_dir=None, write_files=False):
+                        min_res=300, out_dir=None, write_files=False,
+                        move_target_if_fail=False,
+                        relax_factor=1, return_target=False):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1200,6 +1204,11 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     distance_map_surf = distance_map_surf * -1
     distance_map_surf_np = sitk.GetArrayFromImage(
         distance_map_surf).transpose(2, 1, 0)
+    # Get maximum value of distance map
+    max_surf = distance_map_surf_np.max()
+    print(f"Max of distance map: {max_surf}")
+
+    # Write distance map to file
     if out_dir and write_files:
         sitk.WriteImage(distance_map_surf,
                         os.path.join(out_dir, 'distance_map_surf.mha'))
@@ -1211,27 +1220,32 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                             return_wave_distance_map=True,
                                             out_dir=out_dir,
                                             write_files=write_files)
-
     elif seed is None:
         print("Need to create seed, targets given")
-        max_surf = distance_map_surf_np.max()
         index = np.where(distance_map_surf_np == max_surf)
         # have same format as targets
         if isinstance(targets[0], np.ndarray):
             # then physical point
+            index = [int(index[0][0]), int(index[1][0]), int(index[2][0])]
             seed = segmentation.TransformIndexToPhysicalPoint(index)
+            seed = np.array(seed)
         else:
             # else list of indices
-            seed = list(index)
+            seed = [int(index[0][0]), int(index[1][0]), int(index[2][0])]
     elif targets is None:
         print("Need to create targets, seed given")
-        _, targets, output = cluster_map(segmentation)
+        _, targets, output = cluster_map(segmentation,
+                                         return_wave_distance_map=True,
+                                         out_dir=out_dir,
+                                         write_files=write_files)
         # have same format as seed
         if isinstance(seed, list):
             # then list of indices
             targets = [list(
                 segmentation.TransformPhysicalPointToIndex(target.tolist()))
                 for target in targets]
+    print(f"Seed: {seed}")
+    print(f"Targets: {targets}")
 
     # if seed/targets is np.array, convert to index
     if isinstance(seed, np.ndarray):
@@ -1245,7 +1259,6 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
             for target in targets]
         for i, target in enumerate(targets):
             targets[i] = check_border(target, segmentation.GetSize())
-
     else:
         seed_np = segmentation.TransformIndexToPhysicalPoint(seed)
         targets_np = [segmentation.TransformIndexToPhysicalPoint(target)
@@ -1288,7 +1301,20 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         points, success = backtracking_gradient(gradient,
                                                 distance_map_surf_np,
                                                 segmentation,
-                                                seed_np, target_np)
+                                                seed_np, target_np,
+                                                relax_factor=relax_factor)
+        if not success and move_target_if_fail:
+            print("\n   Trying to move target inside segmentation")
+            pot_point = calc_points_target(max_surf, distance_map_surf,
+                                           target_np)
+
+            if pot_point is not None:
+                print(f"    New target: {pot_point}")
+                points, success = backtracking_gradient(gradient,
+                                                        distance_map_surf_np,
+                                                        segmentation,
+                                                        seed_np, pot_point,
+                                                        relax_factor=relax_factor)
         # Add points to list
         points_list.append(points)
         success_list.append(success)
@@ -1308,7 +1334,43 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     else:
         success_overall = True
 
+    if return_target:
+        # only return successful targets
+        targets_np = [targets_np[i] for i in range(len(targets_np))
+                      if success_list[i]]
+        return centerline, success_overall, targets_np
+
     return centerline, success_overall
+
+
+def calc_points_target(max_surf, distance_map_surf, target_np,
+                       N=10000):
+    """
+    Function to move target to new locations by a distance of max_surf / 2
+    """
+    # Calculate N random points around target
+    points = []
+    for i in range(N):
+        point = target_np + np.random.normal(0, 1, 3) * max_surf
+        points.append(point)
+
+    # Find the point with highest distance value
+    max_dist = 0
+    max_point = None
+    for point in points:
+        index = distance_map_surf.TransformPhysicalPointToIndex(point.tolist())
+        # continue if index is outside bounds
+        if (index[0] < 0 or index[1] < 0 or index[2] < 0
+              or index[0] >= distance_map_surf.GetSize()[0]
+              or index[1] >= distance_map_surf.GetSize()[1]
+              or index[2] >= distance_map_surf.GetSize()[2]):
+            continue
+        dist = distance_map_surf.GetPixel(index)
+        if dist > max_dist:
+            max_dist = dist
+            max_point = point
+
+    return max_point
 
 
 def create_centerline_polydata(points_list, success_list, distance_map_surf):
@@ -1347,6 +1409,8 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf):
     radii.SetName("MaximumInscribedSphereRadius")
     global_node_id = vtk.vtkIntArray()
     global_node_id.SetName("GlobalNodeID")
+    cent_id = vtk.vtkIntArray()
+    cent_id.SetName("CenterlineId")
 
     # Iterate over all points
     for ind, points_path in enumerate(points_list):
@@ -1374,6 +1438,8 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf):
             radii.InsertNextValue(radius)
             # Add global node id
             global_node_id.InsertNextValue(i)
+            # Add centerline id
+            cent_id.InsertNextValue(ind)
 
         # Add line to lines if was successful
         if success_list[ind]:
@@ -1384,6 +1450,7 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf):
     centerline.SetLines(lines)
     centerline.GetPointData().AddArray(radii)
     centerline.GetPointData().AddArray(global_node_id)
+    centerline.GetPointData().AddArray(cent_id)
 
     return centerline
 
@@ -1854,7 +1921,8 @@ def test_centerline_fmm(directory, out_dir):
         # Calculate centerline
         centerline = calc_centerline_fmm(
             segmentation, caps[0],
-            [cap for i, cap in enumerate(caps) if i != 0])
+            [cap for i, cap in enumerate(caps) if i != 0]
+            )
         # Write centerline
         name = file.split('.')[0]
         pfn = os.path.join(out_dir, 'centerline_fm_'+name+'.vtp')
@@ -1868,14 +1936,18 @@ if __name__ == '__main__':
 
     # Path to segmentation
     path_segs = '/Users/numisveins/Documents/vascular_data_3d/truths/'
-    path_segs = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/truths/'
+    path_segs = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/truths_no_spacing/'
 
     # Start index
-    start = 1
+    start = 89
 
     # Path to spacing file
     if_spacing_file = True
     spacing_file = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/meta.csv'
+
+    # Path to end points
+    if_end_points = False
+    end_points_dir = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/end_points/'
 
     # List of segmentations
     segs = [f for f in os.listdir(path_segs) if f.endswith('.nii.gz')]
@@ -1892,20 +1964,19 @@ if __name__ == '__main__':
     # Loop through all segmentations
     for seg in segs[start:]:
 
+        print(f"\n\nCalculating centerline for: {seg}\n\n")
+        path_seg = os.path.join(path_segs, seg)
+        name = path_seg.split('/')[-1].split('.')[0]
+
         # skip if already done
         if os.path.exists(os.path.join(out_dir, 'done.txt')):
             with open(os.path.join(out_dir, 'done.txt'), 'r') as f:
                 done = f.read().splitlines()
                 f.close()
-            if seg in done:
+            if name in done:
                 print(f"Already done with: {seg}")
                 continue
-
-        print(f"\n\nCalculating centerline for: {seg}\n\n")
-        path_seg = os.path.join(path_segs, seg)
-        name = path_seg.split('/')[-1].split('.')[0]
-        # Load segmentation
-        name = path_seg.split('/')[-1].split('.')[0]
+    
         # Load segmentation
         segmentation = sitk.ReadImage(path_seg)
 
@@ -1913,13 +1984,31 @@ if __name__ == '__main__':
             # set the spacing
             segmentation.SetSpacing(spacing_values[segs.index(seg)])
         # Write segmentation
-        sitk.WriteImage(segmentation, os.path.join(out_dir,
-                        'seg_'+name+'.mha'))
+        sitk.WriteImage(segmentation, os.path.join(out_dir.replace('images_w', 'truths'),
+                        name+'.mha'))
+
         time_start = time.time()
+        # Get end points
+        if if_end_points:
+            end_points = np.load(os.path.join(end_points_dir, name+'.npy'))
+            # print as polydata
+            polydata_point = points2polydata(end_points)
+            write_geo(os.path.join(out_dir, 'end_points_'+name+'.vtp'),
+                      polydata_point)
+            targets = []
+            for i in range(len(end_points)):
+                targets.append(end_points[i])
+        else:
+            targets = None
+        # Calculate centerline
         centerline, success_overall = calc_centerline_fmm(
             segmentation,
             out_dir=out_dir,
-            write_files=False)
+            write_files=False,
+            seed=None,
+            targets=targets,
+            move_target_if_fail=False,
+            )
 
         print(f"Time in seconds: {time.time() - time_start:0.3f}")
         pfn = os.path.join(out_dir, name+'.vtp')

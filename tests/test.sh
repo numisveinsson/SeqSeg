@@ -17,4 +17,4 @@ python3 auto_centerline.py \
     -outdir tests/test_out/ \
     -start 0 \
     -stop 1 \
-    -max_n_steps 50 \
+    -max_n_steps 10 \

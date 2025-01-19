@@ -746,8 +746,7 @@ def trace_centerline(
                 else:
 
                     if debug:
-                        import pdb
-                        pdb.set_trace()
+                        print("Debugging")
 
                     del vessel_tree.branches[branch][-1]
                     (list_surf_branch, list_cent_branch,
