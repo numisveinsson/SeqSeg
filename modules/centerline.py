@@ -1932,18 +1932,18 @@ def test_centerline_fmm(directory, out_dir):
 if __name__ == '__main__':
 
     # Out directory
-    out_dir = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/centerlines_fmm/'
+    out_dir = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/centerlines_fmm/'
 
     # Path to segmentation
     path_segs = '/Users/numisveins/Documents/vascular_data_3d/truths/'
-    path_segs = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/truths_no_spacing/'
+    path_segs = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/truths/'
 
     # Start index
-    start = 89
+    start = 0
 
     # Path to spacing file
     if_spacing_file = True
-    spacing_file = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/meta.csv'
+    spacing_file = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/meta.csv'
 
     # Path to end points
     if_end_points = False
