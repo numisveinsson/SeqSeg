@@ -1950,7 +1950,7 @@ if __name__ == '__main__':
     end_points_dir = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/end_points/'
 
     # List of segmentations
-    segs = [f for f in os.listdir(path_segs) if f.endswith('.nii.gz')]
+    segs = [f for f in os.listdir(path_segs) if f.endswith('.mha')]
     segs = sorted(segs)
 
     if if_spacing_file:
