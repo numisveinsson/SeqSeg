@@ -255,41 +255,37 @@ if __name__ == '__main__':
         #                 + test_name + '_'+str(i)+'.mha')
 
         assembly = assembly_org
-        name = 'original'
-        # for assembly,name in zip([assembly_ups, assembly_org],
-        #                          ['upsampled', 'original']):
+
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5,
                                                upperThreshold=1)
-        sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_seg_'
+        sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_raw_seg_'
                         + test_name + '_' + str(i) + '.mha')
 
         assembly_binary = sf.keep_component_seeds(assembly_binary,
                                                   initial_seeds)
-        sitk.WriteImage(assembly_binary, dir_output0+'/'+case+'_seg_rem_'
-                        + test_name + '_' + str(i) + '.mha')
+        sitk.WriteImage(assembly_binary, dir_output0+'/'+case+'_segmentation_'
+                        + str(n_steps_taken) + '_steps' + '.mha')
 
         assembly_surface = vf.evaluate_surface(assembly_binary, 1)
-        vf.write_vtk_polydata(assembly_surface, dir_output0+'/'+case
-                              + '_surface_' + test_name + '_'
-                              + str(n_steps_taken) + '.vtp')
-        for level in [10, 40]:  # range(10,50,10):
-            surface_smooth = vf.smooth_surface(assembly_surface, level)
-            vf.write_vtk_polydata(surface_smooth, dir_output+'/final_assembly_'
-                                  + name + '_'+case+'_'+test_name + '_'+str(i)
-                                  + '_'+str(n_steps_taken)+'_'+str(level)
-                                  + '_surface_smooth.vtp')
+        vf.write_vtk_polydata(assembly_surface, dir_output + '/' + case
+                              + '_surface_' + str(n_steps_taken)
+                              + '_steps' + '.vtp')
+        surface_smooth = vf.smooth_polydata(assembly_surface)
+        vf.write_vtk_polydata(surface_smooth, dir_output0 + '/' + case
+                              + '_surface_' + str(n_steps_taken)
+                              + '_steps' + '.vtp')
 
         final_surface = vf.appendPolyData(surfaces)
         final_centerline = vf.appendPolyData(centerlines)
         final_points = vf.appendPolyData(points)
 
-        vf.write_vtk_polydata(final_surface,    dir_output+'/final_'+case+'_'
+        vf.write_vtk_polydata(final_surface,    dir_output+'/all_'+case+'_'
                               + test_name + '_'+str(i)+'_'+str(n_steps_taken)
                               + '_surfaces.vtp')
-        vf.write_vtk_polydata(final_centerline, dir_output+'/final_'+case+'_'
+        vf.write_vtk_polydata(final_centerline, dir_output+'/all_'+case+'_'
                               + test_name + '_'+str(i)+'_'+str(n_steps_taken)
                               + '_centerlines.vtp')
-        vf.write_vtk_polydata(final_points,     dir_output+'/final_'+case+'_'
+        vf.write_vtk_polydata(final_points,     dir_output+'/all_'+case+'_'
                               + test_name + '_'+str(i)+'_'+str(n_steps_taken)
                               + '_points.vtp')
         if calc_global_centerline:
@@ -297,25 +293,25 @@ if __name__ == '__main__':
             global_centerline, targets = calc_centerline_global(
                 assembly_binary,
                 initial_seeds)
-            vf.write_vtk_polydata(global_centerline, dir_output+'/final_'
+            vf.write_vtk_polydata(global_centerline, dir_output0 + '/'
+                                  + case + '_centerline_' + str(n_steps_taken)
+                                  + '_steps' + '.vtp')
+            # write targets
+            targets_pd = vf.points2polydata([target.tolist()
+                                             for target in targets])
+            vf.write_vtk_polydata(targets_pd, dir_output+'/'
                                   + case + '_' + test_name + '_'+str(i)+'_'
                                   + str(n_steps_taken)
-                                  + '_global_centerline.vtp')
-            # write targets
-            targets_pd = vf.points2polydata([target.tolist() for target in targets])
-            vf.write_vtk_polydata(targets_pd, dir_output+'/final_'
-                                    + case + '_' + test_name + '_'+str(i)+'_'
-                                    + str(n_steps_taken)
-                                    + '_targets.vtp')
+                                  + '_targets.vtp')
 
             capped_surface = cap_surface(pred_surface=assembly_surface,
                                          centerline=global_centerline,
                                          file_name=case,
                                          outdir=dir_output,
                                          targets=targets,)
-            vf.write_vtk_polydata(capped_surface, dir_output+'/final_'
-                                    + case + '_' + test_name + '_'+str(i)+'_'
-                                    + str(n_steps_taken)+'_capped_surface.vtp')
+            vf.write_vtk_polydata(capped_surface, dir_output+'/'
+                                  + case + '_' + test_name + '_'+str(i)+'_'
+                                  + str(n_steps_taken)+'_capped_surface.vtp')
 
         if global_config['PREVENT_RETRACE']:
             final_inside_pts = vf.appendPolyData(inside_pts)
