@@ -47,12 +47,12 @@ python3 seqseg.py \
     -train_dataset Dataset042_SEQPULMPARSECT \
     -fold 0 \
     -img_ext .nii.gz \
-    -outdir output_parse_42_seed_down_50/ \
+    -outdir output_parse_42_150_bam/ \
     -scale 1 \
-    -start 0 \
-    -stop -1 \
-    -max_n_steps 500 \
-    -max_n_branches 50 \
+    -start 3 \
+    -stop 6 \
+    -max_n_steps 100 \
+    -max_n_branches 2000 \
     -unit mm \
     -config_name global_pulm \
     -data_dir /global/scratch/users/numi/PARSE_dataset/testset/  \

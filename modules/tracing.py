@@ -720,8 +720,8 @@ def trace_centerline(
                 print("Length of branch: ", len(vessel_tree.branches[branch]))
                 print("\n Moving onto another branch")
 
-                # If inside, then restart branch
-                if ((step_seg['is_inside'] and global_config['RESTART_BRANCH'])
+                # If inside, then restart branch and i is not 0
+                if i != 0 and ((step_seg['is_inside'] and global_config['RESTART_BRANCH'])
                    or len(vessel_tree.branches[branch]) <= 2):
                     # If inside, then move on to next branch
                     # and remove allowed_steps

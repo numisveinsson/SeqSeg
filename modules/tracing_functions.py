@@ -335,8 +335,8 @@ def get_largest_radius_seed(dir_cent):
         initial_seed: initial seed point
         initial_radius: initial radius
     """
-    pt_along = 50
-    add_step = 10
+    pt_along = 150
+    add_step = 5
 
     # Centerline
     cent = read_geo(dir_cent).GetOutput()
