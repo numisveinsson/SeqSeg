@@ -105,6 +105,10 @@ if __name__ == '__main__':
                         default=1000,
                         type=int,
                         help='Max number of steps to take')
+    parser.add_argument('-max_n_steps_per_branch', '--max_n_steps_per_branch',
+                        default=10000,
+                        type=int,
+                        help='Max number of steps to take per branch')
     parser.add_argument('-max_n_branches', '--max_n_branches',
                         default=100,
                         type=int,
