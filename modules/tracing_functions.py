@@ -53,6 +53,7 @@ def get_next_points(centerline_poly,
                     post_proc=False,
                     magn_radius=1,
                     min_radius=0,
+                    add_radius=0,
                     mega_sub=False):
     """
     Get the next point along the centerline
@@ -76,7 +77,10 @@ def get_next_points(centerline_poly,
     # point locations as numpy array
     cent_data = collect_arrays(centerline_poly.GetPointData())
     # Max Inscribed Sphere Radius as numpy array
-    radii = cent_data['MaximumInscribedSphereRadius']
+    try:
+        radii = cent_data['MaximumInscribedSphereRadius']
+    except:
+        radii = cent_data['f']
     points_in_cells = get_points_cells(centerline_poly)
 
     old_vector = current_point-old_point
@@ -155,7 +159,7 @@ def get_next_points(centerline_poly,
         else:
             print("Angle not within limit, returning None for ip=" + str(ip))
 
-    arr_rad = np.array(vessel_r)*magn_radius
+    arr_rad = (np.array(vessel_r)+add_radius)*magn_radius
     arr_pt = np.array(points)
     arr_angl = np.array(angles)
 
@@ -330,8 +334,10 @@ def sort_centerline(centerline):
     # point locations as numpy array
     c_loc = v2n(centerline.GetPoints().GetData())
     # Max Inscribed Sphere Radius as numpy array
-    radii = cent_data['MaximumInscribedSphereRadius']
-
+    try:
+        radii = cent_data['MaximumInscribedSphereRadius']
+    except:
+        radii = cent_data['f']
     # get cent_ids, a list of lists
     # each list is the ids of the points belonging to a centerline
     try:

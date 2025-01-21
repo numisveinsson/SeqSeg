@@ -16,6 +16,8 @@ TREE_ANALYSIS: False
 
 VOLUME_SIZE_RATIO: 5 # default 5, 5.5 for coronaries, 4 for segs
 MAGN_RADIUS: 1
+ADD_RADIUS: 0
+MAX_PERC_ENLARGE: 0.3 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
 MIN_RADIUS: 0.4 # mm (keep in mm)
 MIN_RES: 6
 CENTERLINE_EXTRACTION_VMTK: True # if we want to extract centerline using VMTK
@@ -25,6 +27,7 @@ NR_CHANCES: 2
 NR_ALLOW_RETRACE_STEPS: 5
 PREVENT_RETRACE: True
 SORT_NEXT: True
+MERGE_NEXT: False
 
 ASSEMBLY_EVERY_N: 20 # add to assembly every N steps
 USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)

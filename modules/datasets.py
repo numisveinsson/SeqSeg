@@ -116,7 +116,7 @@ def get_testing_samples(dataset, data_dir=None):
             print('Number of testing samples with centerlines:',
                   len(testing_samples))
             testing_samples.sort()
-            testing_samples = [[s, 0, 50, 60] for s in testing_samples]
+            testing_samples = [[s, 0, -50, -60] for s in testing_samples]
     else:
         print('No data directory provided.')
         print('Using default data directory based on training dataset.')

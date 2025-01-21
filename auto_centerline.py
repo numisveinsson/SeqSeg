@@ -121,7 +121,7 @@ if __name__ == '__main__':
                         '--gpu',
                         default=False,
                         type=bool,
-                        help='Use GPU for nn')
+                        help='Use GPU for U-Net model')
     args = parser.parse_args()
 
     print(args)

@@ -16,6 +16,7 @@ TREE_ANALYSIS: False
 
 VOLUME_SIZE_RATIO: 5.5 # default 5, 5.5 for coronaries, 4 for segs
 MAGN_RADIUS: 1
+ADD_RADIUS: 0
 MAX_PERC_ENLARGE: 0.33 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
 MIN_RADIUS: 0.3 # mm (keep in mm)
 MIN_RES: 5

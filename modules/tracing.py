@@ -78,6 +78,7 @@ def trace_centerline(
     magnify_radius = global_config['MAGN_RADIUS']
     number_chances = global_config['NR_CHANCES']
     min_radius = global_config['MIN_RADIUS'] * scale_unit
+    add_radius = global_config['ADD_RADIUS'] * scale_unit
     run_time = global_config['TIME_ANALYSIS']
     forceful_sidebranch = global_config['FORCEFUL_SIDEBRANCH']
     forceful_sidebranch_magnify = (global_config
@@ -143,7 +144,7 @@ def trace_centerline(
             tile_step_size=0.5,
             use_gaussian=True,
             use_mirroring=True,
-            perform_everything_on_gpu=gpu_avail,
+            # perform_everything_on_gpu=gpu_avail,
             device=device_use,
             verbose=False,
             verbose_preprocessing=False,
@@ -595,6 +596,7 @@ def trace_centerline(
                                              step_seg['old radius'],
                                              magn_radius=magnify_radius,
                                              min_radius=min_radius,
+                                             add_radius=add_radius,
                                              mega_sub=(global_config
                                                        ['MEGA_SUBVOLUME']))
 

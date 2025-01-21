@@ -31,7 +31,10 @@
 #
 ## Command(s) to run (example):
 
-source activate /global/scratch/users/numi/environments/seqseg2
+module load python/3.11.6-gcc-11.4.0
+module load ml/pytorch/2.3.1-py3.11.7
+# pip install nnunetv2
+export PATH="/global/home/users/numi/.local/bin:$PATH"
 
 export nnUNet_raw="/global/scratch/users/numi/nnUnet_data/nnUnet_raw"
 export nnUNet_preprocessed="/global/scratch/users/numi/nnUnet_data/nnUNet_preprocessed"
@@ -44,10 +47,10 @@ python3 auto_centerline.py \
     -train_dataset Dataset042_SEQPULMPARSECT \
     -fold 0 \
     -img_ext .nii.gz \
-    -outdir output_parse_42/ \
+    -outdir output_parse_42_new_seed/ \
     -scale 1 \
-    -start 1 \
-    -stop -1 \
+    -start 3 \
+    -stop 6 \
     -max_n_steps 500 \
     -max_n_branches 50 \
     -unit mm \

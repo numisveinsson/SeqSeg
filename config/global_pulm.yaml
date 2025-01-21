@@ -1,25 +1,25 @@
 # if we are tracing a segmentation or predicting a segmentation as we go
 # True if we have a segmentation, False if we are predicting
-SEGMENTATION: True # usually False
+SEGMENTATION: False # usually False
 
 DEBUG: False
-DEBUG_STEP: 150
+DEBUG_STEP: 100
 
-WRITE_STEPS: False # if we want to write out each step
+WRITE_STEPS: True # if we want to write out each step
 ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 3 # write out animation every x steps
 
 GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
 RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
-TREE_ANALYSIS: True
+TREE_ANALYSIS: False
 
-VOLUME_SIZE_RATIO: 4.5 # default 5, 5.5 for coronaries, 4 for segs
+VOLUME_SIZE_RATIO: 5 # default 5, 5.5 for coronaries, 4 for segs
 MAGN_RADIUS: 1
-ADD_RADIUS: 0
-MAX_PERC_ENLARGE: 0.5 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
-MIN_RADIUS: 0.3 # mm (keep in mm)
-MIN_RES: 6
+ADD_RADIUS: 0.5
+MAX_PERC_ENLARGE: 0.3 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
+MIN_RADIUS: 0.4 # mm (keep in mm)
+MIN_RES: 5
 CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
 TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
@@ -42,7 +42,7 @@ MEGA_SUBVOLUME: False # extract centerline from previous N steps, instead of jus
 NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
 
 STOP_PRE: True # whether to stop tracing prematurely, if True then options below will be used
-STOP_RADIUS: 0.46 # (mm) 0.48 if radius goes below, stop tracing
-MAX_STEPS_BRANCH: 1000 # max num of steps per branch, stop when reached
+STOP_RADIUS: 0.48 # (mm) if radius goes below, stop tracing
+MAX_STEPS_BRANCH: 100 # max num of steps per branch, stop when reached
 
-RESTART_BRANCH: True
+RESTART_BRANCH: False
