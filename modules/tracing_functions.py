@@ -336,6 +336,7 @@ def get_largest_radius_seed(dir_cent, pt_centerline=50):
         initial_radius: initial radius
     """
     pt_along = pt_centerline
+    print(f"\nGetting seed at point {pt_along} along centerline\n")
     add_step = 5
 
     # Centerline
