@@ -47,15 +47,16 @@ python3 seqseg.py \
     -train_dataset Dataset042_SEQPULMPARSECT \
     -fold 0 \
     -img_ext .nii.gz \
-    -outdir output_parse_42_150_bam/ \
+    -outdir output_parse_42_500_bam/ \
     -scale 1 \
-    -start 3 \
+    -start 0 \
     -stop 6 \
     -max_n_steps 100 \
     -max_n_branches 2000 \
     -unit mm \
     -config_name global_pulm \
     -data_dir /global/scratch/users/numi/PARSE_dataset/testset/  \
+    -pt_centerline 500 \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 # Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT
