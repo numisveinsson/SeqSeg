@@ -883,4 +883,4 @@ def calc_centerline_global(predicted_vessels, initial_seeds):
     # append the centerline polydata list to a single polydata
     centerline_poly = appendPolyData(centerline_poly)
 
-    return centerline_poly, targets
+    return centerline_poly, targets, success

@@ -324,7 +324,7 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
     return c_loc[id_point], radii[id_point]
 
 
-def get_largest_radius_seed(dir_cent):
+def get_largest_radius_seed(dir_cent, pt_centerline):
     """
     Get the seed point with the largest radius
     Args:
@@ -335,7 +335,7 @@ def get_largest_radius_seed(dir_cent):
         initial_seed: initial seed point
         initial_radius: initial radius
     """
-    pt_along = 150
+    pt_along = pt_centerline
     add_step = 5
 
     # Centerline

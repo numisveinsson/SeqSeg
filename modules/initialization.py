@@ -43,7 +43,7 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
 
 
 def initialization(json_file_present, test_case, dir_output, dir_cent,
-                   dir_data, unit='mm', write_samples=False):
+                   dir_data, unit='mm', pt_centerline=50, write_samples=False):
 
     if json_file_present:
         potential_branches, initial_seeds = initialize_json(test_case,
@@ -56,6 +56,7 @@ def initialization(json_file_present, test_case, dir_output, dir_cent,
         potential_branches, initial_seeds = initialize_cent(test_case,
                                                             dir_output,
                                                             dir_cent,
+                                                            pt_centerline,
                                                             write_samples)
 
     return potential_branches, initial_seeds
@@ -117,12 +118,14 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, unit,
 
 
 def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
-                    write_samples=False):
+                    pt_centerline=50, write_samples=False):
 
     # Information
     if if_largest_radius:
+        print("Getting seed from longest centerline where the radius is largest")
         (old_seed, old_radius,
-         initial_seed, initial_radius) = get_largest_radius_seed(dir_cent)
+         initial_seed, initial_radius) = get_largest_radius_seed(
+                dir_cent, pt_centerline)
         initial_seeds = [initial_seed]
     else:
         i = test_case[1]

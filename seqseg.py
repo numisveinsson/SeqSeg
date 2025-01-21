@@ -122,11 +122,10 @@ if __name__ == '__main__':
                         default='global',
                         type=str,
                         help='Name of configuration file')
-    parser.add_argument('-gpu',
-                        '--gpu',
-                        default=False,
-                        type=bool,
-                        help='Use GPU for U-Net model')
+    parser.add_argument('-pt_centerline', '--pt_centerline',
+                        default=50,
+                        type=int,
+                        help='Use point centerline')
     args = parser.parse_args()
 
     print(args)
@@ -146,7 +145,6 @@ if __name__ == '__main__':
     unit = args.unit
     max_step_size = args.max_n_steps
     max_n_branches = args.max_n_branches
-    gpu_avail = args.gpu
     write_samples = global_config['WRITE_STEPS']
     take_time = global_config['TIME_ANALYSIS']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
@@ -156,6 +154,7 @@ if __name__ == '__main__':
     img_format = args.img_ext
     scale = args.scale
     test_name = args.test_name
+    pt_centerline = args.pt_centerline
 
     # Weight directory
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
@@ -187,7 +186,7 @@ if __name__ == '__main__':
          initial_seeds) = init.initialization(json_file_present,
                                               test_case, dir_output, dir_cent,
                                               directory_data, unit,
-                                              write_samples)
+                                              pt_centerline, write_samples)
 
         # print to .txt file all outputs
         if not global_config['DEBUG']:
@@ -218,8 +217,8 @@ if __name__ == '__main__':
                                                         global_config,
                                                         unit,
                                                         scale,
-                                                        dir_seg,
-                                                        gpu_avail)
+                                                        dir_seg
+                                                        )
 
         print("\nTotal calculation time is:"
               + str((time.time() - start_time)/60) + " min\n")
@@ -288,11 +287,11 @@ if __name__ == '__main__':
                               + '_points.vtp')
         if calc_global_centerline:
             # Calculate global centerline
-            global_centerline, targets = calc_centerline_global(
+            global_centerline, targets, success = calc_centerline_global(
                 assembly_binary,
                 initial_seeds)
             # if centerline is not None
-            if global_centerline.GetNumberOfPoints() > 0:
+            if success:
                 vf.write_vtk_polydata(global_centerline, dir_output0 + '/'
                                     + case + '_centerline_' + str(n_steps_taken)
                                     + '_steps' + '.vtp')
