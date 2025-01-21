@@ -324,6 +324,59 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
     return c_loc[id_point], radii[id_point]
 
 
+def get_largest_radius_seed(dir_cent):
+    """
+    Get the seed point with the largest radius
+    Args:
+        dir_cent: directory of centerline
+    Returns:
+        old_seed: old seed point
+        old_radius: old radius
+        initial_seed: initial seed point
+        initial_radius: initial radius
+    """
+    # Centerline
+    cent = read_geo(dir_cent).GetOutput()
+    # Sort centerline into data of interest
+    (num_points, c_loc, radii,
+     cent_ids, bifurc_id, num_cent) = sort_centerline(cent)
+
+    # Find the point with the largest radius
+    max_rad = np.max(radii)
+    max_rad_id = np.argmax(radii)
+    # Find the centerline with the largest radius
+    max_rad_cent_id = 0
+    for i in range(num_cent):
+        if max_rad_id in cent_ids[i]:
+            max_rad_cent_id = i
+            break
+    cent_ids = cent_ids[max_rad_cent_id]
+
+    # Check if start or end of centerline has larger radius
+    rad_start = radii[cent_ids[0]]
+    rad_end = radii[cent_ids[-1]]
+
+    if rad_start > rad_end:
+        max_rad_id = cent_ids[10]
+        max_rad = rad_start
+    else:
+        max_rad_id = cent_ids[-10]
+        max_rad = rad_end
+
+    # Get the seed point with the largest radius
+    old_seed = c_loc[max_rad_id]
+    old_radius = max_rad
+    # Initial seed is the next 10th point along the centerline
+    if rad_start > rad_end:
+        initial_seed = c_loc[cent_ids[20]]
+        initial_radius = radii[cent_ids[20]]
+    else:
+        initial_seed = c_loc[cent_ids[-20]]
+        initial_radius = radii[cent_ids[-20]]
+
+    return old_seed, old_radius, initial_seed, initial_radius
+
+
 def sort_centerline(centerline):
     """
     Function to sort the centerline data
@@ -336,7 +389,8 @@ def sort_centerline(centerline):
     # Max Inscribed Sphere Radius as numpy array
     try:
         radii = cent_data['MaximumInscribedSphereRadius']
-    except:
+    except KeyError as e:
+        print("KeyError: " + str(e))
         radii = cent_data['f']
     # get cent_ids, a list of lists
     # each list is the ids of the points belonging to a centerline

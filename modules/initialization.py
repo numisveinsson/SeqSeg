@@ -1,7 +1,7 @@
 from .vtk_functions import write_geo, points2polydata
-from .tracing_functions import get_seed
+from .tracing_functions import get_seed, get_largest_radius_seed
 from .assembly import create_step_dict
-from .datasets import get_directories  #, vmr_directories
+from .datasets import get_directories
 import os
 import numpy as np
 
@@ -53,7 +53,7 @@ def initialization(json_file_present, test_case, dir_output, dir_cent,
                                                             unit,
                                                             write_samples)
     else:
-        potential_branches, initial_seeds = initialize_dict(test_case,
+        potential_branches, initial_seeds = initialize_cent(test_case,
                                                             dir_output,
                                                             dir_cent,
                                                             write_samples)
@@ -116,21 +116,24 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, unit,
     return potential_branches, initial_seeds
 
 
-def initialize_dict(test_case, dir_output, dir_cent, write_samples=False):
-    """
+def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
+                    write_samples=False):
 
-    """
     # Information
-    # case = test_case[0]
-    i = test_case[1]
-    id_old = test_case[2]
-    id_current = test_case[3]
+    if if_largest_radius:
+        (old_seed, old_radius,
+         initial_seed, initial_radius) = get_largest_radius_seed(dir_cent)
+    else:
+        i = test_case[1]
+        id_old = test_case[2]
+        id_current = test_case[3]
 
-    # Get inital seed point + radius
-    old_seed, old_radius = get_seed(dir_cent, i, id_old)
-    print(old_seed)
-    initial_seed, initial_radius = get_seed(dir_cent, i, id_current)
-    initial_seeds = [initial_seed]
+        # Get inital seed point + radius
+        old_seed, old_radius = get_seed(dir_cent, i, id_old)
+        print(old_seed)
+        initial_seed, initial_radius = get_seed(dir_cent, i, id_current)
+        initial_seeds = [initial_seed]
+
     if write_samples:
         write_geo(dir_output + 'points/0_seed_point.vtp',
                   points2polydata([old_seed.tolist()]))
