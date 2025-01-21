@@ -335,46 +335,55 @@ def get_largest_radius_seed(dir_cent):
         initial_seed: initial seed point
         initial_radius: initial radius
     """
+    pt_along = 50
+    add_step = 10
+
     # Centerline
     cent = read_geo(dir_cent).GetOutput()
     # Sort centerline into data of interest
     (num_points, c_loc, radii,
      cent_ids, bifurc_id, num_cent) = sort_centerline(cent)
+    # Sort by length
+    cent_ips = sort_centerline_by_length(cent_ids, c_loc)
+    cent_ids = [cent_ids[i] for i in cent_ips]
+    # Flip radius
+    cent_ids = flip_radius(cent_ids, radii)
 
-    # Find the point with the largest radius
-    max_rad = np.max(radii)
-    max_rad_id = np.argmax(radii)
-    # Find the centerline with the largest radius
-    max_rad_cent_id = 0
-    for i in range(num_cent):
-        if max_rad_id in cent_ids[i]:
-            max_rad_cent_id = i
-            break
-    cent_ids = cent_ids[max_rad_cent_id]
-
-    # Check if start or end of centerline has larger radius
-    rad_start = radii[cent_ids[0]]
-    rad_end = radii[cent_ids[-1]]
-
-    if rad_start > rad_end:
-        max_rad_id = cent_ids[10]
-        max_rad = rad_start
-    else:
-        max_rad_id = cent_ids[-10]
-        max_rad = rad_end
-
-    # Get the seed point with the largest radius
-    old_seed = c_loc[max_rad_id]
-    old_radius = max_rad
-    # Initial seed is the next 10th point along the centerline
-    if rad_start > rad_end:
-        initial_seed = c_loc[cent_ids[20]]
-        initial_radius = radii[cent_ids[20]]
-    else:
-        initial_seed = c_loc[cent_ids[-20]]
-        initial_radius = radii[cent_ids[-20]]
+    old_seed = c_loc[cent_ids[0][pt_along]]
+    old_radius = radii[cent_ids[0][pt_along]]
+    initial_seed = c_loc[cent_ids[0][pt_along+add_step]]
+    initial_radius = radii[cent_ids[0][pt_along+add_step]]
 
     return old_seed, old_radius, initial_seed, initial_radius
+
+
+def sort_centerline_by_length(cent_ids, c_loc):
+    """ Sort centerline ids by length
+        The longest come first
+    Args:
+        cent_ids: list of centerline ids
+        c_loc: centerline locations
+    """
+    lengths = []
+    for ids in cent_ids:
+        locs = c_loc[ids]
+        length = 0
+        for i in range(len(locs)-1):
+            length += np.linalg.norm(locs[i+1] - locs[i])
+        lengths.append(length)
+    return np.argsort(lengths)[::-1]
+
+
+def flip_radius(cent_ids, radii):
+    """ Flip the centerline ids so that the radius is always larger
+    Args:
+        cent_ids: list of centerline ids
+        radii: list of radii
+    """
+    for i in range(len(cent_ids)):
+        if radii[cent_ids[i][0]] < radii[cent_ids[i][-1]]:
+            cent_ids[i] = cent_ids[i][::-1]
+    return cent_ids
 
 
 def sort_centerline(centerline):

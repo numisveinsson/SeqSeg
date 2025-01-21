@@ -91,7 +91,8 @@ if __name__ == '__main__':
                         type=float,
                         help="""Whether to scale image data,
                              needed if units for nnUNet model
-                             and testing data are different""")
+                             and testing data are different, eg 0.1
+                             if model is in cm and data is in mm""")
     parser.add_argument('-start', '--start',
                         default=0,
                         type=int,
@@ -126,22 +127,6 @@ if __name__ == '__main__':
 
     print(args)
 
-    #       [name , dataset, fold, modality, json file present, unit]
-    #       note: fold is either 0,1,2,3 or 'all'
-    #       note: json file present is either True or False
-    # tests = [['3d_fullres', 'Dataset002_SEQAORTAS', 0],
-    #          ['3d_fullres', 'Dataset005_SEQAORTANDFEMOMR', 'all', False],
-    #          ['3d_fullres', 'Dataset006_SEQAORTANDFEMOCT', 'all', True,
-    #           '.vtk', 0.1],
-    #          # 0.1 here means scaling (model is cm but data is mm)
-    #          ['3d_fullres', 'Dataset007_SEQPULMONARYMR', 'all', False],
-    #          ['3d_fullres', 'Dataset009_SEQAORTASMICCT', 'all', True,
-    #           '.nrrd', 1],
-    #          # 1 here means no scaling (model and data are both mm)
-    #          ['3d_fullres', 'Dataset010_SEQCOROASOCACT', 'all', True,
-    #           '.nrrd', 1]
-    #          ]
-
     global_config = load_yaml("./config/"+args.config_name+".yaml")
     print(f"Using config file: {args.config_name}")
 
@@ -156,11 +141,11 @@ if __name__ == '__main__':
     take_time = global_config['TIME_ANALYSIS']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
 
-    dataset = args.train_dataset 
-    fold = args.fold            
-    img_format = args.img_ext   
-    scale = args.scale          
-    test_name = args.test_name  
+    dataset = args.train_dataset
+    fold = args.fold
+    img_format = args.img_ext
+    scale = args.scale  
+    test_name = args.test_name
 
     # Weight directory
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
