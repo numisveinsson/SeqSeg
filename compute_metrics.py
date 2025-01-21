@@ -10,6 +10,8 @@ from modules.capping import (bryan_get_clipping_parameters,
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 from vtk.util.numpy_support import numpy_to_vtk as n2v
 
+from modules.vtk_functions import convertPolyDataToImageData
+
 from scipy.stats import ttest_ind, ttest_rel, wilcoxon
 
 
@@ -505,35 +507,6 @@ def keep_largest_surface(polyData):
     largestRegionPolyData.Update()
 
     return largestRegionPolyData.GetOutput()
-
-
-def convertPolyDataToImageData(poly, ref_im):
-    """
-    Convert the vtk polydata to imagedata
-    Args:
-        poly: vtkPolyData
-        ref_im: reference vtkImage to match the polydata with
-    Returns:
-        output: resulted vtkImageData
-    """
-
-    ref_im.GetPointData().SetScalars(
-        n2v(np.zeros(v2n(ref_im.GetPointData().GetScalars()).shape)))
-    ply2im = vtk.vtkPolyDataToImageStencil()
-    ply2im.SetTolerance(0.05)
-    ply2im.SetInputData(poly)
-    ply2im.SetOutputSpacing(ref_im.GetSpacing())
-    ply2im.SetInformationInput(ref_im)
-    ply2im.Update()
-
-    stencil = vtk.vtkImageStencil()
-    stencil.SetInputData(ref_im)
-    stencil.ReverseStencilOn()
-    stencil.SetStencilData(ply2im.GetOutput())
-    stencil.Update()
-    output = stencil.GetOutput()
-
-    return output
 
 
 def cap_and_keep_largest(pred, centerline, file_name, outdir):

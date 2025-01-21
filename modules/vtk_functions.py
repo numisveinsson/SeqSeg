@@ -945,3 +945,32 @@ def write_normals_centers(mesh_dir, region_8_center,
     writer.SetFileName(os.path.join(mesh_dir, 'normal.vtp'))
     writer.SetInputData(line)
     writer.Write()
+
+
+def convertPolyDataToImageData(poly, ref_im):
+    """
+    Convert the vtk polydata to imagedata
+    Args:
+        poly: vtkPolyData
+        ref_im: reference vtkImage to match the polydata with
+    Returns:
+        output: resulted vtkImageData
+    """
+
+    ref_im.GetPointData().SetScalars(
+        n2v(np.zeros(v2n(ref_im.GetPointData().GetScalars()).shape)))
+    ply2im = vtk.vtkPolyDataToImageStencil()
+    ply2im.SetTolerance(0.05)
+    ply2im.SetInputData(poly)
+    ply2im.SetOutputSpacing(ref_im.GetSpacing())
+    ply2im.SetInformationInput(ref_im)
+    ply2im.Update()
+
+    stencil = vtk.vtkImageStencil()
+    stencil.SetInputData(ref_im)
+    stencil.ReverseStencilOn()
+    stencil.SetStencilData(ply2im.GetOutput())
+    stencil.Update()
+    output = stencil.GetOutput()
+
+    return output

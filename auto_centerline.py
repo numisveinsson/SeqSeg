@@ -304,14 +304,19 @@ if __name__ == '__main__':
                                   + str(n_steps_taken)
                                   + '_targets.vtp')
 
-            capped_surface = cap_surface(pred_surface=assembly_surface,
-                                         centerline=global_centerline,
-                                         file_name=case,
-                                         outdir=dir_output,
-                                         targets=targets,)
+            capped_surface, capped_seg = cap_surface(
+                pred_surface=assembly_surface,
+                centerline=global_centerline,
+                pred_seg=assembly_binary,
+                file_name=case,
+                outdir=dir_output,
+                targets=targets)
             vf.write_vtk_polydata(capped_surface, dir_output+'/'
                                   + case + '_' + test_name + '_'+str(i)+'_'
                                   + str(n_steps_taken)+'_capped_surface.vtp')
+            sitk.WriteImage(capped_seg, dir_output+'/'
+                            + case + '_' + str(n_steps_taken)
+                            + '_capped_seg.mha')
 
         if global_config['PREVENT_RETRACE']:
             final_inside_pts = vf.appendPolyData(inside_pts)

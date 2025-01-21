@@ -3,7 +3,8 @@ import vtk
 from vtk.util.numpy_support import vtk_to_numpy as v2n
 from modules.vtk_functions import (get_largest_connected_polydata,
                                    get_points_cells, points2polydata,
-                                   write_geo)
+                                   write_geo, exportSitk2VTK, exportVTK2Sitk,
+                                   convertPolyDataToImageData)
 
 
 def bryan_get_clipping_parameters(clpd):
@@ -191,7 +192,8 @@ def bryan_clip_surface(surf1, surf2):
     return clipped_surf1
 
 
-def cap_surface(pred_surface, centerline, file_name, outdir, targets=None):
+def cap_surface(pred_surface, centerline, pred_seg, file_name, outdir,
+                targets=None):
 
     if targets is None:
         endpts, radii, unit_vecs = bryan_get_clipping_parameters(centerline)
@@ -204,6 +206,10 @@ def cap_surface(pred_surface, centerline, file_name, outdir, targets=None):
                                                     file_name+'_boxclips',
                                                     outdir, 4)
     clippedpd = bryan_clip_surface(pred_surface, boxpd)
-    # clippedpd = get_largest_connected_polydata(clippedpd)
+    largest = get_largest_connected_polydata(clippedpd)
 
-    return clippedpd
+    img_vtk = exportSitk2VTK(pred_seg)[0]
+    seg_vtk = convertPolyDataToImageData(largest, img_vtk)
+    capped_seg = exportVTK2Sitk(seg_vtk)
+
+    return clippedpd, capped_seg
