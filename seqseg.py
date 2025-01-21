@@ -133,6 +133,12 @@ if __name__ == '__main__':
     dir_output0 = args.outdir
     data_dir = args.data_directory
 
+    # Make sure the output directory exists
+    try:
+        os.mkdir(dir_output0)
+    except Exception as e:
+        print(e)
+
     unit = args.unit
     max_step_size = args.max_n_steps
     max_n_branches = args.max_n_branches
@@ -144,7 +150,7 @@ if __name__ == '__main__':
     dataset = args.train_dataset
     fold = args.fold
     img_format = args.img_ext
-    scale = args.scale  
+    scale = args.scale
     test_name = args.test_name
 
     # Weight directory
