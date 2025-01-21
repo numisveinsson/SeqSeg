@@ -42,15 +42,15 @@ export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/
 
-python3 auto_centerline.py \
+python3 seqseg.py \
     -test_name 3d_fullres \
     -train_dataset Dataset042_SEQPULMPARSECT \
     -fold 0 \
     -img_ext .nii.gz \
-    -outdir output_parse_42_new_seed/ \
+    -outdir output_parse_42_seed_down_50/ \
     -scale 1 \
-    -start 4 \
-    -stop 5 \
+    -start 0 \
+    -stop -1 \
     -max_n_steps 500 \
     -max_n_branches 50 \
     -unit mm \
