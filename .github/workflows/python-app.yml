@@ -37,7 +37,7 @@ jobs:
       run: |
         conda info
         conda list
-        python3 auto_centerline.py \
+        python3 seqseg.py \
         -data_dir tests/test_data/ \
         -config_name global_test \
         -img_ext .nii.gz \
