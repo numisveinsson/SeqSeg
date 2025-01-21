@@ -9,7 +9,7 @@ WRITE_STEPS: True # if we want to write out each step
 ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 3 # write out animation every x steps
 
-GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
+GLOBAL_CENTERLINE: True # if we want to extract global centerline at the end (this may fail)
 RETRACE: False # retrace strategry
 TIME_ANALYSIS: False # if we want to write out how long each step take
 TREE_ANALYSIS: False
