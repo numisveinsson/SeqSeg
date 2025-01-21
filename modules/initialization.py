@@ -123,6 +123,7 @@ def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
     if if_largest_radius:
         (old_seed, old_radius,
          initial_seed, initial_radius) = get_largest_radius_seed(dir_cent)
+        initial_seeds = [initial_seed]
     else:
         i = test_case[1]
         id_old = test_case[2]
