@@ -49,8 +49,8 @@ python3 auto_centerline.py \
     -img_ext .nii.gz \
     -outdir output_parse_42_new_seed/ \
     -scale 1 \
-    -start 5 \
-    -stop 6 \
+    -start 4 \
+    -stop 5 \
     -max_n_steps 500 \
     -max_n_branches 50 \
     -unit mm \

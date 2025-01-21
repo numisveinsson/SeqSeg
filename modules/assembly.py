@@ -342,11 +342,9 @@ class VesselTree:
         
         if len(self.branches[branch]) > 1:
             start = self.branches[branch][1]
-        else:
-            start = self.branches[branch][0]
-        end = self.branches[branch][-1]
-        print(f"Removing steps {start+1} - {end}")
-        del self.steps[start+1:]
+            end = self.branches[branch][-1]
+            print(f"Removing steps {start+1} - {end}")
+            del self.steps[start+1:]
         # remove the list at self.branches[branch]
         self.branches.pop(branch)
         del self.bifurcations[-1]
