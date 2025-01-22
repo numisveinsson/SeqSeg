@@ -14,6 +14,7 @@ from modules.tracing import trace_centerline
 from modules.datasets import get_testing_samples
 from modules.params import load_yaml
 from modules.capping import cap_surface
+from modules.sweep import run_global_segmentation
 
 sys.stdout.flush()
 start_time = time.time()
@@ -215,6 +216,14 @@ if __name__ == '__main__':
                                                          img_format,
                                                          seqseg_test_name)
 
+        # Get sweep segmentation
+        pred_sweep, prob_pred_sweep = run_global_segmentation(
+            dir_image=dir_image,
+            model_folder=dir_model_weights_global,
+            fold=global_fold,
+            scale=global_scale
+        )
+
         # Create directories for results
         create_directories(dir_output, write_samples)
 
@@ -244,7 +253,7 @@ if __name__ == '__main__':
         # Trace centerline
         (centerlines, surfaces, points, inside_pts, assembly_obj,
          vessel_tree, n_steps_taken) = trace_centerline(
-             dir_output,
+            dir_output,
             dir_image,
             case,
             dir_model_weights_seqseg,

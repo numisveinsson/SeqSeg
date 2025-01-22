@@ -1,34 +1,61 @@
-from nnunetv2.paths import nnUNet_results
-import torch
-from batchgenerators.utilities.file_and_folder_operations import join
-from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
+import time
+import SimpleITK as sitk
+from .nnunet import initialize_predictor
+from .sitk_functions import copy_settings
 
+def run_global_segmentation(dir_image, model_folder, fold, scale=1):
+    """ Run global segmentation on a single image
 
-if __name__ == '__main__':
-    # check if GPU is available
-    if torch.cuda.is_available():
-        print('GPU available, using GPU')
-        device_use = torch.device('cuda', 0)
-    else:
-        print('GPU not available, using CPU')
-        device_use = torch.device('cpu', 0)
-    print('About to load predictor object')
-    # instantiate the nnUNetPredictor
-    predictor = nnUNetPredictor(
-        tile_step_size=0.5,
-        use_gaussian=True,
-        use_mirroring=True,
-        device=device_use,
-        verbose=False,
-        verbose_preprocessing=False,
-        allow_tqdm=True
-    )
-    print('About to load model')
-    print('Model folder:', model_folder)
-    # initializes the network architecture, loads the checkpoint
-    predictor.initialize_from_trained_model_folder(
-        join(nnUNet_results, model_folder),
-        use_folds=(fold,),
-        checkpoint_name='checkpoint_best.pth',
-    )
-    print('Done loading model, ready to predict')
+    Parameters
+    ----------
+    dir_image : str
+        Path to the image
+    model_folder : str
+        Path to the model folder
+    fold : int
+        Fold number
+    scale : float
+        Scale factor
+
+    Returns
+    -------
+    pred_img : sitk.Image
+        Segmentation image
+    prob_prediction : sitk.Image
+        Probability image
+    """
+
+    # Load image
+    img = sitk.ReadImage(dir_image)
+
+    spacing_im = img.GetSpacing()
+    spacing = (spacing_im * scale).tolist()
+    spacing = spacing[::-1]
+    props = {}
+    props['spacing'] = spacing
+
+    img_np = sitk.GetArrayFromImage(img)
+    img_np = img_np[None]
+    img_np = img_np.astype('float32')
+
+    predictor = initialize_predictor(model_folder, fold)
+
+    start_time_pred = time.time()
+    prediction = predictor.predict_single_npy_array(img_np,
+                                                    props,
+                                                    None,
+                                                    None,
+                                                    True)
+    print(f"""Prediction time:
+            {(time.time() - start_time_pred):.3f} s""")
+
+    # Probability prediction
+    prob_prediction = sitk.GetImageFromArray(prediction[1][1])
+    prob_prediction = copy_settings(prob_prediction, img)
+
+    # Create segmentation prediction (binary)
+    predicted_vessel = prediction[0]
+    pred_img = sitk.GetImageFromArray(predicted_vessel)
+    pred_img = copy_settings(pred_img, img)
+
+    return pred_img, prob_prediction
