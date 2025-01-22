@@ -126,6 +126,10 @@ if __name__ == '__main__':
                         default=50,
                         type=int,
                         help='Use point centerline')
+    parser.add_argument('-num_seeds_centerline', '--num_seeds_centerline',
+                        default=1,
+                        type=int,
+                        help='Number of seeds for centerline')
     args = parser.parse_args()
 
     print(args)
@@ -155,6 +159,7 @@ if __name__ == '__main__':
     scale = args.scale
     test_name = args.test_name
     pt_centerline = args.pt_centerline
+    num_seeds = args.num_seeds_centerline
 
     # Weight directory
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
@@ -186,7 +191,8 @@ if __name__ == '__main__':
          initial_seeds) = init.initialization(json_file_present,
                                               test_case, dir_output, dir_cent,
                                               directory_data, unit,
-                                              pt_centerline, write_samples)
+                                              pt_centerline, num_seeds,
+                                              write_samples)
 
         # print to .txt file all outputs
         if not global_config['DEBUG']:

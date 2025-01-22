@@ -324,7 +324,7 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
     return c_loc[id_point], radii[id_point]
 
 
-def get_largest_radius_seed(dir_cent, pt_centerline=50):
+def get_largest_radius_seed(dir_cent, pt_centerline=50, num_seeds=1):
     """
     Get the seed point with the largest radius
     Args:
@@ -350,12 +350,18 @@ def get_largest_radius_seed(dir_cent, pt_centerline=50):
     # Flip radius
     cent_ids = flip_radius(cent_ids, radii)
 
-    old_seed = c_loc[cent_ids[0][pt_along]]
-    old_radius = radii[cent_ids[0][pt_along]]
-    initial_seed = c_loc[cent_ids[0][pt_along+add_step]]
-    initial_radius = radii[cent_ids[0][pt_along+add_step]]
+    old_seeds, old_radiuss, initial_seeds, initial_radiuss = [], [], [], []
+    for i in range(num_seeds):
+        old_seed = c_loc[cent_ids[i][pt_along]]
+        old_radius = radii[cent_ids[i][pt_along]]
+        initial_seed = c_loc[cent_ids[i][pt_along+add_step]]
+        initial_radius = radii[cent_ids[i][pt_along+add_step]]
+        old_seeds.append(old_seed)
+        old_radiuss.append(old_radius)
+        initial_seeds.append(initial_seed)
+        initial_radiuss.append(initial_radius)
 
-    return old_seed, old_radius, initial_seed, initial_radius
+    return old_seeds, old_radiuss, initial_seeds, initial_radiuss
 
 
 def sort_centerline_by_length(cent_ids, c_loc):

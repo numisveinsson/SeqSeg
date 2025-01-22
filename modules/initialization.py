@@ -43,7 +43,8 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
 
 
 def initialization(json_file_present, test_case, dir_output, dir_cent,
-                   dir_data, unit='mm', pt_centerline=50, write_samples=False):
+                   dir_data, unit='mm', pt_centerline=50, num_seeds=1,
+                   write_samples=False):
 
     if json_file_present:
         potential_branches, initial_seeds = initialize_json(test_case,
@@ -57,6 +58,7 @@ def initialization(json_file_present, test_case, dir_output, dir_cent,
                                                             dir_output,
                                                             dir_cent,
                                                             pt_centerline,
+                                                            num_seeds,
                                                             write_samples)
 
     return potential_branches, initial_seeds
@@ -118,15 +120,14 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, unit,
 
 
 def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
-                    pt_centerline=50, write_samples=False):
+                    pt_centerline=50, num_seeds=1, write_samples=False):
 
     # Information
     if if_largest_radius:
         print("Getting seed from longest centerline where the radius is largest")
-        (old_seed, old_radius,
-         initial_seed, initial_radius) = get_largest_radius_seed(
-                dir_cent, pt_centerline)
-        initial_seeds = [initial_seed]
+        (old_seeds, old_radiuss,
+         initial_seeds, initial_radiuss) = get_largest_radius_seed(
+                dir_cent, pt_centerline, num_seeds)
     else:
         i = test_case[1]
         id_old = test_case[2]
@@ -137,14 +138,22 @@ def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
         print(old_seed)
         initial_seed, initial_radius = get_seed(dir_cent, i, id_current)
         initial_seeds = [initial_seed]
+        old_seeds = [old_seed]
+        old_radiuss = [old_radius]
+        initial_radiuss = [initial_radius]
 
     if write_samples:
         write_geo(dir_output + 'points/0_seed_point.vtp',
                   points2polydata([old_seed.tolist()]))
-    init_step = create_step_dict(old_seed, old_radius, initial_seed,
-                                 initial_radius, 0)
-    init_step['connection'] = [0, 0]
-    potential_branches = [init_step]
+        write_geo(dir_output + 'points/1_seed_point.vtp',
+                  points2polydata([initial_seed.tolist()]))
+
+    potential_branches = []
+    for i in range(num_seeds):
+        init_step = create_step_dict(old_seeds[i], old_radiuss[i],
+                                     initial_seeds[i], initial_radiuss[i], 0)
+        init_step['connection'] = [0, 0]
+        potential_branches.append(init_step)
 
     return potential_branches, initial_seeds
 
