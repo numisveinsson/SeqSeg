@@ -195,7 +195,7 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im,
                                 spacing_im).astype(int)
         radius *= 1.05
         min_res = size_extract.min()
-        print(f"Subvolume resolution: {size_extract}, Radius: {radius}")
+        print(f"Subvolume resolution: {size_extract}, Radius: {radius:.3f}")
 
     end_bounds = index_extract+size_extract
 

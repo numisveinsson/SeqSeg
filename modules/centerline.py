@@ -1051,7 +1051,8 @@ def interpolate_gradient(gradient, current, seg_img):
 
 
 def backtracking_gradient(gradient, distance_map_surf_np,
-                          seg_img, seed, target, relax_factor=1):
+                          seg_img, seed, target, relax_factor=1,
+                          verbose=False):
     """
     Function to backtrack from a target point to
     a seed point using the gradient.
@@ -1140,7 +1141,7 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     if len(points) == max_number_points:
         print("   Fail: Reached max number of points")
         success = False
-    elif success:
+    elif success and verbose:
         print(f"   Success: {len(points)} points")
 
     # Add seed point to path
@@ -1152,7 +1153,8 @@ def backtracking_gradient(gradient, distance_map_surf_np,
 def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         min_res=300, out_dir=None, write_files=False,
                         move_target_if_fail=False,
-                        relax_factor=1, return_target=False):
+                        relax_factor=1, return_target=False,
+                        verbose=False):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1179,12 +1181,12 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         Centerline of the vessel.
     """
     output = None
-    print(f"Resolution of segmentation: {segmentation.GetSize()}")
+    if verbose:
+        print(f"Resolution of segmentation: {segmentation.GetSize()}")
 
     # Resample if segmentation resolution is too low
     if segmentation.GetSize()[2] < min_res:
-        print(f"""Resampling segmentation from size {segmentation.GetSize()}
-              to size {min_res}""")
+        print(f"    Resampling segmentation from size {segmentation.GetSize()} to size {min_res}")
         # Divide spacing so that the size is at least 50
         divide = segmentation.GetSize()[2] / min_res
         segmentation = sitk.Resample(segmentation,
@@ -1197,7 +1199,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                       .GetSpacing()],
                                      segmentation.GetDirection(), 0,
                                      segmentation.GetPixelID())
-        print(f"New size: {segmentation.GetSize()}")
+        print(f"    New size: {segmentation.GetSize()}")
     # Create distance map
     distance_map_surf = distance_map_from_seg(segmentation)
     # Switch sign of distance map
@@ -1206,7 +1208,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         distance_map_surf).transpose(2, 1, 0)
     # Get maximum value of distance map
     max_surf = distance_map_surf_np.max()
-    print(f"Max of distance map: {max_surf}")
+    if verbose:
+        print(f"Max of distance map: {max_surf}")
 
     # Write distance map to file
     if out_dir and write_files:
@@ -1244,8 +1247,9 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
             targets = [list(
                 segmentation.TransformPhysicalPointToIndex(target.tolist()))
                 for target in targets]
-    print(f"Seed: {seed}")
-    print(f"Targets: {targets}")
+    if verbose:
+        print(f"Seed: {seed}")
+        print(f"Targets: {targets}")
 
     # if seed/targets is np.array, convert to index
     if isinstance(seed, np.ndarray):
@@ -1275,28 +1279,34 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         # print(f"Min: {sitk.GetArrayFromImage(distance_map).min()}")
 
         # Calculate distance map using fast marching method
-        print("Starting fast marching method")
+        if verbose:
+            print("Starting fast marching method")
         output = fast_marching_method(distance_map, seed, stopping_value=1000)
-        print("Finished fast marching method")
-
-    print(f"Max of output: {sitk.GetArrayFromImage(output).max()}")
-    print(f"Min: {sitk.GetArrayFromImage(output).min()}")
+        if verbose:
+            print("Finished fast marching method")
+    if verbose:
+        print(f"Max of output: {sitk.GetArrayFromImage(output).max()}")
+        print(f"Min: {sitk.GetArrayFromImage(output).min()}")
     # sitk.WriteImage(output,
     #                 '/Users/numisveins/Downloads/debug_centerline/output.mha')
     output_mask = sitk.Mask(output, segmentation)
-    print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}")
-    print(f"Min: {sitk.GetArrayFromImage(output_mask).min()}")
+
+    if verbose:
+        print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}")
+        print(f"Min: {sitk.GetArrayFromImage(output_mask).min()}")
     if out_dir and write_files:
         sitk.WriteImage(output_mask,
                         os.path.join(out_dir, 'masked_out_fmm.mha'))
     # Get gradient of distance map
     gradient = gradient_matrix(
         sitk.GetArrayFromImage(output).transpose(2, 1, 0))
-    print("Gradient calculated")
+    if verbose:
+        print("Gradient calculated")
 
     points_list, success_list = [], []
     for t_num, target_np in enumerate(targets_np):
-        print(f"   Starting target {t_num+1}/{len(targets_np)}")
+        if verbose:
+            print(f"        Starting target {t_num+1}/{len(targets_np)}")
         # Calculate path from seed to target
         points, success = backtracking_gradient(gradient,
                                                 distance_map_surf_np,
@@ -1325,8 +1335,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                             distance_map_surf)
     centerline = post_process_centerline(centerline)
 
-    print(f"""Centerline calculated, success ratio:
-          {success_list.count(True)} / {len(success_list)}""")
+    print(f"    Centerline calculated, success ratio: {success_list.count(True)} / {len(success_list)}")
 
     # If success is all False, return False
     if not success_list.count(True):
@@ -1455,7 +1464,7 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf):
     return centerline
 
 
-def post_process_centerline(centerline):
+def post_process_centerline(centerline, verbose=False):
     """
     Function to post process the centerline using vtk functionalities.
 
@@ -1471,8 +1480,9 @@ def post_process_centerline(centerline):
     -------
     centerline : vtkPolyData
     """
-    print(f"""Number of points before post processing:
-          {centerline.GetNumberOfPoints()}""")
+    if verbose:
+        print(f"""Number of points before post processing:
+              {centerline.GetNumberOfPoints()}""")
     # Remove duplicate points
     cleaner = vtk.vtkCleanPolyData()
     cleaner.SetInputData(centerline)
@@ -1493,8 +1503,9 @@ def post_process_centerline(centerline):
     smoother.Update()
     centerline = smoother.GetOutput()
 
-    print(f"""Number of points after post processing:
-          {centerline.GetNumberOfPoints()}""")
+    if verbose:
+        print(f"""Number of points after post processing:
+              {centerline.GetNumberOfPoints()}""")
 
     return centerline
 

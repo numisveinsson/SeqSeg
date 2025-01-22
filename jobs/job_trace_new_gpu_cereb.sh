@@ -47,17 +47,17 @@ python3 seqseg.py \
     -train_dataset Dataset046_SEQCEREBCASMOREMR \
     -fold 2 \
     -img_ext .mha \
-    -outdir output_cas_46_5_bam_bigger/ \
+    -outdir output_cas_46_2_5seeds/ \
     -scale 1 \
-    -start 7 \
-    -stop -1 \
-    -max_n_steps 200 \
+    -start 17 \
+    -stop 18 \
+    -max_n_steps 300 \
     -max_n_branches 2000 \
     -unit mm \
     -config_name global_cereb \
     -data_dir /global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/testset/  \
-    -pt_centerline 2 \
-    # -num_seeds_centerline 2 \
+    -pt_centerline 5 \
+    -num_seeds_centerline 5 \
 
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT

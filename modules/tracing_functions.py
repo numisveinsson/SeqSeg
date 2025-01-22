@@ -13,7 +13,6 @@ sys.stdout.flush()
 class SkipThisStepError(Exception):
     pass
 
-
 def get_smoothing_params(radius,
                          scale_unit,
                          mega_sub=False,
@@ -121,7 +120,7 @@ def get_next_points(centerline_poly,
                       / np.linalg.norm(locs[id_along_cent]-current_point))
 
         angle = 360/(2*np.pi)*np.arccos(np.dot(old_vector, vector))
-        print("The angle is: " + str(angle))
+        print(f"    Angle to next point: {angle:.2f}")
 
         if angle < angle_allow:
             # point_to_check = locs[-1] + 3*rads[id_along_cent_save] * vector
@@ -272,12 +271,12 @@ def orient_caps(caps, current_point, old_point, direction):
         vector = vector/np.linalg.norm(vector)
         # angle between direction and vector to cap
         angle = 360/(2*np.pi)*np.arccos(np.dot(direction, vector))
-        print(f"Angle to cap {i}: {angle}")
+        print(f"    Angle to cap {i}: {angle:.2f}")
         angles.append(angle)
 
     for i in range(len(caps)):
         cap_dist = np.linalg.norm(caps[i] - old_point)
-        print(f"Cap dist {i}: {cap_dist}")
+        print(f"    Cap dist {i}: {cap_dist:.2f}")
         if cap_dist < source_dist:
             source_id = i
             source_dist = cap_dist

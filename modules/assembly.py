@@ -340,19 +340,19 @@ class VesselTree:
                         pot_branch['connection'] = [j, first_step]
                         break
 
-        if len(self.branches[branch]) > 1:
-            start = self.branches[branch][1]
-            end = self.branches[branch][-1]
-            print(f"Removing steps {start+1} - {end}")
-            del self.steps[start+1:]
+        # if len(self.branches[branch]) > 1:
+        start = self.branches[branch][1]
+        end = self.branches[branch][-1]
+        print(f"Removing steps {start+1} - {end}")
+        del self.steps[start+1:]
         # remove the list at self.branches[branch]
         self.branches.pop(branch)
         del self.bifurcations[-1]
 
         # if last branch is empty, remove it - TODO
-        if not self.branches[-1]:
-            self.branches.pop(-1)
-            del self.bifurcations[-1]
+        # if not self.branches[-1]:
+        #     self.branches.pop(-1)
+        #     del self.bifurcations[-1]
 
         print(f"Restarted branch {branch}")
 

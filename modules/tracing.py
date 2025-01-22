@@ -631,7 +631,7 @@ def trace_centerline(
                     next_step['radius'] = (next_step['radius']
                                            * forceful_sidebranch_magnify)
 
-                print("Next radius is: " + str(radius_tree[0]))
+                print(f"Next radius is {radius_tree[0]:.3f}")
                 vessel_tree.add_step(i, next_step, branch)
 
                 if len(radius_tree) > 1:
@@ -667,8 +667,8 @@ def trace_centerline(
                 raise SkipThisStepError(
                     "No next points, stop here"
                 )
-            print("\n This location done: "
-                  + str(time.time() - start_time_loc) + " s\n")
+            print("\n   This location done: "
+                  + f"{time.time() - start_time_loc:.3f} s\n")
 
         # This step failed for some reason
         except Exception as e:
@@ -714,8 +714,11 @@ def trace_centerline(
                 print("Length of branch: ", len(vessel_tree.branches[branch]))
                 print("\n Moving onto another branch")
 
+                if len(vessel_tree.branches) <= 1 and step_seg['is_inside']:
+                    print("\n\nWARNING: First branch is inside, so stopping\n\n")
+
                 # If inside, then restart branch and i is not 0
-                if i != 0 and ((step_seg['is_inside'] and global_config['RESTART_BRANCH'])
+                if i != 0 and len(vessel_tree.branches) > 1 and ((step_seg['is_inside'] and global_config['RESTART_BRANCH'])
                    or len(vessel_tree.branches[branch]) <= 2):
                     # If inside, then move on to next branch
                     # and remove allowed_steps
