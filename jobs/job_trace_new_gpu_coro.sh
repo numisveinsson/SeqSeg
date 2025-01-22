@@ -44,19 +44,19 @@ cd /global/scratch/users/numi/SeqSeg/
 
 python3 seqseg.py \
     -test_name 3d_fullres \
-    -train_dataset Dataset042_SEQPULMPARSECT \
-    -fold 0 \
-    -img_ext .nii.gz \
-    -outdir output_parse_42_100_bam_biggerrr/ \
+    -train_dataset Dataset045_SEQCOROASOCAMORECT \
+    -fold 2 \
+    -img_ext .nrrd \
+    -outdir output_asoca_45_10_bam_biggerr_addrad/ \
     -scale 1 \
-    -start 1 \
-    -stop 2 \
-    -max_n_steps 1000 \
+    -start 0 \
+    -stop -1 \
+    -max_n_steps 500 \
     -max_n_branches 2000 \
     -unit mm \
-    -config_name global_pulm \
-    -data_dir /global/scratch/users/numi/PARSE_dataset/testset/  \
-    -pt_centerline 100 \
+    -config_name global_coro \
+    -data_dir /global/scratch/users/numi/ASOCA/testset/  \
+    -pt_centerline 10 \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 # Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT
