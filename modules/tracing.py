@@ -26,6 +26,8 @@ from .tracing_functions import (SkipThisStepError, convert_seg_to_surfs,
 
 from .centerline import calc_centerline_fmm
 
+from .nnunet import initialize_predictor
+
 sys.stdout.flush()
 
 
@@ -119,46 +121,12 @@ def trace_centerline(
     assembly_segs = Segmentation(case, image_file, weighted,
                                  weight_type=weight_type)
 
+    # Load model
     if not (seg_file and trace_seg):
-
-        from nnunetv2.paths import nnUNet_results
-        import torch
-        from batchgenerators.utilities.file_and_folder_operations import join
-        from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
-
-        # check if GPU is available
-        if torch.cuda.is_available():
-            print('GPU available, using GPU')
-            device_use = torch.device('cuda', 0)
-        else:
-            print('GPU not available, using CPU')
-            device_use = torch.device('cpu', 0)
-        print('About to load predictor object')
-        # instantiate the nnUNetPredictor
-        predictor = nnUNetPredictor(
-            tile_step_size=0.5,
-            use_gaussian=True,
-            use_mirroring=True,
-            device=device_use,
-            verbose=False,
-            verbose_preprocessing=False,
-            allow_tqdm=True
-        )
-        print('About to load model')
-        print('Model folder:', model_folder)
-        # initializes the network architecture, loads the checkpoint
-        predictor.initialize_from_trained_model_folder(
-            join(nnUNet_results, model_folder),
-            use_folds=(fold,),
-            checkpoint_name='checkpoint_best.pth',
-        )
-        print('Done loading model, ready to predict')
+        predictor = initialize_predictor(model_folder, fold)
     else:
         print('No need to load model, we are using a given segmentation')
 
-    # Note: make initial seed within loop
-    # initial_seed = assembly_segs.assembly.TransformPhysicalPointToIndex(
-    #                vessel_tree.steps[0]['point'].tolist())
     branch = 0
 
     # Track combos of all polydata
