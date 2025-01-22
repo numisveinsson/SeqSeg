@@ -47,11 +47,11 @@ python3 seqseg.py \
     -train_dataset Dataset046_SEQCEREBCASMOREMR \
     -fold 2 \
     -img_ext .mha \
-    -outdir output_cas_46_5_bam/ \
+    -outdir output_cas_46_5_bam_biggerrr/ \
     -scale 1 \
     -start 0 \
     -stop -1 \
-    -max_n_steps 100 \
+    -max_n_steps 500 \
     -max_n_branches 2000 \
     -unit mm \
     -config_name global_cereb \
