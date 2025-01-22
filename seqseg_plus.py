@@ -228,11 +228,7 @@ if __name__ == '__main__':
         create_directories(dir_output, write_samples)
 
         (potential_branches,
-         initial_seeds) = init.initialization(json_file_present,
-                                              test_case, dir_output, dir_cent,
-                                              directory_data, unit,
-                                              pt_centerline, num_seeds,
-                                              write_samples)
+         initial_seeds) = init.initialize_from_seg(pred_sweep, dir_output)
 
         # print to .txt file all outputs
         if not global_config['DEBUG']:

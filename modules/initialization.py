@@ -2,6 +2,8 @@ from .vtk_functions import write_geo, points2polydata
 from .tracing_functions import get_seed, get_largest_radius_seed
 from .assembly import create_step_dict
 from .datasets import get_directories
+from .centerline import calc_centerline_fmm
+
 import os
 import numpy as np
 
@@ -194,3 +196,32 @@ def get_seeds_cardiac_mesh(mesh_dir, name, unit):
             radius_est,
             region_8_center+2*radius_est*region_8_normal,
             radius_est)
+
+
+def initialize_from_seg(segmentation,
+                        dir_output,
+                        num_seeds=1,
+                        write_samples=False):
+    """
+    Initialize the potential branches and initial seeds for the
+    segmentation process, based on the segmentation
+    """
+    initial_seeds = []
+    # Seed points
+    potential_branches = []
+
+    # Calculate centerline of segmentation
+    centerline, success, targets_np = calc_centerline_fmm(
+        segmentation,
+        seed=None,
+        targets=None,
+        min_res=300,
+        out_dir=dir_output,
+        write_files=True,
+        move_target_if_fail=False,
+        relax_factor=1,
+        return_target=True,
+        verbose=True
+    )
+
+    return potential_branches, initial_seeds
