@@ -49,8 +49,8 @@ python3 seqseg.py \
     -img_ext .nii.gz \
     -outdir output_parse_42_100_bam_biggerrr/ \
     -scale 1 \
-    -start 1 \
-    -stop 2 \
+    -start 4 \
+    -stop 6 \
     -max_n_steps 1000 \
     -max_n_branches 2000 \
     -unit mm \
