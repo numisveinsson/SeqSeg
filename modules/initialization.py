@@ -57,9 +57,10 @@ def initialization(json_file_present, test_case, dir_output, dir_cent,
         potential_branches, initial_seeds = initialize_cent(test_case,
                                                             dir_output,
                                                             dir_cent,
-                                                            pt_centerline,
-                                                            num_seeds,
-                                                            write_samples)
+                                                            if_largest_radius=True,
+                                                            pt_centerline=pt_centerline,
+                                                            num_seeds=num_seeds,
+                                                            write_samples=write_samples)
 
     return potential_branches, initial_seeds
 
