@@ -144,10 +144,13 @@ def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
         initial_radiuss = [initial_radius]
 
     if write_samples:
-        write_geo(dir_output + 'points/0_seed_point.vtp',
-                  points2polydata([old_seed.tolist()]))
-        write_geo(dir_output + 'points/1_seed_point.vtp',
-                  points2polydata([initial_seed.tolist()]))
+        for i in range(num_seeds):
+            old_seed = old_seeds[i]
+            initial_seed = initial_seeds[i]
+            write_geo(dir_output + 'points/0_seed_point.vtp',
+                      points2polydata([old_seed.tolist()]))
+            write_geo(dir_output + 'points/1_seed_point.vtp',
+                      points2polydata([initial_seed.tolist()]))
 
     potential_branches = []
     for i in range(num_seeds):
