@@ -97,7 +97,7 @@ def remove_other_vessels(image, seed):
         binary image file (either 0 or 1)
     """
 
-    labels, means = connected_comp_info(image, False)
+    # labels, means = connected_comp_info(image, False)
     ccimage = sitk.ConnectedComponent(image)
 
     # print(f"Seeds to remove around: {seed}")
