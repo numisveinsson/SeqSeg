@@ -128,7 +128,7 @@ def remove_other_vessels(image, seed):
     return labelImage
 
 
-def connected_comp_info(original_seg, print_condition):
+def connected_comp_info(original_seg, print_condition=False):
     """
     Print info on the component being kept
     """
@@ -136,6 +136,7 @@ def connected_comp_info(original_seg, print_condition):
     stats = sitk.LabelIntensityStatisticsImageFilter()
     stats.Execute(removed_seg, original_seg)
     means = []
+    sizes = []
 
     for label in stats.GetLabels():
         if print_condition:
@@ -143,7 +144,8 @@ def connected_comp_info(original_seg, print_condition):
                   .format(label, stats.GetMean(label),
                           stats.GetPhysicalSize(label)))
         means.append(stats.GetMean(label))
-    return stats.GetLabels(), means
+        sizes.append(stats.GetPhysicalSize(label))
+    return stats.GetLabels(), means, sizes
 
 
 def extract_volume(reader_im, index_extract, size_extract):

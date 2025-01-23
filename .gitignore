@@ -1,7 +1,7 @@
 ### Python ###
 
 # Test files
-test_output/*
+test_out*
 tests/test_out/*
 # Byte-compiled / optimized / DLL files
 __pycache__/

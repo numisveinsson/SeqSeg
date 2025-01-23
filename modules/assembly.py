@@ -23,7 +23,8 @@ class Segmentation:
                  image_file=None,
                  weighted=False,
                  weight_type=None,
-                 image=None):
+                 image=None,
+                 start_seg=None):
         """
         Args:
             case: name of the case
@@ -32,20 +33,24 @@ class Segmentation:
             weighted: whether to use a weighted average for the segmentation
             weight_type: type of weight to use for the weighted average
             image: image object to create the global segmentation
+            start_seg: initial segmentation to start with
         """
         if case:
             self.name = case
         if image_file:
             self.image_reader = read_image(image_file)
 
-            new_img = create_new(self.image_reader)
-            self.assembly = new_img
+            if start_seg is not None:
+                self.assembly = start_seg
+            else:
+                new_img = create_new(self.image_reader)
+                self.assembly = new_img
 
         elif image:
 
             self.image_reader = image
             self.assembly = image
-        
+
         else:
             print("Please provide either an image file or an image object")
 
@@ -55,7 +60,10 @@ class Segmentation:
 
         if weighted:
             # also keep track of how many updates to pixels
-            self.n_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
+            if start_seg is None:
+                self.n_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
+            else:
+                self.n_updates = sitk_to_numpy(self.assembly)
             # print("Creating weighted segmentation")
             assert weight_type, "Please provide a weight type"
             assert weight_type in ['radius', 'gaussian'], """Weight type

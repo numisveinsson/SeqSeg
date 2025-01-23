@@ -1,11 +1,19 @@
-from .vtk_functions import write_geo, points2polydata
-from .tracing_functions import get_seed, get_largest_radius_seed
-from .assembly import create_step_dict
-from .datasets import get_directories
-from .centerline import calc_centerline_fmm
-
+import sys
 import os
 import numpy as np
+import SimpleITK as sitk
+
+sys.path.insert(0, './')
+from modules.vtk_functions import write_geo, points2polydata
+from modules.tracing_functions import get_seed, get_largest_radius_seed
+from modules.assembly import create_step_dict
+from modules.datasets import get_directories
+from modules.centerline import calc_centerline_fmm
+from modules.sitk_functions import connected_comp_info
+
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 
 def process_init(test_case, directory_data, dir_output0, img_format, test):
@@ -154,6 +162,15 @@ def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
             write_geo(dir_output + 'points/1_seed_point.vtp',
                       points2polydata([initial_seed.tolist()]))
 
+    potential_branches = create_pots(num_seeds, old_seeds, old_radiuss,
+                                     initial_seeds, initial_radiuss)
+
+    return potential_branches, initial_seeds
+
+
+def create_pots(num_seeds, old_seeds, old_radiuss,
+                initial_seeds, initial_radiuss):
+
     potential_branches = []
     for i in range(num_seeds):
         init_step = create_step_dict(old_seeds[i], old_radiuss[i],
@@ -161,7 +178,7 @@ def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
         init_step['connection'] = [0, 0]
         potential_branches.append(init_step)
 
-    return potential_branches, initial_seeds
+    return potential_branches
 
 
 def get_seeds_cardiac_mesh(mesh_dir, name, unit):
@@ -205,23 +222,101 @@ def initialize_from_seg(segmentation,
     """
     Initialize the potential branches and initial seeds for the
     segmentation process, based on the segmentation
-    """
-    initial_seeds = []
-    # Seed points
-    potential_branches = []
 
-    # Calculate centerline of segmentation
-    centerline, success, targets_np = calc_centerline_fmm(
-        segmentation,
-        seed=None,
-        targets=None,
-        min_res=300,
-        out_dir=dir_output,
-        write_files=True,
-        move_target_if_fail=False,
-        relax_factor=1,
-        return_target=True,
-        verbose=True
-    )
+    Parameters
+    ----------
+    segmentation : sitk.Image
+        Segmentation image, binary
+    dir_output : str
+        Output directory
+    num_seeds : int
+        Number of seeds
+    write_samples : bool
+        Write samples
+
+    Returns
+    -------
+    potential_branches : list
+        List of potential branches
+    initial_seeds : list
+        List of initial seeds
+    """
+    # Connected info
+    stats, means, sizes = connected_comp_info(segmentation,
+                                       True)
+    # Keep the largest connected component
+    ccimage = sitk.ConnectedComponent(segmentation)
+    # stats = sitk.LabelIntensityStatisticsImageFilter()
+    # stats.Execute(ccimage, segmentation)
+
+    # max_label = stats.GetMaximum()
+    # Get the largest connected component
+    largest_label = np.argmax(sizes)+1
+    segmentation_1 = sitk.Mask(ccimage, ccimage == largest_label)
+    segmentation_1 = segmentation_1 > 0
+
+    # Get the second largest connected component
+    sizes[largest_label-1] = 0
+    second_largest_label = np.argmax(sizes)+1
+    segmentation_2 = sitk.Mask(ccimage, ccimage == second_largest_label)
+    segmentation_2 = segmentation_2 > 0
+
+    # Get the third largest connected component
+    sizes[second_largest_label-1] = 0
+    third_largest_label = np.argmax(sizes)+1
+    segmentation_3 = sitk.Mask(ccimage, ccimage == third_largest_label)
+    segmentation_3 = segmentation_3 > 0
+
+    if write_samples:
+        sitk.WriteImage(segmentation_1, dir_output + 'seg_1.mha')
+        sitk.WriteImage(segmentation_2, dir_output + 'seg_2.mha')
+        sitk.WriteImage(segmentation_3, dir_output + 'seg_3.mha')
+
+    segs = [segmentation_1]  # , segmentation_2, segmentation_3]
+    # Seed points
+    initial_seeds = []
+    potential_branches = []
+    for segmentation in segs:
+        # Calculate centerline of segmentation
+        centerline, success, targets_np = calc_centerline_fmm(
+            segmentation,
+            seed=None,
+            targets=None,
+            min_res=300,
+            out_dir=dir_output,
+            write_files=True,
+            move_target_if_fail=False,
+            relax_factor=1,
+            return_target=True,
+            verbose=True
+        )
+        if success:
+            # Write the centerline
+            write_geo(dir_output + 'centerline.vtp', centerline)
+            # Get the seeds
+            (old_seeds, old_radiuss,
+             initial_seeds, initial_radiuss) = get_largest_radius_seed(
+                dir_cent=dir_output+'centerline.vtp',
+                pt_centerline=3,
+                num_seeds=len(targets_np)
+                )
+            # Create potential branches
+            potential_branches += create_pots(len(targets_np),
+                                              old_seeds, old_radiuss,
+                                              initial_seeds, initial_radiuss)
+        else:
+            print("Centerline calculation failed! - No seeds found!")
 
     return potential_branches, initial_seeds
+
+
+if __name__ == '__main__':
+    "Test the initialization"
+    out_dir = '/Users/numisveins/Documents/repositories/SeqSeg/tests/test_init/'
+    # Read in segmentation
+    seg = sitk.ReadImage('/Users/numisveins/Documents/datasets/ASOCA_dataset/Results_Predictions/output_2d_coroasocact/new_format_mha/coroasocact_001.mha')
+    # Initialize
+    potential_branches, initial_seeds = initialize_from_seg(seg,
+                                                            out_dir,
+                                                            num_seeds=1,
+                                                            write_samples=True)

@@ -43,7 +43,8 @@ def trace_centerline(
     global_config,
     unit='cm',
     scale=1,
-    seg_file=None
+    seg_file=None,
+    start_seg=None
 ):
 
     if unit == 'cm':
@@ -119,7 +120,8 @@ def trace_centerline(
     init_step = potential_branches[0]
     vessel_tree = VesselTree(case, image_file, init_step, potential_branches)
     assembly_segs = Segmentation(case, image_file, weighted,
-                                 weight_type=weight_type)
+                                 weight_type=weight_type,
+                                 start_seg=start_seg)
 
     # Load model
     if not (seg_file and trace_seg):

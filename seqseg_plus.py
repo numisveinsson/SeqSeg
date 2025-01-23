@@ -223,6 +223,8 @@ if __name__ == '__main__':
             fold=global_fold,
             scale=global_scale
         )
+        # Write sweep segmentation
+        sitk.WriteImage(pred_sweep, dir_output0+'/'+case+'_sweep_seg.mha')
 
         # Create directories for results
         create_directories(dir_output, write_samples)
@@ -236,12 +238,7 @@ if __name__ == '__main__':
             sys.stdout = open(dir_output+"/out.txt", "w")
         else:
             print("Start tracing with debug mode on")
-            # import pdb
-            # pdb.set_trace()
-        if json_file_present:
-            print("We got seed point from json file")
-        else:
-            print("We did not get seed point from json file")
+
         print(test_case)
         print(f"Initial points: {potential_branches}")
         print(f"Time is: {time.time()}")
@@ -260,7 +257,8 @@ if __name__ == '__main__':
             global_config,
             unit,
             seqseg_scale,
-            dir_seg
+            dir_seg,
+            start_seg=pred_sweep  # Note this is binary (should be prob)
         )
 
         print("\nTotal calculation time is:"
@@ -299,7 +297,7 @@ if __name__ == '__main__':
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5,
                                                upperThreshold=1)
         sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_raw_seg_'
-                        + test_name + '_' + str(i) + '.mha')
+                        + seqseg_test_name + '_' + str(i) + '.mha')
 
         assembly_binary = sf.keep_component_seeds(assembly_binary,
                                                   initial_seeds)
@@ -319,15 +317,18 @@ if __name__ == '__main__':
         final_centerline = vf.appendPolyData(centerlines)
         final_points = vf.appendPolyData(points)
 
-        vf.write_vtk_polydata(final_surface,    dir_output+'/all_'+case+'_'
-                              + test_name + '_'+str(i)+'_'+str(n_steps_taken)
-                              + '_surfaces.vtp')
-        vf.write_vtk_polydata(final_centerline, dir_output+'/all_'+case+'_'
-                              + test_name + '_'+str(i)+'_'+str(n_steps_taken)
-                              + '_centerlines.vtp')
-        vf.write_vtk_polydata(final_points,     dir_output+'/all_'+case+'_'
-                              + test_name + '_'+str(i)+'_'+str(n_steps_taken)
-                              + '_points.vtp')
+        vf.write_vtk_polydata(
+            final_surface, dir_output+'/all_'+case+'_'
+            + seqseg_test_name + '_'+str(i)+'_'+str(n_steps_taken)
+            + '_surfaces.vtp')
+        vf.write_vtk_polydata(
+            final_centerline, dir_output+'/all_'+case+'_'
+            + seqseg_test_name + '_'+str(i)+'_'+str(n_steps_taken)
+            + '_centerlines.vtp')
+        vf.write_vtk_polydata(
+            final_points, dir_output+'/all_'+case+'_'
+            + seqseg_test_name + '_'+str(i)+'_'+str(n_steps_taken)
+            + '_points.vtp')
         if calc_global_centerline:
             # Calculate global centerline
             global_centerline, targets, success = calc_centerline_global(
@@ -335,16 +336,18 @@ if __name__ == '__main__':
                 initial_seeds)
             # if centerline is not None
             if success:
-                vf.write_vtk_polydata(global_centerline, dir_output0 + '/'
-                                    + case + '_centerline_' + str(n_steps_taken)
-                                    + '_steps' + '.vtp')
+                vf.write_vtk_polydata(
+                    global_centerline, dir_output0 + '/'
+                    + case + '_centerline_' + str(n_steps_taken)
+                    + '_steps' + '.vtp')
                 # write targets
                 targets_pd = vf.points2polydata([target.tolist()
                                                 for target in targets])
-                vf.write_vtk_polydata(targets_pd, dir_output+'/'
-                                    + case + '_' + test_name + '_'+str(i)+'_'
-                                    + str(n_steps_taken)
-                                    + '_targets.vtp')
+                vf.write_vtk_polydata(
+                    targets_pd, dir_output+'/'
+                    + case + '_' + seqseg_test_name + '_'+str(i)+'_'
+                    + str(n_steps_taken)
+                    + '_targets.vtp')
 
                 capped_surface, capped_seg = cap_surface(
                     pred_surface=assembly_surface,
@@ -353,18 +356,20 @@ if __name__ == '__main__':
                     file_name=case,
                     outdir=dir_output,
                     targets=targets)
-                vf.write_vtk_polydata(capped_surface, dir_output+'/'
-                                    + case + '_' + test_name + '_'+str(i)+'_'
-                                    + str(n_steps_taken)+'_capped_surface.vtp')
+                vf.write_vtk_polydata(
+                    capped_surface, dir_output+'/'
+                    + case + '_' + seqseg_test_name + '_'+str(i)+'_'
+                    + str(n_steps_taken)+'_capped_surface.vtp')
                 sitk.WriteImage(capped_seg, dir_output+'/'
                                 + case + '_' + str(n_steps_taken)
                                 + '_capped_seg.mha')
 
         if global_config['PREVENT_RETRACE']:
             final_inside_pts = vf.appendPolyData(inside_pts)
-            vf.write_vtk_polydata(final_inside_pts, dir_output + '/final_'
-                                  + case + '_' + test_name + '_'+str(i)+'_'
-                                  + str(n_steps_taken)+'_inside_points.vtp')
+            vf.write_vtk_polydata(
+                final_inside_pts, dir_output + '/final_'
+                + case + '_' + seqseg_test_name + '_'+str(i)+'_'
+                + str(n_steps_taken)+'_inside_points.vtp')
 
         if not global_config['DEBUG']:
             # close the file
