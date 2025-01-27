@@ -8,7 +8,6 @@ from modules.capping import (bryan_get_clipping_parameters,
                              bryan_generate_oriented_boxes,
                              bryan_clip_surface)
 from vtk.util.numpy_support import vtk_to_numpy as v2n
-from vtk.util.numpy_support import numpy_to_vtk as n2v
 
 from modules.vtk_functions import convertPolyDataToImageData
 

@@ -1154,7 +1154,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         min_res=300, out_dir=None, write_files=False,
                         move_target_if_fail=False,
                         relax_factor=1, return_target=False,
-                        verbose=False):
+                        verbose=False, return_failed=False):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1332,7 +1332,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     # Create vtk polydata for points
     centerline = create_centerline_polydata(points_list,
                                             success_list,
-                                            distance_map_surf)
+                                            distance_map_surf,
+                                            return_failed=return_failed)
     centerline = post_process_centerline(centerline)
 
     print(f"    Centerline calculated, success ratio: {success_list.count(True)} / {len(success_list)}")
@@ -1382,7 +1383,8 @@ def calc_points_target(max_surf, distance_map_surf, target_np,
     return max_point
 
 
-def create_centerline_polydata(points_list, success_list, distance_map_surf):
+def create_centerline_polydata(points_list, success_list, distance_map_surf,
+                               return_failed=False):
     """
     Function to create a vtk polydata from a list of points.
     Each list of points is a path from seed to target and is stored as a line.
