@@ -740,6 +740,7 @@ def smooth_polydata(poly, iteration=25, boundary=False,
                     feature=False, smoothingFactor=0.):  # .1
     """
     This function smooths a vtk polydata
+    Original settings: 25, False, False, 0.
     Args:
         poly: vtk polydata to smooth
         boundary: boundary smooth bool

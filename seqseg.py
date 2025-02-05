@@ -212,19 +212,20 @@ if __name__ == '__main__':
 
         # Trace centerline
         (centerlines, surfaces, points, inside_pts, assembly_obj,
-         vessel_tree, n_steps_taken) = trace_centerline(dir_output,
-                                                        dir_image,
-                                                        case,
-                                                        dir_model_weights,
-                                                        fold,
-                                                        potential_branches,
-                                                        max_step_size,
-                                                        max_n_branches,
-                                                        global_config,
-                                                        unit,
-                                                        scale,
-                                                        dir_seg
-                                                        )
+         vessel_tree, n_steps_taken) = trace_centerline(
+            dir_output,
+            dir_image,
+            case,
+            dir_model_weights,
+            fold,
+            potential_branches,
+            max_step_size,
+            max_n_branches,
+            global_config,
+            unit,
+            scale,
+            dir_seg
+        )
 
         print("\nTotal calculation time is:"
               + str((time.time() - start_time)/60) + " min\n")
@@ -261,21 +262,24 @@ if __name__ == '__main__':
 
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5,
                                                upperThreshold=1)
-        sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_raw_seg_'
+        sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_binary_seg_'
+                        + test_name + '_' + str(i) + '.mha')
+        sitk.WriteImage(assembly, dir_output+'/'+case+'_prob_seg_'
                         + test_name + '_' + str(i) + '.mha')
 
         assembly_binary = sf.keep_component_seeds(assembly_binary,
                                                   initial_seeds)
-        sitk.WriteImage(assembly_binary, dir_output0+'/'+case+'_segmentation_'
+        sitk.WriteImage(assembly_binary, dir_output0+'/'+case
+                        + '_seg_containing_seeds_'
                         + str(n_steps_taken) + '_steps' + '.mha')
 
         assembly_surface = vf.evaluate_surface(assembly_binary, 1)
         vf.write_vtk_polydata(assembly_surface, dir_output + '/' + case
-                              + '_surface_' + str(n_steps_taken)
+                              + '_surface_mesh_nonsmooth' + str(n_steps_taken)
                               + '_steps' + '.vtp')
         surface_smooth = vf.smooth_polydata(assembly_surface)
         vf.write_vtk_polydata(surface_smooth, dir_output0 + '/' + case
-                              + '_surface_' + str(n_steps_taken)
+                              + '_surface_mesh_smooth' + str(n_steps_taken)
                               + '_steps' + '.vtp')
 
         final_surface = vf.appendPolyData(surfaces)
@@ -299,15 +303,16 @@ if __name__ == '__main__':
             # if centerline is not None
             if success:
                 vf.write_vtk_polydata(global_centerline, dir_output0 + '/'
-                                    + case + '_centerline_' + str(n_steps_taken)
-                                    + '_steps' + '.vtp')
+                                      + case + '_centerline_'
+                                      + str(n_steps_taken)
+                                      + '_steps' + '.vtp')
                 # write targets
                 targets_pd = vf.points2polydata([target.tolist()
                                                 for target in targets])
                 vf.write_vtk_polydata(targets_pd, dir_output+'/'
-                                    + case + '_' + test_name + '_'+str(i)+'_'
-                                    + str(n_steps_taken)
-                                    + '_targets.vtp')
+                                      + case + '_' + test_name + '_'+str(i)+'_'
+                                      + str(n_steps_taken)
+                                      + '_targets.vtp')
 
                 capped_surface, capped_seg = cap_surface(
                     pred_surface=assembly_surface,
@@ -317,8 +322,9 @@ if __name__ == '__main__':
                     outdir=dir_output,
                     targets=targets)
                 vf.write_vtk_polydata(capped_surface, dir_output+'/'
-                                    + case + '_' + test_name + '_'+str(i)+'_'
-                                    + str(n_steps_taken)+'_capped_surface.vtp')
+                                      + case + '_' + test_name + '_'+str(i)+'_'
+                                      + str(n_steps_taken)
+                                      + '_capped_surface.vtp')
                 sitk.WriteImage(capped_seg, dir_output+'/'
                                 + case + '_' + str(n_steps_taken)
                                 + '_capped_seg.mha')
