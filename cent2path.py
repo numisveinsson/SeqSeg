@@ -61,7 +61,7 @@ def write_pth_file(file_path, point_coordinates):
         tree.write(f, encoding="UTF-8", xml_declaration=True)
 
 def main():
-    vtp_file = "/Users/numisveins/Documents/datasets/vascular_data_3d/fmm_centerlines/0159_0001.vtp"  # Input VTP file
+    vtp_file = "/Users/numisveins/Documents/datasets/vascular_data_3d/centerlines/0160_6001.vtp"  # Input VTP file
     pth_file = "output.pth"  # Output PTH file
 
     # Read the VTP file
