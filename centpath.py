@@ -131,7 +131,7 @@ class ImageProcessing:
         sample_points.append(list(pt1))
         
         return sample_points
-    
+
     def clear_old_path_files(self):
         for filename in os.listdir(self.output_directory):
             if filename.endswith(".pth"):

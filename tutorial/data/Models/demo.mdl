@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<format version="1.0" />
+<model type="PolyData">
+    <timestep id="0">
+        <model_element type="PolyData" num_sampling="0">
+            <segmentations>
+                <seg name="aorta" />
+                <seg name="right_iliac" />
+            </segmentations>
+            <faces>
+                <face id="1" name="wall_aorta" type="wall" visible="true" opacity="1" color1="0.705882370471954" color2="0.298039227724075" color3="0.701960802078247" />
+                <face id="2" name="wall_right_iliac" type="wall" visible="true" opacity="1" color1="0.239215686917305" color2="0.333333343267441" color3="0.733333349227905" />
+                <face id="3" name="cap_aorta" type="cap" visible="true" opacity="1" color1="0.223529413342476" color2="0.666666686534882" color3="0.250980406999588" />
+                <face id="4" name="cap_right_iliac" type="cap" visible="true" opacity="1" color1="0.843137264251709" color2="0.254901975393295" color3="0.254901975393295" />
+                <face id="5" name="cap_aorta_2" type="cap" visible="true" opacity="1" color1="0.831372559070587" color2="0.694117665290833" color3="0.24705882370472" />
+            </faces>
+            <blend_radii />
+            <blend_param blend_iters="2" sub_blend_iters="3" cstr_smooth_iters="2" lap_smooth_iters="50" subdivision_iters="1" decimation="0.01" />
+        </model_element>
+    </timestep>
+</model>

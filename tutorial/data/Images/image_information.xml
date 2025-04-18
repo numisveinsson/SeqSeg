@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ImageObjectInformation modification_time="1741983700" creation_time="1741983700" version="1.0">
+    <timestep id="0">
+        <created_with_simvascular_version>2023.05</created_with_simvascular_version>
+        <path></path>
+        <image_file_name>0110.vti</image_file_name>
+        <image_header_file_name>0110.vti.hdr</image_header_file_name>
+        <image_name>0110</image_name>
+        <data_is_local_copy>true</data_is_local_copy>
+        <scale_factor>0</scale_factor>
+    </timestep>
+</ImageObjectInformation>
+
