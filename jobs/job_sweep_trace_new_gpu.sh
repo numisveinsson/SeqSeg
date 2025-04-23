@@ -24,7 +24,7 @@
 #SBATCH --gres=gpu:GTX2080TI:1
 #
 # Wall clock limit:
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=numi@berkeley.edu
@@ -42,19 +42,24 @@ export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/
 
-python3 seqseg.py \
-    -test_name 3d_fullres \
-    -train_dataset Dataset048_SEQAORTAVMRGALACT \
-    -fold 0 \
-    -img_ext .mha \
-    -outdir output_gala_aaas/ \
-    -scale 1 \
+python3 seqseg_plus.py \
+    -outdir output_sweep_asoca/ \
+    -global_test_name 3d_fullres \
+    -global_train_dataset Dataset012_COROASOCACT \
+    -global_fold all \
+    -global_scale 1 \
+    -seqseg_test_name 3d_fullres \
+    -seqseg_train_dataset Dataset045_SEQCOROASOCAMORECT \
+    -seqseg_fold 2 \
+    -img_ext .nrrd \
+    -seqseg_scale 1 \
     -start 0 \
-    -stop -1 \
-    -max_n_steps 500 \
-    -max_n_branches 10 \
-    -unit cm \
-    -config_name global_aorta \
+    -stop 1 \
+    -max_n_steps 200 \
+    -max_n_branches 20 \
+    -unit mm \
+    -config_name global_coro \
+    -data_dir /global/scratch/users/numi/ASOCA/testset/  \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 # Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT

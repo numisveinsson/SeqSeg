@@ -106,6 +106,11 @@ def remove_other_vessels(image, seed):
         labels_seeds = []
         for i in range(len(seed)):
             labels_seeds.append(ccimage[seed[i]])
+
+        # if only one seed and it is background, set it to 1
+        if len(labels_seeds) == 1 and labels_seeds[0] == 0:
+            labels_seeds[0] = 1
+
         # create a new image with only the labels of interest
         labelImage = sitk.BinaryThreshold(ccimage,
                                           lowerThreshold=labels_seeds[0],

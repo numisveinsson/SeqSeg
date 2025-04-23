@@ -1,5 +1,6 @@
 import time
 import SimpleITK as sitk
+import numpy as np
 from .nnunet import initialize_predictor
 from .sitk_functions import copy_settings
 
@@ -29,6 +30,7 @@ def run_global_segmentation(dir_image, model_folder, fold, scale=1):
     img = sitk.ReadImage(dir_image)
 
     spacing_im = img.GetSpacing()
+    spacing_im = np.array(spacing_im)
     spacing = (spacing_im * scale).tolist()
     spacing = spacing[::-1]
     props = {}

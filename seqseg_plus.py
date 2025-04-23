@@ -145,7 +145,7 @@ if __name__ == '__main__':
                         help="""Whether to scale image data for global segmentation,
                              needed if units for nnUNet model and testing data are different,
                              eg 0.1 if model is in cm and data is in mm""")
-    parser.add_argument('-global_dataset', '--global_dataset',
+    parser.add_argument('-global_train_dataset', '--global_train_dataset',
                         type=str,
                         default='Dataset012_COROASOCACT',
                         help="""Name of dataset used to train nnUNet
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     seqseg_test_name = args.seqseg_test_name
     seqseg_scale = args.seqseg_scale
 
-    global_dataset = args.global_dataset
+    global_dataset = args.global_train_dataset
     global_fold = args.global_fold
     global_test_name = args.global_test_name
     global_scale = args.global_scale

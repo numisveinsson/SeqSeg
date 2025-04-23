@@ -151,17 +151,17 @@ def get_testing_samples(dataset, data_dir=None):
                          ]:
         
             directory = '/global/scratch/users/numi/vascular_data_3d/'
-            dir_json = directory + 'test.json'
+            # dir_json = directory + 'test.json'
             testing_samples = [  # get_testing_samples_json(dir_json)
 
-                ['0139_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
-                ['0141_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
-                ['0146_1001', 0, 0, 10, 'ct'],  # Aortofemoral CT
+                ['0139_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+                ['0141_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+                ['0146_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
                 ['0174_0000', 0, 5, 10, 'ct'],  # Aorta CT
                 ['0176_0000', 0, 50, 60, 'ct'],  # Aorta CT
                 ['0188_0001_aorta', 5, -10, -20, 'ct'],  # Aorta CT
                 ['O150323_2009_aorta', 0, 10, 20, 'ct'],  # Aorta CT
-                ['O344211000_2006_aorta', 0, 5, 10, 'ct'],  # Aorta CT
+                ['O344211000_2006_aorta', 0, 0, 1, 'ct'],  # Aorta CT
             ]
 
         elif dataset == 'Dataset007_SEQPULMONARYMR':
@@ -191,6 +191,19 @@ def get_testing_samples(dataset, data_dir=None):
             directory = '/global/scratch/users/numi/PARSE_dataset/'
             dir_asoca_json = directory + 'test.json'
             testing_samples = get_testing_samples_json(dir_asoca_json)
+
+        elif dataset == 'Dataset048_SEQAORTAVMRGALACT':
+
+            directory = '/global/scratch/users/numi/vascular_data_3d/'
+            # dir_json = directory + 'test.json'
+            testing_samples = [  # get_testing_samples_json(dir_json)
+                ['0139_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+                ['0141_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+                ['0144_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+                ['0146_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+                ['0150_0001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+                ['0151_0001', 0, 0, 1, 'ct'],  # Aortofemoral CT
+            ]
 
         else:
             print('Dataset not found')

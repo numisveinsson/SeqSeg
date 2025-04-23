@@ -25,7 +25,7 @@ TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 3
 NR_ALLOW_RETRACE_STEPS: 10
-PREVENT_RETRACE: True
+PREVENT_RETRACE: False
 SORT_NEXT: True
 MERGE_NEXT: False
 

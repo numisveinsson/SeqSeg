@@ -21,7 +21,7 @@
 #SBATCH --cpus-per-task=1
 #
 # Wall clock limit:
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=numi@berkeley.edu
@@ -54,7 +54,7 @@ python3 auto_centerline.py \
     -max_n_branches 50 \
     -unit cm \
     -config_name global_aorta \
-    -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
+    # -data_dir /global/scratch/users/numi/MICCAI_AVT_Data/  \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 # Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT

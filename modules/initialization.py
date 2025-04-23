@@ -272,7 +272,7 @@ def initialize_from_seg(segmentation,
         sitk.WriteImage(segmentation_2, dir_output + 'seg_2.mha')
         sitk.WriteImage(segmentation_3, dir_output + 'seg_3.mha')
 
-    segs = [segmentation_1]  # , segmentation_2, segmentation_3]
+    segs = [segmentation_1, segmentation_2]#, segmentation_3]
     # Seed points
     initial_seeds = []
     potential_branches = []

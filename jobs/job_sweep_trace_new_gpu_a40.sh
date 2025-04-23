@@ -9,7 +9,7 @@
 #SBATCH --partition=savio3_gpu
 #
 # QoS:
-#SBATCH --qos=gtx2080_gpu3_normal
+#SBATCH --qos=a40_gpu3_normal
 #
 # Number of nodes:
 #SBATCH --nodes=1
@@ -18,13 +18,13 @@
 #SBATCH --ntasks=1
 #
 # Processors per task:
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=8
 #
 # Number of GPUs, this can be in the format of "gpu:[1-4]", or "gpu:K80:[1-4] with the type included
-#SBATCH --gres=gpu:GTX2080TI:1
+#SBATCH --gres=gpu:A40:1
 #
 # Wall clock limit:
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=numi@berkeley.edu
@@ -42,19 +42,24 @@ export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/
 
-python3 seqseg.py \
-    -test_name 3d_fullres \
-    -train_dataset Dataset048_SEQAORTAVMRGALACT \
-    -fold 0 \
-    -img_ext .mha \
-    -outdir output_gala_aaas/ \
-    -scale 1 \
+python3 seqseg_plus.py \
+    -outdir output_sweep_asoca_2000steps/ \
+    -global_test_name 3d_fullres \
+    -global_train_dataset Dataset012_COROASOCACT \
+    -global_fold all \
+    -global_scale 1 \
+    -seqseg_test_name 3d_fullres \
+    -seqseg_train_dataset Dataset045_SEQCOROASOCAMORECT \
+    -seqseg_fold 2 \
+    -img_ext .nrrd \
+    -seqseg_scale 1 \
     -start 0 \
     -stop -1 \
-    -max_n_steps 500 \
-    -max_n_branches 10 \
-    -unit cm \
-    -config_name global_aorta \
+    -max_n_steps 1000 \
+    -max_n_branches 2000 \
+    -unit mm \
+    -config_name global_coro \
+    -data_dir /global/scratch/users/numi/ASOCA/testset_no_gt/  \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 # Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT
