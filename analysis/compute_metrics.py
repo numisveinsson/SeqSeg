@@ -3,13 +3,15 @@ import SimpleITK as sitk
 import vtk
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
+
 from modules import vtk_functions as vf
 from modules.capping import (bryan_get_clipping_parameters,
                              bryan_generate_oriented_boxes,
                              bryan_clip_surface)
 from vtk.util.numpy_support import vtk_to_numpy as v2n
-
-from modules.vtk_functions import convertPolyDataToImageData
 
 from scipy.stats import ttest_ind, ttest_rel, wilcoxon
 
@@ -234,13 +236,15 @@ def process_case_name(case_name):
 
     case_name = case_name[:-17]
 
+    print(f"Case name: {case_name}")
+
     if 'seg' in case_name:
         name = case_name[13:]
         name_split = case_name.split('_')
         # add until 'seg'
         name = ''
         for n in name_split:
-            if n == 'seg':
+            if 'seg' in n:
                 break
             name += n
             name += '_'
@@ -248,6 +252,7 @@ def process_case_name(case_name):
     else:
         name = case_name[15:]
 
+    print(f"New name: {name}")
     return name
 
 
@@ -357,9 +362,9 @@ def pre_process(pred, folder, case, write_postprocessed,
     else:
         print("No centerline provided for clipping")
 
-    if write_postprocessed and i_metric == 0:
-        sitk.WriteImage(labelImage,
-                        pred_folder+folder+'/postprocessed/'+case+'.mha')
+    # if write_postprocessed and i_metric == 0:
+    #     sitk.WriteImage(labelImage,
+    #                     pred_folder+folder+'/postprocessed/'+case+'.mha')
 
     # print np array of label image
     # labelImageArray = sitk.GetArrayFromImage(labelImage)
@@ -375,6 +380,8 @@ def get_case_names(folder, pred_folder):
     segs = [seg for seg in segs if '.' not in seg[0]]
     # only keep files not folders
     segs = [seg for seg in segs if '.' in seg]
+    # only keep files with .nii.gz or .mha extension
+    segs = [seg for seg in segs if '.nii.gz' in seg or '.mha' in seg]
     # sort
     import natsort
     segs = natsort.natsorted(segs)
@@ -509,6 +516,7 @@ def keep_largest_surface(polyData):
 
 
 def cap_and_keep_largest(pred, centerline, file_name, outdir):
+    from modules.vtk_functions import convertPolyDataToImageData
 
     predpd = vf.evaluate_surface(pred, 0.5)
     endpts, radii, unit_vecs = bryan_get_clipping_parameters(centerline)
@@ -579,8 +587,9 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
 
             folders_mod = [folder for folder in pred_folders
                            if modality in folder]
+            
             # only keep if 'seqseg' in name
-            folders_mod = [folder for folder in folders_mod if 'seqseg' in folder]
+            # folders_mod = [folder for folder in folders_mod if 'seqseg' in folder]
 
             if process_names:
                 case_names = get_case_names([fo for fo in folders_mod
@@ -599,6 +608,8 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                 segs = [seg for seg in segs if '.' not in seg[0]]
                 # only keep files not folders
                 segs = [seg for seg in segs if '.' in seg]
+                # only keep files with .nii.gz or .mha extension
+                segs = [seg for seg in segs if '.nii.gz' in seg or '.mha' in seg]
                 # sort
                 import natsort
                 segs = natsort.natsorted(segs)
@@ -610,9 +621,9 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
 
                 for i, seg in enumerate(segs):
                     print(f" Seg: {seg}")
-                    # if modality == 'mr' and i == 2:
-                    #     # skip first case for MR
-                    #     continue
+                    if modality == 'mr' and i == 2:
+                        # skip first case for MR
+                        continue
                     # if i == 0:
                     #     continue
 
@@ -629,21 +640,21 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                     if pred.GetOrigin() != truth.GetOrigin():
                         pred.SetOrigin(truth.GetOrigin())
 
-                        if write_postprocessed:
-                            sitk.WriteImage(pred, pred_folder+folder+'/postprocessed/'
-                                            + case + '_origin.mha')
-                            sitk.WriteImage(truth, pred_folder+folder+'/postprocessed/'
-                                            + case + '_origin_truth.mha')
+                        # if write_postprocessed:
+                        #     sitk.WriteImage(pred, pred_folder+folder+'/postprocessed/'
+                        #                     + case + '_origin.mha')
+                        #     sitk.WriteImage(truth, pred_folder+folder+'/postprocessed/'
+                        #                     + case + '_origin_truth.mha')
                     
                     # check transform matrix and make same
                     if pred.GetDirection() != truth.GetDirection():
                         pred.SetDirection(truth.GetDirection())
 
-                        if write_postprocessed:
-                            sitk.WriteImage(pred, pred_folder+folder+'/postprocessed/'
-                                            + case + '_direction.mha')
-                            sitk.WriteImage(truth, pred_folder+folder+'/postprocessed/'
-                                            + case + '_direction_truth.mha')
+                        # if write_postprocessed:
+                        #     sitk.WriteImage(pred, pred_folder+folder+'/postprocessed/'
+                        #                     + case + '_direction.mha')
+                        #     sitk.WriteImage(truth, pred_folder+folder+'/postprocessed/'
+                        #                     + case + '_direction_truth.mha')
 
                     if metric == 'centerline overlap' or cap:
                         from modules import vtk_functions as vf
@@ -1105,7 +1116,7 @@ if __name__ == '__main__':
 
     name_graph = 'Comparison'
     # save_name = 'test_keep_noclip_unpaired_ttest_skipfirst'
-    save_name = 'test_seqseg_keep_clip_wilcoxon'
+    save_name = 'test_seqseg_datasetsize'
     preprocess_pred = True  # if cap or keep largest label
     masked = False
     write_postprocessed = False
@@ -1113,11 +1124,11 @@ if __name__ == '__main__':
     print_case_names = True
     process_names = True  # if we want to process case names, like seqseg paper
 
-    cap = True
+    cap = False
     keep_largest_label_benchmark = True
     paired_ttest = False
     mecnemar = False
-    wilcoxon_bool = True
+    wilcoxon_bool = False
 
     # input folder of segmentation results
     pred_folder = '/Users/numisveins/Documents/data_seqseg_paper/pred_mic_aortas_june24/results/'
@@ -1126,11 +1137,11 @@ if __name__ == '__main__':
     mask_folder = '/Users/numisveins/Documents/MICCAI_Challenge23_Aorta_Tree_Data/global_masks/'
     output_folder = '/Users/numisveins/Documents/data_seqseg_paper/pred_mic_aortas_june24/graphs/'
 
-    pred_folder = '/Users/numisveins/Documents/data_papers/data_seqseg_paper/pred_aortas_june24_3/'
-    truth_folder = '/Users/numisveins/Documents/datasets/vascular_data_3d/truths/'
-    cent_folder = '/Users/numisveins/Documents/datasets/vascular_data_3d/centerlines/'
+    pred_folder = '//Users/numisveins/Documents/data_papers/data_seqseg_paper/dataset_size_study/'
+    truth_folder = '/Users/numisveins/Documents/datasets/vmr/truths/'
+    cent_folder = '/Users/numisveins/Documents/datasets/vmr/centerlines/'
     # mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
-    output_folder = '/Users/numisveins/Documents/data_papers/data_seqseg_paper/graphs_miros_capped/'
+    output_folder = '//Users/numisveins/Documents/data_papers/data_seqseg_paper/dataset_size_study/out/'
 
     # # vascular data
     # pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/pred_seqseg_ct/new_format/'
@@ -1138,7 +1149,7 @@ if __name__ == '__main__':
 
     # # cardiac data
     # pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/meshes/'
-    # truth_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/Ground truth cardiac segmentations/'
+    # truth_folder = '/Users/numisveins/Documents/data_combo_paper/outct_data/Ground truth cardiac segmentations/'
 
     # get all folders in pred_folder
     pred_folders = os.listdir(pred_folder)
@@ -1149,9 +1160,9 @@ if __name__ == '__main__':
     # pred_folders = [folder for folder in pred_folders if '3d' not in folder]
 
     # modalities
-    modalities = ['mr', 'ct']
+    modalities = ['ct']  # , 'mr']
     # metrics
-    metrics = ['dice', 'hausdorff', 'centerline overlap']
+    metrics = ['centerline overlap']  # 'dice']#, 'hausdorff', ]
 
     calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                          mask_folder, output_folder, modalities, metrics,
