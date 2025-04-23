@@ -1,4 +1,4 @@
-# Neural Vessel Segmentation Tutorial ✨🩺💻
+# SeqSeg Segmentation Tutorial ✨🩺💻
 
 This tutorial will guide you through installing the required software, downloading necessary resources, and running the segmentation pipeline on a medical image. 🏥📊🖥️
 
