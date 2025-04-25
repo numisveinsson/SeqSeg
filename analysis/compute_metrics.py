@@ -439,7 +439,7 @@ def get_names_folders(list_folders):
 
     for i, folder in enumerate(list_folders):
 
-        if 'pred_seqseg' in folder:
+        if 'seqseg' in folder:
 
             names.append('SeqSeg')
 
@@ -730,7 +730,7 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                             print(f"No significant difference between {list(scores.keys())[i]} and {list(scores.keys())[j]}\n")
 
             # Make box plot for modality
-            plt.figure()
+            plt.figure(figsize=(3, 5))
             # set font to Times New Roman
             plt.rcParams["font.family"] = "Times New Roman"
             # set font size to 14
@@ -740,7 +740,7 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
             colors = ['pink', 'lightblue', 'lightgreen', 'orange',
                       'yellow', 'lightbrown', 'purple', 'brown',
                       'black', 'grey']
-            boxplot = plt.boxplot(scores.values(), patch_artist=True)
+            boxplot = plt.boxplot(scores.values(), patch_artist=True, widths=0.3)
             for patch, color in zip(boxplot['boxes'], colors):
                 patch.set_facecolor(color)
             # add legend
@@ -758,8 +758,9 @@ def calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
             plt.ylabel(f'{get_metric_name(metric)}')
             # plt.xlabel('Method')
             if 'dice' in metric:
-                plt.ylim(top=0.95+(0.05*(len(scores.keys()) - 1)))
-                plt.ylim(bottom=0.5)
+                plt.ylim(top=1.1+(0.05*(len(scores.keys()) - 1)))
+                # plt.ylim(top=1)
+                plt.ylim(bottom=0)
             if 'centerline' in metric:
                 plt.ylim(top=1.1+(0.05*(len(scores.keys()) - 1)))
                 plt.ylim(bottom=0)
@@ -1116,15 +1117,15 @@ if __name__ == '__main__':
 
     name_graph = 'Comparison'
     # save_name = 'test_keep_noclip_unpaired_ttest_skipfirst'
-    save_name = 'test_seqseg_datasetsize'
+    save_name = 'test_seqseg_cap_keep_largest'
     preprocess_pred = True  # if cap or keep largest label
     masked = False
-    write_postprocessed = False
+    write_postprocessed = True
 
     print_case_names = True
     process_names = True  # if we want to process case names, like seqseg paper
 
-    cap = False
+    cap = True
     keep_largest_label_benchmark = True
     paired_ttest = False
     mecnemar = False
@@ -1142,6 +1143,13 @@ if __name__ == '__main__':
     cent_folder = '/Users/numisveins/Documents/datasets/vmr/centerlines/'
     # mask_folder = '/Users/numisveins/Documents/vascular_data_3d/masks_around_truth/masks_4r/'
     output_folder = '//Users/numisveins/Documents/data_papers/data_seqseg_paper/dataset_size_study/out/'
+
+    # Gala data
+    pred_folder = '/Users/numisveins/Documents/data_papers/data_gala_aaas/'
+    truth_folder = '/Users/numisveins/Documents/datasets/vmr/truths/'
+    cent_folder = '/Users/numisveins/Documents/datasets/vmr/centerlines/'
+    output_folder = '/Users/numisveins/Documents/data_papers/data_gala_aaas/out/'
+
 
     # # vascular data
     # pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/pred_seqseg_ct/new_format/'
@@ -1162,7 +1170,7 @@ if __name__ == '__main__':
     # modalities
     modalities = ['ct']  # , 'mr']
     # metrics
-    metrics = ['centerline overlap']  # 'dice']#, 'hausdorff', ]
+    metrics = ['centerline overlap', 'dice', 'hausdorff', ]
 
     calc_metrics_folders(pred_folders, pred_folder, truth_folder, cent_folder,
                          mask_folder, output_folder, modalities, metrics,

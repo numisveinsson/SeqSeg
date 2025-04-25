@@ -1,15 +1,15 @@
 ![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/python-app.yml/badge.svg)
 
-# SeqSeg: Automatic Tracking and Segmentation of Blood Vessels
+# SeqSeg: Automatic Tracking and Segmentation of Blood Vessels in CT and MR Images
 
-See paper [here](https://rdcu.be/dU0wy) for citation.
+See paper [here](https://rdcu.be/dU0wy) for detailed explanations and citation.
 
-Below is an example output of the algorithm on a 3D MR image of the abdominal aorta:
+Below is an example showing the algorithm tracking and segmenting an abdominal aorta in 3D MR image scan:
 
 ![](assets/mr_model_tracing_fast_shorter.gif)
 
 ## How it works
-SeqSeg is a method for automatic segmentation of blood vessels in medical images. The algorithm uses a neural network to segment the image and then uses a tracking algorithm to take steps along the centerline of the segmented vessel.
+SeqSeg is a method for automatic tracking and segmentation of blood vessels in medical images. The algorithm uses a neural network to segment the vasculature locally and uses a tracking algorithm to take steps along the direction of the vessel and down bifurcation detected.
 
 Here is the workflow of the algorithm:
 
@@ -20,39 +20,54 @@ where the neural network was trained on local subvolume patches of the image:
 ![](assets/seqseg_training.png)
 
 ## Set Up
-SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the medical image volumes. You will need model weights to run the algorithm. After training the nnU-Net model, the weights will be saved in the `nnUNet_results` folder. Before running you must set a global environment variable to say where that folder is, for example:
-
-```bash
-export nnUNet_results="/path/to/model/weights/nnUnet/nnUNet_results"
-```
+SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder.
 
 Main package dependencies (see environment.yml file for all):
 
 Basic:
-- Python 3.10.5
+- Python 3.11
 
 Machine Learning:
-- nnU-Net
-- Pytorch
+- nnU-Net, nnunetv2=2.5.1
+- Pytorch, torch=2.3.1
 
 Image and Data Processing:
-- SITK
-- VTK
-- Numpy
-- Matplotlib
-- Pyyaml
+- SITK, simpleitk=2.2.1
+- VTK, vtk=9.1.0
+- PyYaml, pyyaml=6.0.1
+- Matplotlib (optional)
+- Pyyaml (optional)
 
 and if using VMTK (not required):
 - VMTK
 
+Example setup using conda:
+```bash
+conda create -n seqseg python=3.11
+conda activate seqseg
+conda install ..
+```
+Example setup using pip (first create a virtual environment, see [here](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/)):
+```bash
+python3 -m venv seqseg
+source seqseg/bin/activate
+pip install python==3.11
+pip install ...
+```
+Note: The code is tested with Python 3.11 and nnU-Net 2.5.1. If you are using a different version, please check the compatibility of the packages.
+
+## Testing
+
 Current workflow:
-1. Create conda environment using environment_new.yml
+1. Create conda or virtual environment and install ''Image and Data Processing'' dependencies.
 2. Test this environment using the test script tests/test.sh
 3. Install nnunet and pytorch using the instructions [here](https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/installation_instructions.md).
 4. Try the full installation according to details below
 
 
 ## Running
+
+See [here](https://github.com/numisveinsson/SeqSeg/blob/main/tutorial/tutorial.md) for tutorial on how to run the code.
 
 ### Set weights directory
 ```bash
@@ -66,12 +81,12 @@ conda activate seqseg
 
 ### Run
 ```bash
-python3 auto_centerline.py --data_dir data --test_name 3d_fullres --train_dataset Dataset001_AORTAS --config_name global.yml --fold all --img_ext .nii.gz --outdir output --scale 1 --start 0 --stop -1 --max_n_steps 1000 --unit cm
+python3 seqseg.py --data_dir data --test_name 3d_fullres --train_dataset Dataset001_AORTAS --config_name global.yml --fold all --img_ext .nii.gz --outdir output --scale 1 --start 0 --stop -1 --max_n_steps 1000 --unit cm
 ```
 
 ### Details
 
-`auto_centerline`: Main script to run.
+`seqseg`: Main script to run.
 
 Arguments:
 

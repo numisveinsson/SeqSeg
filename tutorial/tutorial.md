@@ -79,7 +79,7 @@ python seqseg.py --num_steps 50 \
 ## Viewing the Output 📊🖼️🔬
 
 After running the segmentation, the output will include: 🗂️📁✅
-- `segmentation.vtp`: The segmented vessel structure.
+- `segmentation.mha`: The segmented vessel structure.
 - `centerline.vtp`: The extracted centerline of the vessels.
 - `surface_mesh.vtp`: The reconstructed surface mesh.
 
