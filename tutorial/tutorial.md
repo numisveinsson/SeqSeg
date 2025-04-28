@@ -26,54 +26,40 @@ Hint: if you do not wish to choose a seed point, one is given below.
 
 ### Using ParaView:
 1. Open ParaView.
-2. Load the medical image (`scan.nii.gz`) via **File > Open**.
+2. Load the medical image (`0110_0001.mha`) from the `data/Images` directory.
 3. Use the **Volume Rendering** option to inspect the image.
 4. Identify and note the seed point coordinates for segmentation.
 
 ### Using VolView:
 1. Open VolView.
-2. Load the `scan.nii.gz` file.
+2. Load the `0110_0001.mha` image from the `data/Images` directory.
 3. Use the **Thresholding** and **Opacity Adjustments** to visualize structures.
 4. Pick a seed point and record its coordinates.
 
 ## Running the Segmentation 🏃‍♂️🧠📈
 
-Run the segmentation script `seqseg.py` with the required arguments: 🖥️🔢⚙️
+1. Define where the weights (downloaded above) are located. 📂🔍
 
 ```bash
-python seqseg.py --num_steps <NUM_STEPS> \
-                 --num_branches <NUM_BRANCHES> \
-                 --seed_point <X,Y,Z> \
-                 --out_dir <OUTPUT_DIRECTORY> \
-                 --weights_path <WEIGHTS_PATH> \
-                 --data_dir <DATA_DIRECTORY>
+export nnUNet_results="../example/path/to/nnUNet_results"
 ```
 
-Example run with a given seed point (e.g., `100,120,80`):
+2. Define seed point coordinates in the ``data/seeds.json`` file. 📍📝
+
+The file has default seed points you can use or you can specify your own. The coordinates should be in the format `[x, y, z]` and correspond to the physical coordinates in the 3D image, see the file for example. Note that each seed point requires ``two`` coordinates: to define a vector direction for the initialization. The ``third`` argument is a radius estimate, usually for aortas a radius=1.1cm is a good enough approximation. 🧭
+
+3. Run the segmentation script `seqseg.py` with the required arguments: 🖥️🔢⚙️
 
 ```bash
-python seqseg.py --num_steps 50 \
-                 --num_branches 3 \
-                 --seed_point 100,120,80 \
-                 --out_dir results/ \
-                 --weights_path models/weights.pth \
-                 --data_dir data/
-``` 🖥️🔢⚙️
-
-```bash
-python seqseg.py --num_steps <NUM_STEPS> \
-                 --num_branches <NUM_BRANCHES> \
-                 --seed_point <X,Y,Z> \
-                 --out_dir <OUTPUT_DIRECTORY>
-```
-
-Example run with a given seed point (e.g., `100,120,80`):
-
-```bash
-python seqseg.py --num_steps 50 \
-                 --num_branches 3 \
-                 --seed_point 100,120,80 \
-                 --out_dir results/
+python seqseg.py \
+    -test_name 3d_fullres \
+    -train_dataset Dataset001_AORTAS \
+    -data_dir data/ \
+    -img_ext .mha \
+    -config_name global_aorta \
+    -max_n_steps <NUM_STEPS> \
+    -max_n_branches <NUM_BRANCHES> \
+    -outdir <OUTPUT_DIRECTORY> \
 ```
 
 ## Viewing the Output 📊🖼️🔬

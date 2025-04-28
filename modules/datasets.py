@@ -85,7 +85,7 @@ def get_testing_samples(dataset, data_dir=None):
         print('Data directory provided')
         directory = data_dir
         print('Checking for json file')
-        dir_json = directory + 'test.json'
+        dir_json = directory + 'seeds.json'
         if os.path.isfile(dir_json):
             print('Json file found')
             testing_samples = get_testing_samples_json(dir_json)
@@ -151,7 +151,7 @@ def get_testing_samples(dataset, data_dir=None):
                          ]:
         
             directory = '/global/scratch/users/numi/vascular_data_3d/'
-            # dir_json = directory + 'test.json'
+            # dir_json = directory + 'seeds.json'
             testing_samples = [  # get_testing_samples_json(dir_json)
 
                 ['0139_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
@@ -177,25 +177,25 @@ def get_testing_samples(dataset, data_dir=None):
         elif dataset == 'Dataset009_SEQAORTASMICCT':
 
             directory = '/global/scratch/users/numi/test_data/miccai_aortas/'
-            dir_json = directory + 'test.json'
+            dir_json = directory + 'seeds.json'
             testing_samples = get_testing_samples_json(dir_json)
 
         elif dataset == 'Dataset010_SEQCOROASOCACT':
 
             directory = '/global/scratch/users/numi/ASOCA_test/'
             # directory = '/global/scratch/users/numi/Karthik_test/'
-            dir_json = directory + 'test.json'
+            dir_json = directory + 'seeds.json'
             testing_samples = get_testing_samples_json(dir_json)
 
         elif dataset == 'Dataset016_SEQPULMPARSECT':
             directory = '/global/scratch/users/numi/PARSE_dataset/'
-            dir_asoca_json = directory + 'test.json'
+            dir_asoca_json = directory + 'seeds.json'
             testing_samples = get_testing_samples_json(dir_asoca_json)
 
         elif dataset == 'Dataset048_SEQAORTAVMRGALACT':
 
             directory = '/global/scratch/users/numi/vascular_data_3d/'
-            # dir_json = directory + 'test.json'
+            # dir_json = directory + 'seeds.json'
             testing_samples = [  # get_testing_samples_json(dir_json)
                 ['0139_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
                 ['0141_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT

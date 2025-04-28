@@ -22,12 +22,12 @@ where the neural network was trained on local subvolume patches of the image:
 ## Set Up
 SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder.
 
-Main package dependencies (see environment.yml file for all):
+Main package dependencies:
 
 Basic:
 - Python 3.11
 
-Machine Learning:
+Machine Learning (Note: must be installed according to nnU-Net instructions):
 - nnU-Net, nnunetv2=2.5.1
 - Pytorch, torch=2.3.1
 
@@ -63,7 +63,6 @@ Current workflow:
 2. Test this environment using the test script tests/test.sh
 3. Install nnunet and pytorch using the instructions [here](https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/installation_instructions.md).
 4. Try the full installation according to details below
-
 
 ## Running
 

@@ -18,7 +18,7 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 def process_init(test_case, directory_data, dir_output0, img_format, test):
 
-    path = directory_data + 'test.json'
+    path = directory_data + 'seeds.json'
     json_file_present = os.path.isfile(path)
 
     dir_seg = os.path.isdir(directory_data + 'truths')
