@@ -62,7 +62,7 @@ def create_directories(output_folder, write_samples):
             print(e)
 
 
-if __name__ == '__main__':
+def main():
     """ Set up"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-data_dir', '--data_directory',
@@ -378,3 +378,7 @@ if __name__ == '__main__':
 
     print("\nTotal calculation time is: ")
     print(f"{((time.time() - start_time)/60):.2f} min\n")
+
+
+if __name__ == '__main__':
+    main()

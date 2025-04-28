@@ -228,7 +228,7 @@ def main():
         )
 
         print("\nTotal calculation time is:"
-              + str((time.time() - start_time)/60) + " min\n")
+              + f"{((time.time() - start_time)/60):.2f} min\n")
 
         if take_time:
             vessel_tree.time_analysis()
@@ -286,13 +286,16 @@ def main():
             final_points = vf.appendPolyData(points)
 
             vf.write_vtk_polydata(final_surface,    dir_output+'/all_'+case+'_'
-                                  + test_name + '_'+str(i)+'_'+str(n_steps_taken)
+                                  + test_name + '_'+str(i)+'_'
+                                  + str(n_steps_taken)
                                   + '_surfaces.vtp')
             vf.write_vtk_polydata(final_centerline, dir_output+'/all_'+case+'_'
-                                  + test_name + '_'+str(i)+'_'+str(n_steps_taken)
+                                  + test_name + '_'+str(i)+'_'
+                                  + str(n_steps_taken)
                                   + '_centerlines.vtp')
             vf.write_vtk_polydata(final_points,     dir_output+'/all_'+case+'_'
-                                  + test_name + '_'+str(i)+'_'+str(n_steps_taken)
+                                  + test_name + '_'+str(i)+'_'
+                                  + str(n_steps_taken)
                                   + '_points.vtp')
         if calc_global_centerline:
             # Calculate global centerline
@@ -333,14 +336,15 @@ def main():
                 final_inside_pts = vf.appendPolyData(inside_pts)
                 vf.write_vtk_polydata(final_inside_pts, dir_output + '/final_'
                                       + case + '_' + test_name + '_'+str(i)+'_'
-                                      + str(n_steps_taken)+'_inside_points.vtp')
+                                      + str(n_steps_taken)
+                                      + '_inside_points.vtp')
 
         if not global_config['DEBUG']:
             # close the file
             sys.stdout.close()
             sys.stdout = sys.__stdout__
 
-    print("\nTotal calculation time is: ")
+    print("\nTotal calculation time for all cases is: ")
     print(f"{((time.time() - start_time)/60):.2f} min\n")
 
 
