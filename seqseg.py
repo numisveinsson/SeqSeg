@@ -61,7 +61,7 @@ def create_directories(output_folder, write_samples):
             print(e)
 
 
-if __name__ == '__main__':
+def main():
     """ Set up"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-data_dir', '--data_directory',
@@ -253,8 +253,6 @@ if __name__ == '__main__':
         # Assembly work
         assembly_org = assembly_obj.assembly
         # assembly_ups = assembly_obj.upsample_sitk()
-        print("""\nTotal calculation time is: "
-              + str((time.time() - start_time)/60) + " min\n""")
         # sitk.WriteImage(assembly_org, dir_output+'/'+case+'_assembly_'
         #                 + test_name + '_'+str(i)+'.mha')
 
@@ -282,19 +280,20 @@ if __name__ == '__main__':
                               + '_surface_mesh_smooth' + str(n_steps_taken)
                               + '_steps' + '.vtp')
 
-        final_surface = vf.appendPolyData(surfaces)
-        final_centerline = vf.appendPolyData(centerlines)
-        final_points = vf.appendPolyData(points)
+        if len(centerlines) > 0:
+            final_surface = vf.appendPolyData(surfaces)
+            final_centerline = vf.appendPolyData(centerlines)
+            final_points = vf.appendPolyData(points)
 
-        vf.write_vtk_polydata(final_surface,    dir_output+'/all_'+case+'_'
-                              + test_name + '_'+str(i)+'_'+str(n_steps_taken)
-                              + '_surfaces.vtp')
-        vf.write_vtk_polydata(final_centerline, dir_output+'/all_'+case+'_'
-                              + test_name + '_'+str(i)+'_'+str(n_steps_taken)
-                              + '_centerlines.vtp')
-        vf.write_vtk_polydata(final_points,     dir_output+'/all_'+case+'_'
-                              + test_name + '_'+str(i)+'_'+str(n_steps_taken)
-                              + '_points.vtp')
+            vf.write_vtk_polydata(final_surface,    dir_output+'/all_'+case+'_'
+                                  + test_name + '_'+str(i)+'_'+str(n_steps_taken)
+                                  + '_surfaces.vtp')
+            vf.write_vtk_polydata(final_centerline, dir_output+'/all_'+case+'_'
+                                  + test_name + '_'+str(i)+'_'+str(n_steps_taken)
+                                  + '_centerlines.vtp')
+            vf.write_vtk_polydata(final_points,     dir_output+'/all_'+case+'_'
+                                  + test_name + '_'+str(i)+'_'+str(n_steps_taken)
+                                  + '_points.vtp')
         if calc_global_centerline:
             # Calculate global centerline
             global_centerline, targets, success = calc_centerline_global(
@@ -330,10 +329,11 @@ if __name__ == '__main__':
                                 + '_capped_seg.mha')
 
         if global_config['PREVENT_RETRACE']:
-            final_inside_pts = vf.appendPolyData(inside_pts)
-            vf.write_vtk_polydata(final_inside_pts, dir_output + '/final_'
-                                  + case + '_' + test_name + '_'+str(i)+'_'
-                                  + str(n_steps_taken)+'_inside_points.vtp')
+            if len(inside_pts) > 0:
+                final_inside_pts = vf.appendPolyData(inside_pts)
+                vf.write_vtk_polydata(final_inside_pts, dir_output + '/final_'
+                                      + case + '_' + test_name + '_'+str(i)+'_'
+                                      + str(n_steps_taken)+'_inside_points.vtp')
 
         if not global_config['DEBUG']:
             # close the file
@@ -342,3 +342,7 @@ if __name__ == '__main__':
 
     print("\nTotal calculation time is: ")
     print(f"{((time.time() - start_time)/60):.2f} min\n")
+
+
+if __name__ == '__main__':
+    main()

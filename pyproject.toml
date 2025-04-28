@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seqseg"
+version = "0.1.0"
+description = "A simple deep learning-based medical image blood vessel tracking and segmentation tool."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Numi Sveinsson Cepero", email = "numi@berkeley.com"},
+    {name = "Shadden Lab, UC Berkeley"}
+]
+keywords = [
+    "segmentation",
+    "deep learning",
+    "medical imaging",
+    "nnunet",
+    "medical image analysis",
+    "medical image segmentation",
+    "nnU-Net",
+    "blood vessel segmentation",
+    "vascular segmentation",
+    "vascular tracking"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Medical Science Apps."
+]
+
+dependencies = [
+    "vtk",
+    "SimpleITK",
+    "PyYAML",
+    "nnunetv2",
+]
+
+[project.scripts]
+seqseg = "seqseg.seqseg:main"
+
+[project.urls]
+homepage = "https://github.com/numisveinsson/SeqSeg"
+repository = "https://github.com/numisveinsson/SeqSeg"

@@ -1,0 +1,48 @@
+# if we are tracing a segmentation or predicting a segmentation as we go
+# True if we have a segmentation, False if we are predicting
+SEGMENTATION: False # usually False
+
+DEBUG: True
+DEBUG_STEP: 10000
+
+WRITE_STEPS: True # if we want to write out each step
+ANIMATION: False # to write out animation files
+ANIMATION_STEPS: 3 # write out animation every x steps
+
+GLOBAL_CENTERLINE: False # if we want to extract global centerline at the end (this may fail)
+RETRACE: False # retrace strategry
+TIME_ANALYSIS: False # if we want to write out how long each step take
+TREE_ANALYSIS: False
+
+VOLUME_SIZE_RATIO: 4.9 # default 5, 5.5 for coronaries, 4 for segs
+MAGN_RADIUS: 1.05
+ADD_RADIUS: 0.3 # mm (keep in mm)
+MAX_PERC_ENLARGE: 0.3 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
+MIN_RADIUS: 0.3 # mm (keep in mm)
+MIN_RES: 6
+CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
+TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
+
+NR_CHANCES: 3
+NR_ALLOW_RETRACE_STEPS: 10
+PREVENT_RETRACE: True
+SORT_NEXT: True
+MERGE_NEXT: False
+
+ASSEMBLY_EVERY_N: 20 # add to assembly every N steps
+USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)
+BUFFER_N: 20 # add to assembly steps buff_N steps ago
+WEIGHTED_ASSEMBLY: True # if assembly should be weighted
+WEIGHT_TYPE: gaussian # type of weighting for assembly
+
+FORCEFUL_SIDEBRANCH: False
+FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1
+
+MEGA_SUBVOLUME: False # extract centerline from previous N steps, instead of just 1
+NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
+
+STOP_PRE: True # whether to stop tracing prematurely, if True then options below will be used
+STOP_RADIUS: 0.46 # (mm) 0.48 if radius goes below, stop tracing
+MAX_STEPS_BRANCH: 1000 # max num of steps per branch, stop when reached
+
+RESTART_BRANCH: True

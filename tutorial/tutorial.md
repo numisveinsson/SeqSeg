@@ -53,13 +53,14 @@ The file has default seed points you can use or you can specify your own. The co
 ```bash
 python seqseg.py \
     -test_name 3d_fullres \
-    -train_dataset Dataset001_AORTAS \
-    -data_dir data/ \
+    -train_dataset Dataset005_SEQAORTANDFEMOMR \
+    -fold all \
+    -data_dir tutorial/data/ \
     -img_ext .mha \
-    -config_name global_aorta \
-    -max_n_steps <NUM_STEPS> \
-    -max_n_branches <NUM_BRANCHES> \
-    -outdir <OUTPUT_DIRECTORY> \
+    -config_name aorta_tutorial \
+    -max_n_steps 5 \
+    -max_n_branches 2 \
+    -outdir tutorial/output/ \
 ```
 
 ## Viewing the Output 📊🖼️🔬

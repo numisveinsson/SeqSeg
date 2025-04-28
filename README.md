@@ -20,7 +20,7 @@ where the neural network was trained on local subvolume patches of the image:
 ![](assets/seqseg_training.png)
 
 ## Set Up
-SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder.
+SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the local medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder.
 
 Main package dependencies:
 
