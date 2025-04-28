@@ -323,7 +323,7 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
     return c_loc[id_point], radii[id_point]
 
 
-def get_largest_radius_seed(dir_cent, pt_centerline=50, num_seeds=1):
+def get_largest_radius_seed(dir_cent, pt_centerline=0, num_seeds=1):
     """
     Get the seed point with the largest radius
     Args:
@@ -336,7 +336,7 @@ def get_largest_radius_seed(dir_cent, pt_centerline=50, num_seeds=1):
     """
     pt_along = pt_centerline
     print(f"\nGetting seed at point {pt_along} along centerline\n")
-    add_step = 5
+    add_step = 2
 
     # Centerline
     cent = read_geo(dir_cent).GetOutput()
@@ -348,6 +348,12 @@ def get_largest_radius_seed(dir_cent, pt_centerline=50, num_seeds=1):
     cent_ids = [cent_ids[i] for i in cent_ips]
     # Flip radius
     cent_ids = flip_radius(cent_ids, radii)
+
+    # If num_seeds is larger than number of centerlines
+    if num_seeds > len(cent_ids):
+        num_seeds = len(cent_ids) - 1
+        print(f"Number of seeds is larger than number of centerlines, "
+              f"setting to {num_seeds}")
 
     old_seeds, old_radiuss, initial_seeds, initial_radiuss = [], [], [], []
     for i in range(num_seeds):

@@ -64,10 +64,11 @@ def initialization(json_file_present, test_case, dir_output, dir_cent,
                                                             unit,
                                                             write_samples)
     else:
+        if_largest_radius=True
         potential_branches, initial_seeds = initialize_cent(test_case,
                                                             dir_output,
                                                             dir_cent,
-                                                            if_largest_radius=True,
+                                                            if_largest_radius=if_largest_radius,
                                                             pt_centerline=pt_centerline,
                                                             num_seeds=num_seeds,
                                                             write_samples=write_samples)
@@ -131,7 +132,7 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, unit,
 
 
 def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
-                    pt_centerline=50, num_seeds=1, write_samples=False):
+                    pt_centerline=0, num_seeds=1, write_samples=False):
 
     # Information
     if if_largest_radius:
@@ -154,7 +155,7 @@ def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
         initial_radiuss = [initial_radius]
 
     if write_samples:
-        for i in range(num_seeds):
+        for i in range(len(old_seeds)):
             old_seed = old_seeds[i]
             initial_seed = initial_seeds[i]
             write_geo(dir_output + 'points/0_seed_point.vtp',
@@ -162,7 +163,7 @@ def initialize_cent(test_case, dir_output, dir_cent, if_largest_radius=True,
             write_geo(dir_output + 'points/1_seed_point.vtp',
                       points2polydata([initial_seed.tolist()]))
 
-    potential_branches = create_pots(num_seeds, old_seeds, old_radiuss,
+    potential_branches = create_pots(len(old_seeds), old_seeds, old_radiuss,
                                      initial_seeds, initial_radiuss)
 
     return potential_branches, initial_seeds

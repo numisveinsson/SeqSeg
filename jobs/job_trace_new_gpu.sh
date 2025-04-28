@@ -47,14 +47,16 @@ python3 seqseg.py \
     -train_dataset Dataset048_SEQAORTAVMRGALACT \
     -fold 0 \
     -img_ext .mha \
-    -outdir output_gala_aaas/ \
+    -outdir output_gala_aaas_more_seeds/ \
     -scale 1 \
     -start 0 \
     -stop -1 \
     -max_n_steps 500 \
-    -max_n_branches 10 \
+    -max_n_branches 30 \
     -unit cm \
     -config_name global_aorta \
+    -pt_centerline 1 \
+    -num_seeds_centerline 15 \
 
 # Dataset010_SEQCOROASOCACT Dataset006_SEQAORTANDFEMOCT Dataset005_SEQAORTANDFEMOMR Dataset016_SEQPULMPARSECT
 # Dataset018_SEQAORTASONEMR Dataset017_SEQAORTASONECT
