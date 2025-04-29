@@ -134,7 +134,11 @@ def main():
 
     print(args)
 
-    global_config = load_yaml("./config/"+args.config_name+".yaml")
+    # Load configuration file
+    config_path = os.path.join(os.path.dirname(__file__),
+                               'config', args.config_name + '.yaml')
+
+    global_config = load_yaml(config_path)
     print(f"Using config file: {args.config_name}")
 
     dir_output0 = args.outdir
