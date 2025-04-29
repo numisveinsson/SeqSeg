@@ -75,9 +75,9 @@ def main():
     parser.add_argument('-data_dir', '--data_directory',
                         type=str,
                         help='Name of the folder containing the testing data')
-    # parser.add_argument('-nnunet_results_path', '--nnunet_results_path',
-    #                     type=str,
-    #                     help='Path to nnUNet results folder')
+    parser.add_argument('-nnunet_results_path', '--nnunet_results_path',
+                        type=str,
+                        help='Path to nnUNet results folder')
     parser.add_argument('-test_name', '--test_name',
                         default='3d_fullres',
                         type=str,
@@ -174,7 +174,9 @@ def main():
     num_seeds = args.num_seeds_centerline
 
     # Weight directory
+    weight_dir_nnunet = args.nnunet_results_path
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
+    dir_model_weights = os.path.join(weight_dir_nnunet, dir_model_weights,)
 
     testing_samples, directory_data = get_testing_samples(dataset, data_dir)
     print("Testing samples about to run:")

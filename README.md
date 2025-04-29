@@ -68,11 +68,6 @@ Note: The code is tested with Python 3.11 and nnU-Net 2.5.1. If you are using a 
 
 See [here](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/tutorial.md) for tutorial on how to run the code.
 
-### Set weights directory
-```bash
-export nnUNet_results="/path/to/model/weights/nnUnet/nnUNet_results"
-```
-
 ### Set up data directory
 Create a directory structure for your data as follows:
 
@@ -103,6 +98,7 @@ source seqseg/bin/activate
 ```bash
 seqseg \
     -data_dir seqseg/tutorial/data/ \
+    -nnunet_results_path nnUNet_results/ \
     -test_name 3d_fullres \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold 0 \

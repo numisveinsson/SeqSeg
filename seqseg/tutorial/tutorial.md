@@ -19,6 +19,7 @@ Download the pre-trained neural network weights from the following link: 🔗⬇
 [Download Weights](<https://zenodo.org/records/15020477>)
 
 Save the weights folder called nnUNet_results in a directory, e.g., `models/`. 📁🗂️💾
+You will need to specify the path to this directory when running the segmentation script. 🛤️
 
 ## Viewing the tutorial Medical Image 🔍🖥️🩻
 
@@ -42,13 +43,7 @@ Hint: if you do not wish to choose a seed point, one is given below.
 
 ## Running the Segmentation 🏃‍♂️🧠📈
 
-1. Define where the weights (downloaded above) are located. 📂🔍
-
-```bash
-export nnUNet_results="../example/path/to/nnUNet_results"
-```
-
-2. Define seed point coordinates in the ``data/seeds.json`` file. 📍📝
+1. Define seed point coordinates in the ``data/seeds.json`` file. 📍📝
 
 The file has default seed points you can use or you can specify your own. The coordinates should be in the format `[x, y, z]` and correspond to the physical coordinates in the 3D image, see the file for example. Note that each seed point requires ``two`` coordinates: to define a vector direction for the initialization. The ``third`` argument is a radius estimate, usually for aortas a radius=1.1cm is a good enough approximation. 🧭
 
@@ -65,11 +60,12 @@ Example `seeds.json` file:
 ]
 ```
 
-3. Run the segmentation script `seqseg` with the required arguments: 🖥️🔢⚙️
+2. Run the segmentation script `seqseg` with the required arguments: 🖥️🔢⚙️
 
 ```bash
 seqseg \
     -data_dir seqseg/tutorial/data/ \
+    -nnunet_results_path .../nnUNet_results/ \
     -test_name 3d_fullres \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
@@ -80,7 +76,25 @@ seqseg \
     -outdir output/
     -unit cm \
     -scale 1 \
+    -start 0 \
+    -stop 1
 ```
+### Explanation of Arguments: 📜🔍
+
+- `-data_dir`: Path to the directory containing the medical images and `seeds.json` file. 📂
+- `-nnunet_results_path`: Path to the directory containing the pre-trained nnUNet model weights. 📁
+- `-test_name`: Name of the nnUNet test configuration to use (e.g., `3d_fullres`). 📊
+- `-train_dataset`: Name of the dataset used to train the nnUNet model (e.g., `Dataset005_SEQAORTANDFEMOMR`). 📚
+- `-fold`: Specifies which fold to use for the nnUNet model (e.g., `0` or `all` for all folds). 📅
+- `-img_ext`: File extension of the medical images (e.g., `.mha`). 📸
+- `-config_name`: Name of the configuration file to use (e.g., `aorta_tutorial`). 📄
+- `-max_n_steps`: Maximum number of steps for the segmentation algorithm (e.g., `5`). ⏳
+- `-max_n_branches`: Maximum number of branches to explore during segmentation (e.g., `2`). 🌿
+- `-outdir`: Directory where the output files will be saved (e.g., `output/`). 📂
+- `-unit`: Unit of measurement for the coordinates (e.g., `cm`). 📏
+- `-scale`: Scale factor for the coordinates (e.g., `1`). 📐
+- `-start`: Starting index for processing images (e.g., `0`). 🔢
+- `-stop`: Stopping index for processing images (e.g., `1` to process only the first image). 🔚
 
 ## Viewing the Output 📊🖼️🔬
 

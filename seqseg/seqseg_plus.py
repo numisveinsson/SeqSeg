@@ -68,9 +68,9 @@ def main():
     parser.add_argument('-data_dir', '--data_directory',
                         type=str,
                         help='Name of the folder containing the testing data')
-    # parser.add_argument('-nnunet_results_path', '--nnunet_results_path',
-    #                     type=str,
-    #                     help='Path to nnUNet results folder')
+    parser.add_argument('-nnunet_results_path', '--nnunet_results_path',
+                        type=str,
+                        help='Path to nnUNet results folder')
     parser.add_argument('-seqseg_test_name', '--seqseg_test_name',
                         default='3d_fullres',
                         type=str,
@@ -197,6 +197,13 @@ def main():
     dir_model_weights_global = (global_dataset
                                 + '/nnUNetTrainer__nnUNetPlans__'
                                 + global_test_name)
+    weight_dir_nnunet = args.nnunet_results_path
+    dir_model_weights_seqseg = os.path.join(weight_dir_nnunet, dir_model_weights_seqseg,)
+    dir_model_weights_global = os.path.join(weight_dir_nnunet, dir_model_weights_global,)
+    print("Using nnUNet model weights from:")
+    print(dir_model_weights_seqseg)
+    print("Using nnUNet model weights for global segmentation from:")
+    print(dir_model_weights_global)
 
     testing_samples, directory_data = get_testing_samples(seqseg_dataset,
                                                           data_dir)

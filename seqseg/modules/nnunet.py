@@ -1,8 +1,6 @@
 def initialize_predictor(model_folder, fold):
 
-    from nnunetv2.paths import nnUNet_results
     import torch
-    from batchgenerators.utilities.file_and_folder_operations import join
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
     # check if GPU is available
@@ -27,7 +25,7 @@ def initialize_predictor(model_folder, fold):
     print('Model folder:', model_folder)
     # initializes the network architecture, loads the checkpoint
     predictor.initialize_from_trained_model_folder(
-        join(nnUNet_results, model_folder),
+        model_folder,
         use_folds=(fold,),
         checkpoint_name='checkpoint_best.pth',
     )
