@@ -68,6 +68,9 @@ def main():
     parser.add_argument('-data_dir', '--data_directory',
                         type=str,
                         help='Name of the folder containing the testing data')
+    # parser.add_argument('-nnunet_results_path', '--nnunet_results_path',
+    #                     type=str,
+    #                     help='Path to nnUNet results folder')
     parser.add_argument('-seqseg_test_name', '--seqseg_test_name',
                         default='3d_fullres',
                         type=str,

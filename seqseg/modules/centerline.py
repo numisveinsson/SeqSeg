@@ -7,8 +7,8 @@ import SimpleITK as sitk
 import numpy as np
 # from numba import jit
 sys.path.insert(0, './')
-from modules.sitk_functions import create_new, distance_map_from_seg
-from modules.vtk_functions import (calc_caps, evaluate_surface, 
+from seqseg.modules.sitk_functions import create_new, distance_map_from_seg
+from seqseg.modules.vtk_functions import (calc_caps, evaluate_surface, 
                                    points2polydata, write_geo)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -247,7 +247,7 @@ def pathfinding(segmentation, source, targets, radius):
                                                        current,
                                                        current_radius,
                                                        targets)
-    from modules.vtk_functions import points2polydata, write_geo
+    from seqseg.modules.vtk_functions import points2polydata, write_geo
     polydata_point = points2polydata(points_list)
     pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/',
                        'first_branch.vtp')
@@ -711,7 +711,7 @@ def take_steps_gradient(distance_map_np, seeds, seg_img, tol=1e-2,
     # Initialize seed points
     final_seeds = []
     current_seeds = seeds
-    from modules.vtk_functions import points2polydata, write_geo
+    from seqseg.modules.vtk_functions import points2polydata, write_geo
     polydata_point = points2polydata(current_seeds)
     pfn = os.path.join('/Users/numisveins/Downloads/debug_centerline/',
                        'initial_seeds.vtp')
@@ -846,7 +846,7 @@ def calculate_centerline_gradient(segmentation):
         points.InsertNextPoint(seed)
 
     # Create vtk polydata for lines
-    from modules.vtk_functions import points2polydata
+    from seqseg.modules.vtk_functions import points2polydata
     centerline = points2polydata(final_seeds)
 
     return centerline

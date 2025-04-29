@@ -6,7 +6,11 @@ This tutorial is based on the SimVascular tutorial, using the same MR medical im
 
 ## Installation 🚀🔧🐍
 
-First, install the required dependencies using pip or conda. See main ReadMe for details. 📦🔗
+First, install the required dependencies using pip or conda. 📦🔗
+Simply,
+```bash
+pip install seqseg
+```
 
 ## Download Neural Network Weights 📥🤖📂
 

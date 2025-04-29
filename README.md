@@ -13,13 +13,17 @@ SeqSeg is a method for automatic tracking and segmentation of blood vessels in m
 
 Here is the workflow of the algorithm:
 
-![](assets/seqseg.png)
+![](seqseg/assets/seqseg.png)
 
 where the neural network was trained on local subvolume patches of the image:
 
-![](assets/seqseg_training.png)
+![](seqseg/assets/seqseg_training.png)
 
 ## Set Up
+Simply install SeqSeg using pip:
+```bash
+pip install seqseg
+```
 SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the local medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder.
 
 Main package dependencies:
@@ -45,24 +49,16 @@ Example setup using conda:
 ```bash
 conda create -n seqseg python=3.11
 conda activate seqseg
-conda install ..
+pip install seqseg
+
 ```
 Example setup using pip (first create a virtual environment, see [here](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/)):
 ```bash
 python3 -m venv seqseg
 source seqseg/bin/activate
-pip install python==3.11
-pip install ...
+pip install seqseg
 ```
 Note: The code is tested with Python 3.11 and nnU-Net 2.5.1. If you are using a different version, please check the compatibility of the packages.
-
-## Testing
-
-Current workflow:
-1. Create conda or virtual environment and install ''Image and Data Processing'' dependencies.
-2. Test this environment using the test script tests/test.sh
-3. Install nnunet and pytorch using the instructions [here](https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/installation_instructions.md).
-4. Try the full installation according to details below
 
 ## Running
 
@@ -73,14 +69,49 @@ See [here](https://github.com/numisveinsson/SeqSeg/blob/main/tutorial/tutorial.m
 export nnUNet_results="/path/to/model/weights/nnUnet/nnUNet_results"
 ```
 
+### Set up data directory
+Create a directory structure for your data as follows:
+
+1. Images: Directory containing the medical images to be segmented.
+2. Seeds: A `seeds.json` file containing the seed points for initialization.
+3. Centerlines (optional): Directory containing centerline files if available.
+4. Truths (optional): Directory containing ground truth segmentations if available.
+seqseg/tutorial/data/
+    ├── images
+    ├── seeds.json
+    ├── centerlines (if applicable)
+
+SeqSeg requires a seed point for initialization. This can be given by either:
+- `seeds.json` file: located in data directory (see sample under data)
+- centerline: if centerlines are given, we initialize using the first points of the centerline
+- cardiac mesh: then the aortic valve must be labeled as Region 8 and LV 7
+
 ### Activate environment (eg. conda)
 ```bash
 conda activate seqseg
 ```
+or if using virtual environment:
+```bash
+source seqseg/bin/activate
+```
 
 ### Run
 ```bash
-python3 seqseg.py --data_dir data --test_name 3d_fullres --train_dataset Dataset001_AORTAS --config_name global.yml --fold all --img_ext .nii.gz --outdir output --scale 1 --start 0 --stop -1 --max_n_steps 1000 --unit cm
+seqseg \
+    -data_dir seqseg/tutorial/data/ \
+    -test_name 3d_fullres \
+    -train_dataset Dataset005_SEQAORTANDFEMOMR \
+    -fold 0 \
+    -img_ext .mha \
+    -config_name aorta_tutorial \
+    -max_n_steps 5 \
+    -max_n_branches 2 \
+    -max_n_steps_per_branch 50 \
+    -outdir output/ \
+    -unit cm \
+    -scale 1 \
+    -start 0 \
+    -stop -1
 ```
 
 ### Details
@@ -112,18 +143,6 @@ Arguments:
 -`max_n_steps`: This argument specifies the maximum number of steps to run the algorithm. The default value is 1000.
 
 -`unit`: This argument specifies the unit of the image data. The default value is 'cm'.
-
-Data directory: Assumes the following structure:
-- Directory
-    - images
-    - centerlines (if applicable)
-    - truths (if applicable)
-    - test.json (if applicable)
-
-SeqSeg requires a seed point for initialization. This can be given by either:
-- test.json file: located in data directory (see sample under data)
-- centerline: if centerlines are given, we initialize using the first points of the centerline
-- cardiac mesh: then the aortic valve must be labeled as Region 8 and LV 7
 
 ## Config file
 `config/global.yml`: File contains config parameters, default is set but can be changed depending on task

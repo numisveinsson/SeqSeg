@@ -3,13 +3,13 @@ import os
 import numpy as np
 import SimpleITK as sitk
 
-sys.path.insert(0, './')
-from modules.vtk_functions import write_geo, points2polydata
-from modules.tracing_functions import get_seed, get_largest_radius_seed
-from modules.assembly import create_step_dict
-from modules.datasets import get_directories
-from modules.centerline import calc_centerline_fmm
-from modules.sitk_functions import connected_comp_info
+# sys.path.insert(0, './')
+from seqseg.modules.vtk_functions import write_geo, points2polydata
+from seqseg.modules.tracing_functions import get_seed, get_largest_radius_seed
+from seqseg.modules.assembly import create_step_dict
+from seqseg.modules.datasets import get_directories
+from seqseg.modules.centerline import calc_centerline_fmm
+from seqseg.modules.sitk_functions import connected_comp_info
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

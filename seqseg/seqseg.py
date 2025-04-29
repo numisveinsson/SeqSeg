@@ -6,18 +6,26 @@ import sys
 import argparse
 import SimpleITK as sitk
 
-from modules import sitk_functions as sf
-from modules import vtk_functions as vf
-from modules import initialization as init
-from modules.assembly import calc_centerline_global
-from modules.tracing import trace_centerline
-from modules.datasets import get_testing_samples
-from modules.params import load_yaml
-from modules.capping import cap_surface
+from seqseg.modules import sitk_functions as sf
+from seqseg.modules import vtk_functions as vf
+from seqseg.modules import initialization as init
+from seqseg.modules.assembly import calc_centerline_global
+from seqseg.modules.tracing import trace_centerline
+from seqseg.modules.datasets import get_testing_samples
+from seqseg.modules.params import load_yaml
+from seqseg.modules.capping import cap_surface
+from importlib import resources
+import yaml
+
 
 sys.stdout.flush()
 start_time = time.time()
 faulthandler.enable()
+
+
+def load_yaml_config(config_name):
+    with resources.files('seqseg.config').joinpath(f'{config_name}.yaml').open('r') as f:
+        return yaml.safe_load(f)
 
 
 def create_directories(output_folder, write_samples):
@@ -67,6 +75,9 @@ def main():
     parser.add_argument('-data_dir', '--data_directory',
                         type=str,
                         help='Name of the folder containing the testing data')
+    # parser.add_argument('-nnunet_results_path', '--nnunet_results_path',
+    #                     type=str,
+    #                     help='Path to nnUNet results folder')
     parser.add_argument('-test_name', '--test_name',
                         default='3d_fullres',
                         type=str,
@@ -135,10 +146,7 @@ def main():
     print(args)
 
     # Load configuration file
-    config_path = os.path.join(os.path.dirname(__file__),
-                               'config', args.config_name + '.yaml')
-
-    global_config = load_yaml(config_path)
+    global_config = load_yaml_config(args.config_name)
     print(f"Using config file: {args.config_name}")
 
     dir_output0 = args.outdir

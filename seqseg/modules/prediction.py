@@ -114,7 +114,7 @@ class Prediction:
             distance_poly = v2n(dist_fltr.GetOutput().GetPointData().GetArray(0))
             return np.mean(distance_poly), dist_fltr.GetOutput()
 
-        from modules.vtk_functions import exportSitk2VTK, v2n, vtk_marching_cube
+        from seqseg.modules.vtk_functions import exportSitk2VTK, v2n, vtk_marching_cube
 
         ref_im = resample_spacing(self.seg_vol, template_size=(256,256,256), order=0)[0]
         ref_im, M = exportSitk2VTK(ref_im)
@@ -135,7 +135,7 @@ class Prediction:
                 continue
             p_s = vtk_marching_cube(pred_im, 0, i)
             r_s = vtk_marching_cube(ref_im, 0, i)
-            from modules.vtk_functions import write_vtk_polydata
+            from seqseg.modules.vtk_functions import write_vtk_polydata
             write_vtk_polydata(p_s, '/Users/numisveinsson/Downloads/surf1.vtp')
             write_vtk_polydata(r_s, '/Users/numisveinsson/Downloads/surf2.vtp')
             #dist_ref2pred, d_ref2pred = _get_assd(p_s, r_s)

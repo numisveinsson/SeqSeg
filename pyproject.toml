@@ -46,3 +46,6 @@ seqseg = "seqseg.seqseg:main"
 [project.urls]
 homepage = "https://github.com/numisveinsson/SeqSeg"
 repository = "https://github.com/numisveinsson/SeqSeg"
+
+[tool.setuptools]
+package-data = { "seqseg" = ["config/*.yaml"] }
