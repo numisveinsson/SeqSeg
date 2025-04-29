@@ -6,7 +6,7 @@ See paper [here](https://rdcu.be/dU0wy) for detailed explanations and citation.
 
 Below is an example showing the algorithm tracking and segmenting an abdominal aorta in 3D MR image scan:
 
-![](assets/mr_model_tracing_fast_shorter.gif)
+![](seqseg/assets/mr_model_tracing_fast_shorter.gif)
 
 ## How it works
 SeqSeg is a method for automatic tracking and segmentation of blood vessels in medical images. The algorithm uses a neural network to segment the vasculature locally and uses a tracking algorithm to take steps along the direction of the vessel and down bifurcation detected.
