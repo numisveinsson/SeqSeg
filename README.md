@@ -1,4 +1,5 @@
 ![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/python-app.yml/badge.svg)
+![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/test.yml/badge.svg)
 
 # SeqSeg: Automatic Tracking and Segmentation of Blood Vessels in CT and MR Images
 
