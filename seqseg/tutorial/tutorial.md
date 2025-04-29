@@ -52,19 +52,34 @@ export nnUNet_results="../example/path/to/nnUNet_results"
 
 The file has default seed points you can use or you can specify your own. The coordinates should be in the format `[x, y, z]` and correspond to the physical coordinates in the 3D image, see the file for example. Note that each seed point requires ``two`` coordinates: to define a vector direction for the initialization. The ``third`` argument is a radius estimate, usually for aortas a radius=1.1cm is a good enough approximation. 🧭
 
-3. Run the segmentation script `seqseg.py` with the required arguments: 🖥️🔢⚙️
+Example `seeds.json` file:
+
+```json
+[
+    {
+        "name": "0110_0001",
+        "seeds": [
+            [   [-2.07367, -2.1973, 13.4288] , [-1.17086, -1.33526, 12.2407] , 1.1  ]
+        ]
+    }
+]
+```
+
+3. Run the segmentation script `seqseg` with the required arguments: 🖥️🔢⚙️
 
 ```bash
-python seqseg.py \
+seqseg \
+    -data_dir seqseg/tutorial/data/ \
     -test_name 3d_fullres \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
-    -data_dir tutorial/data/ \
     -img_ext .mha \
     -config_name aorta_tutorial \
     -max_n_steps 5 \
     -max_n_branches 2 \
-    -outdir tutorial/output/ \
+    -outdir output/
+    -unit cm \
+    -scale 1 \
 ```
 
 ## Viewing the Output 📊🖼️🔬

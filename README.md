@@ -8,6 +8,9 @@ Below is an example showing the algorithm tracking and segmenting an abdominal a
 
 ![](seqseg/assets/mr_model_tracing_fast_shorter.gif)
 
+## Tutorial
+[Here](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/tutorial.md) is a tutorial on how to run the code, including installation instructions, downloading model weights, and running the segmentation pipeline on a medical image.
+
 ## How it works
 SeqSeg is a method for automatic tracking and segmentation of blood vessels in medical images. The algorithm uses a neural network to segment the vasculature locally and uses a tracking algorithm to take steps along the direction of the vessel and down bifurcation detected.
 
@@ -62,7 +65,7 @@ Note: The code is tested with Python 3.11 and nnU-Net 2.5.1. If you are using a 
 
 ## Running
 
-See [here](https://github.com/numisveinsson/SeqSeg/blob/main/tutorial/tutorial.md) for tutorial on how to run the code.
+See [here](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/tutorial.md) for tutorial on how to run the code.
 
 ### Set weights directory
 ```bash
@@ -145,7 +148,7 @@ Arguments:
 -`unit`: This argument specifies the unit of the image data. The default value is 'cm'.
 
 ## Config file
-`config/global.yml`: File contains config parameters, default is set but can be changed depending on task
+`config/xx.yml`: File contains config parameters, default is set but can be changed depending on task
 
 We recommend duplicating the file and changing the name to avoid overwriting the default values.
 If so, the config file must be passed as an argument when running the script: `config_name`
