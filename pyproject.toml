@@ -49,3 +49,9 @@ repository = "https://github.com/numisveinsson/SeqSeg"
 
 [tool.setuptools]
 package-data = { "seqseg" = ["config/*.yaml"] }
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "some-other-dev-tools"
+]
