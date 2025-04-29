@@ -29,7 +29,7 @@ jobs:
       with:
           python-version: "3.10"
           channels: conda-forge
-          environment-file: tests/environment_new.yml
+          environment-file: seqseg/tests/environment_new.yml
           channel-priority: flexible
           activate-environment: environment_new
     # Test python script
@@ -37,11 +37,11 @@ jobs:
       run: |
         conda info
         conda list
-        python3 seqseg.py \
-        -data_dir tests/test_data/ \
+        python3 seqseg/seqseg.py \
+        -data_dir seqseg/tests/test_data/ \
         -config_name global_test \
         -img_ext .nii.gz \
-        -outdir tests/test_out/ \
+        -outdir seqseg/tests/test_out/ \
         -start 0 \
         -stop 1 \
         -max_n_steps 3 \
