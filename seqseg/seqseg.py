@@ -174,9 +174,10 @@ def main():
     num_seeds = args.num_seeds_centerline
 
     # Weight directory
-    weight_dir_nnunet = args.nnunet_results_path
     dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
-    dir_model_weights = os.path.join(weight_dir_nnunet, dir_model_weights,)
+    if args.nnunet_results_path is not None:
+        weight_dir_nnunet = args.nnunet_results_path
+        dir_model_weights = os.path.join(weight_dir_nnunet, dir_model_weights,)
 
     testing_samples, directory_data = get_testing_samples(dataset, data_dir)
     print("Testing samples about to run:")
