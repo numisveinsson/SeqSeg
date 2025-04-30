@@ -11,6 +11,12 @@ Simply,
 ```bash
 pip install seqseg
 ```
+Test the installation by running the following command in your terminal: 🖥️✅
+
+```bash
+seqseg --help
+```
+If the installation was successful, you should see the help message for the SeqSeg command-line interface. 📜💬
 
 ## Download Neural Network Weights 📥🤖📂
 

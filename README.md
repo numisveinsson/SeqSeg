@@ -28,6 +28,11 @@ Simply install SeqSeg using pip:
 ```bash
 pip install seqseg
 ```
+Check to see if the installation was successful by running:
+```bash
+seqseg --help
+```
+
 SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the local medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder.
 
 Main package dependencies:
