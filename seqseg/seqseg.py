@@ -141,6 +141,10 @@ def main():
                         default=1,
                         type=int,
                         help='Number of seeds for centerline')
+    parser.add_argument('-write_samples', '--write_samples',
+                        default=0,
+                        type=int,
+                        help='Whether to write samples')
     args = parser.parse_args()
 
     print(args)
@@ -161,7 +165,7 @@ def main():
     unit = args.unit
     max_step_size = args.max_n_steps
     max_n_branches = args.max_n_branches
-    write_samples = global_config['WRITE_STEPS']
+    write_samples = args.write_samples
     take_time = global_config['TIME_ANALYSIS']
     calc_global_centerline = global_config['GLOBAL_CENTERLINE']
 
