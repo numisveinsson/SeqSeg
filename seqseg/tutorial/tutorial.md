@@ -24,6 +24,8 @@ Download the pre-trained neural network weights from the following link: 🔗⬇
 
 [Download Weights](<https://zenodo.org/records/15020477>)
 
+Note that the model was trained on a dataset of images in centimeters. If you are running inference on images in millimeters, you will need to specify the `-unit mm` and `-scale 0.1` flag when running the segmentation script. 📏🔍
+
 Save the weights folder called nnUNet_results in a directory, e.g., `models/`. 📁🗂️💾
 You will need to specify the path to this directory when running the segmentation script. 🛤️
 
@@ -101,6 +103,16 @@ seqseg \
 - `-scale`: Scale factor for the coordinates (e.g., `1`). 📐
 - `-start`: Starting index for processing images (e.g., `0`). 🔢
 - `-stop`: Stopping index for processing images (e.g., `1` to process only the first image). 🔚
+
+### Debugging: 🐞🔍
+If you encounter any issues, you can set the `-write_samples` flag to `1` to write out the samples used for training. This can help in debugging the segmentation process. 🛠️🔧
+
+```bash
+seqseg \
+    -write_samples 1 \
+    ...
+```
+This will create folders `samples` in the output directory, containing the output from each step. 📂🗂️
 
 ## Viewing the Output 📊🖼️🔬
 

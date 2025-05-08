@@ -119,6 +119,10 @@ seqseg \
     -stop -1
 ```
 
+Note on units: typically the images used for training and tesing have the same units (e.g. mm or cm). If the units are different, you can set the `scale` argument to convert between the two. Here are the two examples where the units are different:
+- If the nnUNet model was trained on mm and the testing data is in cm, then set `scale=10`.
+- If the nnUNet model was trained on cm and the testing data is in mm, then set `scale=0.1`.
+
 ### Details
 
 `seqseg`: Main script to run.
@@ -139,7 +143,7 @@ Arguments:
 
 -`outdir`: This argument specifies the output directory where the results will be saved.
 
--`scale`: This argument specifies whether to scale image data. This is needed if the units for the nnUNet model and testing data are different. The default value is 1.
+-`scale`: This argument specifies whether to scale image data. This is needed if the units for the nnUNet model and testing data are different. Example: if the nnUNet model was trained on mm and the testing data is in cm, then set scale=10. The default value is 1.
 
 -`start`: This argument specifies where to start in the list of testing samples. The default value is 0.
 
