@@ -2,10 +2,10 @@
 # True if we have a segmentation, False if we are predicting
 SEGMENTATION: False # usually False
 
-DEBUG: True
+DEBUG: False
 DEBUG_STEP: 10000
 
-WRITE_STEPS: True # if we want to write out each step
+WRITE_STEPS: False # if we want to write out each step
 ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 3 # write out animation every x steps
 
