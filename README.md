@@ -76,7 +76,7 @@ See [here](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/tut
 ### Set up data directory
 Create a directory structure for your data as follows:
 
-1. Images: Directory containing the medical images to be segmented.
+1. Images: Directory containing the medical images to be segmented. Image extension can be `.nii.gz`, `.mha`, `.nrrd`, or any of [these](https://simpleitk.readthedocs.io/en/master/IO.html).
 2. Seeds: A `seeds.json` file containing the seed points for initialization.
 3. Centerlines (optional): Directory containing centerline files if available.
 4. Truths (optional): Directory containing ground truth segmentations if available.
