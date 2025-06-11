@@ -18,7 +18,7 @@ seqseg --help
 ```
 If the installation was successful, you should see the help message for the SeqSeg command-line interface. 📜💬
 
-## Download Neural Network Weights 📥🤖📂
+## Download Neural Network Weights 📥🤖
 
 Download the pre-trained neural network weights from the following link: 🔗⬇️💾
 
@@ -26,8 +26,15 @@ Download the pre-trained neural network weights from the following link: 🔗⬇
 
 Note that the model was trained on a dataset of images in centimeters. If you are running inference on images in millimeters, you will need to specify the `-unit mm` and `-scale 0.1` flag when running the segmentation script. 📏🔍
 
-Save the weights folder called nnUNet_results in a directory, e.g., `models/`. 📁🗂️💾
-You will need to specify the path to this directory when running the segmentation script. 🛤️
+You will need to specify the path to the downloaded directory `nnUNet_results` when running the segmentation script. 🛤️
+
+## Download Tutorial Data 📂
+
+You need to clone the SeqSeg repository from GitHub to get the tutorial data and scripts. This repository contains the medical image and seed points.
+```bash
+git clone https://github.com/numisveinsson/SeqSeg.git
+```
+Note that this data is the Demo Project from the SimVascular project, you can find more information about the project [here](https://simvascular.github.io/). 📚🌐
 
 ## Viewing the tutorial Medical Image 🔍🖥️🩻
 
