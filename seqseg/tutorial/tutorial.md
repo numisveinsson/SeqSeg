@@ -30,6 +30,7 @@ Download the pre-trained neural network weights from the following link: 🔗⬇
 Note that the model was trained on a dataset of images in centimeters. If you are running inference on images in millimeters, you will need to specify the `-unit mm` and `-scale 0.1` flag when running the segmentation script.
 
 You will need to specify the path to the downloaded directory `nnUNet_results` when running the segmentation script.
+- For example, you can place the downloaded directory in the same directory as the `SeqSeg` cloned repository, and specify the path as `-nnunet_results_path ../nnUNet_results/`. See the example below for more details. 📂
 
 Note: make sure to unzip the downloaded file.
 - On windows, you can use the built-in unzip functionality by right-clicking the file and selecting "Extract All".
@@ -88,7 +89,7 @@ MacOS/Linux:
 ```bash
 seqseg \
     -data_dir seqseg/tutorial/data/ \
-    -nnunet_results_path .../nnUNet_results/ \
+    -nnunet_results_path ../nnUNet_results/ \
     -nnunet_type 3d_fullres \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
@@ -109,7 +110,7 @@ Windows:
 ```bash
 seqseg `
     -data_dir seqseg/tutorial/data/ `
-    -nnunet_results_path ...\nnUNet_results\ `
+    -nnunet_results_path ..\nnUNet_results\ `
     -nnunet_type 3d_fullres `
     -train_dataset Dataset005_SEQAORTANDFEMOMR `
     -fold all `
