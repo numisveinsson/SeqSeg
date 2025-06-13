@@ -46,3 +46,13 @@ This might take a few minutes as it will download and install all necessary depe
 seqseg --help
 ```
 If the installation was successful, you should see the help message for the SeqSeg command-line interface.
+
+## 6. Git clone the SeqSeg repository 📂
+
+Choose a directory where you want to clone the SeqSeg repository, e.g., `C:\Documents\`. Open a command prompt and run the following command:
+```bash
+git clone https://github.com/numisveinsson/SeqSeg.git
+```
+This will create a directory named `SeqSeg` containing the tutorial data and scripts.
+
+## 7. All set! 🎉
