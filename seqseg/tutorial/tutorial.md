@@ -85,6 +85,8 @@ Example `seeds.json` file:
 
 2. Run the segmentation script `seqseg` with the required arguments: 🖥️
 
+Make sure to be inside the `SeqSeg` directory, and the following command will run the segmentation pipeline on the medical image using the pre-trained nnUNet model. The output will be saved in the `output/` directory that is created automatically. 📂
+
 MacOS/Linux:
 ```bash
 seqseg \
