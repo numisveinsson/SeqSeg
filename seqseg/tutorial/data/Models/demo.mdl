@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<format version="1.0" />
-<model type="PolyData">
+<model type="PolyData" version="1.0">
     <timestep id="0">
-        <model_element type="PolyData" num_sampling="0">
+        <model_element type="PolyData" num_sampling="0" use_uniform="0">
             <segmentations>
                 <seg name="aorta" />
                 <seg name="right_iliac" />

@@ -184,3 +184,24 @@ To view the outputs in ParaView:
 
 This tutorial covers the end-to-end workflow for vessel segmentation. You should now be able to install the software, process medical images, and analyze results using ParaView. 🏥🧠📊
 
+## Importing and Modeling in SimVascular 🛠️
+
+To import the segmented vessel into SimVascular for further modeling:
+1. Open SimVascular.
+2. Right click the `Models` tab and select `Import Solid Model`.
+3. Select the `0110_0001_surface_mesh_smooth_X_steps.vtp` file from the output directory.
+4. Name the model (e.g., `AortaModel_SeqSeg`).
+4. Click on the `AortaModel_SeqSeg` model in the `Models` tab to select it.
+5. Under `Face Ops`, select `Extract Faces` and choose Seqaration Angle as `90.0`. (High so we get one face for the whole aorta)
+6. Click `Extract Faces` to extract the faces.
+7. Now you can use `Global Ops` to
+    - `Smooth` the model
+    - `Decimate` the model
+    - `Remesh` the model
+8. Or use `Local Ops` to
+    - `Trim` the model to create inlets and outlets
+    - `Smooth` the model locally
+9. Once you have trimmed the model, you can use `Face Ops` to
+    - `Fill Holes w IDs` to fill the trimmed holes in the model
+    - Label the faces of the model for boundary conditions
+    10. Model is ready for meshing and simulation in SimVascular! 🎉
