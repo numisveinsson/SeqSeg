@@ -103,7 +103,23 @@ seqseg \
 ```
 Windows:
 ```bash
-seqseg -data_dir seqseg/tutorial/data/ -nnunet_results_path .../nnUNet_results/ -nnunet_type 3d_fullres -train_dataset Dataset005_SEQAORTANDFEMOMR -fold all -img_ext .mha -config_name aorta_tutorial -max_n_steps 5 -max_n_branches 2 -outdir output/ -unit cm -scale 1 -start 0 -stop 1 -write_steps 0 -extract_global_centerline 0
+seqseg `
+    -data_dir seqseg/tutorial/data/ `
+    -nnunet_results_path ...\nnUNet_results\ `
+    -nnunet_type 3d_fullres `
+    -train_dataset Dataset005_SEQAORTANDFEMOMR `
+    -fold all `
+    -img_ext .mha `
+    -config_name aorta_tutorial `
+    -max_n_steps 5 `
+    -max_n_branches 2 `
+    -outdir output/ `
+    -unit cm `
+    -scale 1 `
+    -start 0 `
+    -stop 1 `
+    -write_steps 0 `
+    -extract_global_centerline 0
 ```
 ### Explanation of Arguments: 📜🔍
 
