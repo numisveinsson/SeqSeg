@@ -7,6 +7,9 @@ This tutorial is based on the SimVascular tutorial, using the same MR medical im
 ## Installation 🚀
 
 First, install the required dependencies using pip or conda. 📦
+
+Best practice is to create a virtual environment for the installation. You can use `venv` or `conda` for this purpose. See the [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/) for more information on creating virtual environments.
+
 Simply,
 ```bash
 pip install seqseg
