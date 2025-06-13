@@ -44,7 +44,8 @@ def trace_centerline(
     unit='cm',
     scale=1,
     seg_file=None,
-    start_seg=None
+    start_seg=None,
+    write_samples=False
 ):
 
     if unit == 'cm':
@@ -58,9 +59,6 @@ def trace_centerline(
     # Debugging
     debug = global_config['DEBUG']
     debug_step = global_config['DEBUG_STEP']
-
-    # Write out params
-    write_samples = global_config['WRITE_STEPS']
 
     retrace_cent = global_config['RETRACE']
     take_time = global_config['TIME_ANALYSIS']
@@ -831,7 +829,7 @@ def trace_centerline(
         print("Adding rest of segs to global")
         # Add rest of local segs to global before returning
         check = 2
-        while (check < len(vessel_tree.steps)
+        while (check <= len(vessel_tree.steps)
                and vessel_tree.steps[-check]['prob_predicted_vessel']):
             assembly_segs.add_segmentation((vessel_tree.steps[-check]
                                             ['prob_predicted_vessel']),

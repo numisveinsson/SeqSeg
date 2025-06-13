@@ -78,10 +78,11 @@ def main():
     parser.add_argument('-nnunet_results_path', '--nnunet_results_path',
                         type=str,
                         help='Path to nnUNet results folder')
-    parser.add_argument('-test_name', '--test_name',
+    parser.add_argument('-nnunet_type', '--nnunet_type',
+                        choices=['3d_fullres', '2d'],
                         default='3d_fullres',
                         type=str,
-                        help='Name of nnUNet test to use, eg 3d_fullres/2d')
+                        help='Type of nnUNet model to use, eg 3d_fullres/2d')
     parser.add_argument('-train_dataset', '--train_dataset',
                         type=str,
                         default='Dataset010_SEQCOROASOCACT',
@@ -141,10 +142,18 @@ def main():
                         default=1,
                         type=int,
                         help='Number of seeds for centerline')
-    parser.add_argument('-write_samples', '--write_samples',
+    parser.add_argument('-write_steps', '--write_steps',
                         default=0,
                         type=int,
-                        help='Whether to write samples')
+                        help='Whether to write all intermediate steps')
+    parser.add_argument('-extract_global_centerline', '--extract_global_centerline',
+                        default=0,
+                        type=int,
+                        help='Whether to extract global centerline after segmentation')
+    parser.add_argument('-cap_surface_cent', '--cap_surface_cent',
+                        default=0,
+                        type=int,
+                        help='Whether to cap surface centerline')
     args = parser.parse_args()
 
     print(args)
@@ -165,15 +174,16 @@ def main():
     unit = args.unit
     max_step_size = args.max_n_steps
     max_n_branches = args.max_n_branches
-    write_samples = args.write_samples
+    write_samples = args.write_steps
     take_time = global_config['TIME_ANALYSIS']
-    calc_global_centerline = global_config['GLOBAL_CENTERLINE']
+    calc_global_centerline = args.extract_global_centerline
+    cap_surface_cent = args.cap_surface_cent
 
     dataset = args.train_dataset
     fold = args.fold
     img_format = args.img_ext
     scale = args.scale
-    test_name = args.test_name
+    test_name = args.nnunet_type
     pt_centerline = args.pt_centerline
     num_seeds = args.num_seeds_centerline
 
@@ -192,9 +202,12 @@ def main():
     if args.stop == -1:
         args.stop = len(testing_samples)
 
-    for test_case in testing_samples[args.start: args.stop]:
+    print(f"Running from {args.start} to {args.stop} of {len(testing_samples)} samples")
 
-        print(f'\n{test_case}\n')
+    for i, test_case in enumerate(testing_samples[args.start: args.stop]):
+
+        print(f"\nProcessing test case {i+args.start+1} of {len(testing_samples)}: {test_case}")
+        # print(f'\n{test_case}\n')
 
         (dir_output, dir_image, dir_seg, dir_cent,
          case, i, json_file_present) = init.process_init(test_case,
@@ -243,7 +256,8 @@ def main():
             global_config,
             unit,
             scale,
-            dir_seg
+            dir_seg,
+            write_samples=write_samples
         )
 
         print("\nTotal calculation time is:"
@@ -294,7 +308,7 @@ def main():
         vf.write_vtk_polydata(assembly_surface, dir_output + '/' + case
                               + '_surface_mesh_nonsmooth' + str(n_steps_taken)
                               + '_steps' + '.vtp')
-        surface_smooth = vf.smooth_polydata(assembly_surface)
+        surface_smooth = vf.smooth_polydata(assembly_surface, iteration=75, smoothingFactor=0.1)
         vf.write_vtk_polydata(surface_smooth, dir_output0 + '/' + case
                               + '_surface_mesh_smooth' + str(n_steps_taken)
                               + '_steps' + '.vtp')
@@ -322,7 +336,7 @@ def main():
                 assembly_binary,
                 initial_seeds)
             # if centerline is not None
-            if success:
+            if success or len(targets) > 0:
                 vf.write_vtk_polydata(global_centerline, dir_output0 + '/'
                                       + case + '_centerline_'
                                       + str(n_steps_taken)
@@ -335,20 +349,21 @@ def main():
                                       + str(n_steps_taken)
                                       + '_targets.vtp')
 
-                capped_surface, capped_seg = cap_surface(
-                    pred_surface=assembly_surface,
-                    centerline=global_centerline,
-                    pred_seg=assembly_binary,
-                    file_name=case,
-                    outdir=dir_output,
-                    targets=targets)
-                vf.write_vtk_polydata(capped_surface, dir_output+'/'
-                                      + case + '_' + test_name + '_'+str(i)+'_'
-                                      + str(n_steps_taken)
-                                      + '_capped_surface.vtp')
-                sitk.WriteImage(capped_seg, dir_output+'/'
-                                + case + '_' + str(n_steps_taken)
-                                + '_capped_seg.mha')
+                if cap_surface_cent:
+                    capped_surface, capped_seg = cap_surface(
+                        pred_surface=assembly_surface,
+                        centerline=global_centerline,
+                        pred_seg=assembly_binary,
+                        file_name=case,
+                        outdir=dir_output,
+                        targets=targets)
+                    vf.write_vtk_polydata(capped_surface, dir_output+'/'
+                                        + case + '_' + test_name + '_'+str(i)+'_'
+                                        + str(n_steps_taken)
+                                        + '_capped_surface.vtp')
+                    sitk.WriteImage(capped_seg, dir_output+'/'
+                                    + case + '_' + str(n_steps_taken)
+                                    + '_capped_seg.mha')
 
         if global_config['PREVENT_RETRACE']:
             if len(inside_pts) > 0:

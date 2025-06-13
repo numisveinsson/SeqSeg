@@ -7,10 +7,15 @@ def initialize_predictor(model_folder, fold):
     if torch.cuda.is_available():
         print('GPU available, using GPU')
         device_use = torch.device('cuda', 0)
+    # check if mps is available (for Apple Silicon)
+    elif torch.backends.mps.is_available() and not '3d' in model_folder:
+        print('Using MPS backend for Apple Silicon, only available for 2D models')
+        device_use = torch.device('mps')
     else:
         print('GPU not available, using CPU')
         device_use = torch.device('cpu', 0)
     print('About to load predictor object')
+
     # instantiate the nnUNetPredictor
     predictor = nnUNetPredictor(
         tile_step_size=0.5,

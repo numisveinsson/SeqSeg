@@ -883,6 +883,10 @@ def calc_centerline_global(predicted_vessels, initial_seeds):
           with {len(initial_seeds)} initial seeds""")
     # create a list for centerline polydata
     centerline_poly = []
+    # create a list for targets
+    targets_list = []
+    # create a success flag
+    success_list = []
     # loop over the initial seeds
     for seed in initial_seeds:
         # keep the component with the seed
@@ -890,10 +894,18 @@ def calc_centerline_global(predicted_vessels, initial_seeds):
         # calculate the centerline
         cent, success, targets = calc_centerline_fmm(predicted_vessel,
                                                      seed,
-                                                     return_target=True)
+                                                     return_target_all=True,
+                                                     verbose=True,
+                                                     return_failed=True)
         centerline_poly.append(cent)
+        targets_list.append(targets)
+        success_list.append(success)
 
     # append the centerline polydata list to a single polydata
     centerline_poly = appendPolyData(centerline_poly)
+    # make single list
+    targets_list = [item for sublist in targets_list for item in sublist]
+    # success if any of the centerlines were successful
+    success_list = any(success_list)
 
-    return centerline_poly, targets, success
+    return centerline_poly, targets_list, success_list

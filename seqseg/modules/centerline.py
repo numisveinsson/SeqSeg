@@ -1154,6 +1154,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         min_res=300, out_dir=None, write_files=False,
                         move_target_if_fail=False,
                         relax_factor=1, return_target=False,
+                        return_target_all=False,
                         verbose=False, return_failed=False):
     """
     Function to calculate the centerline of a segmentation
@@ -1349,8 +1350,12 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         targets_np = [targets_np[i] for i in range(len(targets_np))
                       if success_list[i]]
         return centerline, success_overall, targets_np
-
-    return centerline, success_overall
+    elif return_target_all:
+        # return all targets, even if not successful
+        return centerline, success_overall, targets_np
+    # else return only centerline and success
+    else:
+        return centerline, success_overall
 
 
 def calc_points_target(max_surf, distance_map_surf, target_np,
@@ -1455,6 +1460,10 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf,
         # Add line to lines if was successful
         if success_list[ind]:
             lines.InsertNextCell(line)
+        elif return_failed:
+            # If return_failed is True, still add the line
+            lines.InsertNextCell(line)
+            print(f"Failed to reach target {ind+1}, still adding line with {len(points_path)} points.")
 
     # Add points, lines and radii to polydata
     centerline.SetPoints(points)
