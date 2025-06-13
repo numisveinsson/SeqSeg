@@ -39,3 +39,10 @@ C:\seqseg_env\Scripts\activate
 ```bash
 pip install seqseg
 ```
+This might take a few minutes as it will download and install all necessary dependencies.
+
+## 5. Verify installation ✅
+```bash
+seqseg --help
+```
+If the installation was successful, you should see the help message for the SeqSeg command-line interface.
