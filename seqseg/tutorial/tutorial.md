@@ -123,10 +123,16 @@ If you encounter any issues, you can set the `-write_samples` flag to `1` to wri
 
 ```bash
 seqseg \
-    -write_samples 1 \
+    -write_steps 1 \
     ...
 ```
-This will create folders `samples` in the output directory, containing the output from each step. 📂🗂️
+This will create folders with all the intermediate steps in the output directory, allowing you to inspect the segmentation process step-by-step. 📂🔍
+
+- `volumes` : contains the subvolumes extracted from the original image.
+- 'surfaces` : contains the surfaces extracted from the segmentation predictions.
+- `centerlines` : contains the centerlines extracted from the segmentation predictions.
+- `predictions` : contains the segmentation predictions.
+- `points` : contains the points chosen to move to the next step.
 
 ## Viewing the Output 📊🔬
 
