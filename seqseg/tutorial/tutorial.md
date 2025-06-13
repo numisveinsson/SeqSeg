@@ -31,6 +31,10 @@ Note that the model was trained on a dataset of images in centimeters. If you ar
 
 You will need to specify the path to the downloaded directory `nnUNet_results` when running the segmentation script.
 
+Note: make sure to unzip the downloaded file.
+- On windows, you can use the built-in unzip functionality by right-clicking the file and selecting "Extract All".
+- On macOS, you can double-click the file to unzip it.
+
 ## Download Tutorial Data 📂
 
 You need to clone the SeqSeg repository from GitHub to get the tutorial data and scripts. This repository contains the medical image and seed points.
