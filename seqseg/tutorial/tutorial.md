@@ -146,6 +146,7 @@ seqseg `
 - `-stop`: Stopping index for processing images (e.g., `1` to process only the first image). 🔚
 - `-write_steps`: If set to `1`, writes out all the steps. Useful for debugging. (default is `0`)
 - `-extract_global_centerline`: If set to `1`, extracts the global centerline of the segmented vessels. (default is `0`)
+
 ### Debugging: 🐞🔍
 If you encounter any issues, you can set the `-write_samples` flag to `1` to write out the samples used for training. This can help in debugging the segmentation process. 🛠️🔧
 
@@ -165,9 +166,13 @@ This will create folders with all the intermediate steps in the output directory
 ## Viewing the Output 📊🔬
 
 After running the segmentation, the output will include: 🗂️✅
-- `segmentation.mha`: The segmented vessel structure.
-- `centerline.vtp`: The extracted centerline of the vessels.
-- `surface_mesh.vtp`: The reconstructed surface mesh.
+- `0110_0001_seg_containing_seeds_X_steps.mha`: The segmented vessel structure.
+- `0110_0001_centerline_X_steps.vtp`: The extracted centerline of the vessels.
+- `0110_0001_surface_mesh_smooth_X_steps.vtp`: The reconstructed surface mesh.
+
+where the `X` in the filenames corresponds to the number of steps taken in the segmentation process.
+
+The `0110_0001` prefix corresponds to the name of the medical image used for segmentation.
 
 To view the outputs in ParaView:
 1. Open ParaView.

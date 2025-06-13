@@ -306,11 +306,11 @@ def main():
 
         assembly_surface = vf.evaluate_surface(assembly_binary, 1)
         vf.write_vtk_polydata(assembly_surface, dir_output + '/' + case
-                              + '_surface_mesh_nonsmooth' + str(n_steps_taken)
+                              + '_surface_mesh_nonsmooth_' + str(n_steps_taken)
                               + '_steps' + '.vtp')
         surface_smooth = vf.smooth_polydata(assembly_surface, iteration=75, smoothingFactor=0.1)
         vf.write_vtk_polydata(surface_smooth, dir_output0 + '/' + case
-                              + '_surface_mesh_smooth' + str(n_steps_taken)
+                              + '_surface_mesh_smooth_' + str(n_steps_taken)
                               + '_steps' + '.vtp')
 
         if len(centerlines) > 0:
