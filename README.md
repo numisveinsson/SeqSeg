@@ -24,7 +24,7 @@ where the neural network was trained on local subvolume patches of the image:
 ![](seqseg/assets/seqseg_training.png)
 
 ## Set Up
-Simply install SeqSeg using pip:
+If you are familiar with python, you can simply install SeqSeg using pip:
 ```bash
 pip install seqseg
 ```
@@ -33,7 +33,21 @@ Check to see if the installation was successful by running:
 seqseg --help
 ```
 
-SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the local medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder.
+Example setup using conda:
+```bash
+conda create -n seqseg python=3.11
+conda activate seqseg
+pip install seqseg
+
+```
+Example setup using pip (first create a virtual environment, see [here](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/)):
+```bash
+python3 -m venv seqseg
+source seqseg/bin/activate
+pip install seqseg
+```
+
+SeqSeg relies on [nnU-Net](https://github.com/MIC-DKFZ/nnUNet) for segmentation of the local medical image volumes. You will need model weights to run the algorithm - either use pretrained weights (available) or train a model yourself. After training a nnU-Net model, the weights will be saved in a `nnUNet_results` folder. This folder is required to run SeqSeg, and its path is set as an argument when running the script.
 
 Main package dependencies:
 
@@ -54,19 +68,6 @@ Image and Data Processing:
 and if using VMTK (not required):
 - VMTK
 
-Example setup using conda:
-```bash
-conda create -n seqseg python=3.11
-conda activate seqseg
-pip install seqseg
-
-```
-Example setup using pip (first create a virtual environment, see [here](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/)):
-```bash
-python3 -m venv seqseg
-source seqseg/bin/activate
-pip install seqseg
-```
 Note: The code is tested with Python 3.11 and nnU-Net 2.5.1. If you are using a different version, please check the compatibility of the packages.
 
 ## Running
@@ -111,7 +112,6 @@ seqseg \
     -config_name aorta_tutorial \
     -max_n_steps 5 \
     -max_n_branches 2 \
-    -max_n_steps_per_branch 50 \
     -outdir output/ \
     -unit cm \
     -scale 1 \

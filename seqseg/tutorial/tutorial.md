@@ -6,7 +6,19 @@ This tutorial is based on the SimVascular tutorial, using the same MR medical im
 
 ## Installation 🚀
 
-First, install the required dependencies using pip or conda. 📦
+### Prerequisites 🛠️
+This tutorial assumes you have Python and Git installed on your system. If you do not have Python installed, please refer to [Python Installation Guide](https://www.python.org/downloads/)
+and [Git Installation Guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+
+- MacOS users should have Python 3.11 and Git installed. Or you can install them using [Homebrew](https://brew.sh):
+```bash
+brew install python@3.11
+brew install git
+```
+- Windows users can download the installers from the official websites, see [here](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/windows.md) for detailed Windows SeqSeg installation.
+
+### Install SeqSeg 📦
+Now, first we install SeqSeg and its required dependencies using pip or conda. 📦
 
 Best practice is to create a virtual environment for the installation. You can use `venv` or `conda` for this purpose. See the [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/) for more information on creating virtual environments.
 
@@ -48,25 +60,25 @@ Note that this data is the Demo Project from the SimVascular project, you can fi
 
 You can visualize the medical image in ParaView or VolView to identify a suitable seed point. 🎯
 
-The medical image is located in the `data/Images` directory and is named `0110_0001.mha`. This image is a 3D volume of a MR scan of a human abdominal aorta. 🧠
+The medical image is located in the `tutorial/data/Images` directory and is named `0110_0001.mha`. This image is a 3D volume of a MR scan of a human abdominal aorta. 🧠
 
 Hint: if you do not wish to choose a seed point, one is given below.
 
 ### Using ParaView:
 1. Open ParaView.
-2. Load the medical image (`0110_0001.mha`) from the `data/Images` directory.
+2. Load the medical image (`0110_0001.mha`) from the `tutorial/data/Images` directory.
 3. Use the **Volume Rendering** option to inspect the image.
 4. Identify and note the seed point coordinates for segmentation.
 
 ### Using VolView:
 1. Open VolView.
-2. Load the `0110_0001.mha` image from the `data/Images` directory.
+2. Load the `0110_0001.mha` image from the `tutorial/data/Images` directory.
 3. Use the **Thresholding** and **Opacity Adjustments** to visualize structures.
 4. Pick a seed point and record its coordinates.
 
 ## Running the Segmentation Pipeline 💻
 
-1. Define seed point coordinates in the ``data/seeds.json`` file. 📍
+1. Define seed point coordinates in the ``tutorial/data/seeds.json`` file. 📍
 
 The file has default seed points you can use or you can specify your own. The coordinates should be in the format `[x, y, z]` and correspond to the physical coordinates in the 3D image, see the file for example. Note that each seed point requires ``two`` coordinates: to define a vector direction for the initialization. The ``third`` argument is a radius estimate, usually for aortas a radius=1.1cm is a good enough approximation. 🧭
 
@@ -184,7 +196,7 @@ To view the outputs in ParaView:
 
 This tutorial covers the end-to-end workflow for vessel segmentation. You should now be able to install the software, process medical images, and analyze results using ParaView. 🏥🧠📊
 
-## Importing and Modeling in SimVascular 🛠️
+## Next: Importing and Modeling in SimVascular 🛠️
 
 To import the segmented vessel into SimVascular for further modeling:
 1. Open SimVascular.

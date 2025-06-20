@@ -1079,7 +1079,7 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     success : bool
         Boolean indicating if the backtracking was successful.
     """
-    max_number_points = 100000
+    max_number_points = 1000000
     use_gradient_grid = True
     step_size = 0.01
 

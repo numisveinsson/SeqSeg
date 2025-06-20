@@ -118,7 +118,7 @@ def main():
                         type=int,
                         help='Max number of steps to take')
     parser.add_argument('-max_n_steps_per_branch', '--max_n_steps_per_branch',
-                        default=10000,
+                        default=100,
                         type=int,
                         help='Max number of steps to take per branch')
     parser.add_argument('-max_n_branches', '--max_n_branches',
@@ -160,7 +160,7 @@ def main():
 
     # Load configuration file
     global_config = load_yaml_config(args.config_name)
-    print(f"Using config file: {args.config_name}")
+    print(f"\nUsing config file: {args.config_name}")
 
     dir_output0 = args.outdir
     data_dir = args.data_directory
@@ -174,6 +174,7 @@ def main():
     unit = args.unit
     max_step_size = args.max_n_steps
     max_n_branches = args.max_n_branches
+    max_n_steps_per_branch = args.max_n_steps_per_branch
     write_samples = args.write_steps
     take_time = global_config['TIME_ANALYSIS']
     calc_global_centerline = args.extract_global_centerline
@@ -231,13 +232,13 @@ def main():
             # write to file
             sys.stdout = open(dir_output+"/out.txt", "w")
         else:
-            print("Start tracing with debug mode on")
+            print("\nStart tracing with debug mode on")
             # import pdb
             # pdb.set_trace()
         if json_file_present:
-            print("We got seed point from json file")
+            print("\nWe got seed point from json file")
         else:
-            print("We did not get seed point from json file")
+            print("\nWe did not get seed point from json file")
         print(test_case)
         print(f"Initial points: {potential_branches}")
         print(f"Time is: {time.time()}")
@@ -253,6 +254,7 @@ def main():
             potential_branches,
             max_step_size,
             max_n_branches,
+            max_n_steps_per_branch,
             global_config,
             unit,
             scale,

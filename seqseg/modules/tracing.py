@@ -40,6 +40,7 @@ def trace_centerline(
     potential_branches,
     max_step_size,
     max_n_branches,
+    max_n_steps_per_branch,
     global_config,
     unit='cm',
     scale=1,
@@ -85,7 +86,7 @@ def trace_centerline(
                                    ["FORCEFUL_SIDEBRANCH_MAGN_RADIUS"])
     stop_pre = global_config['STOP_PRE']
     stop_radius = global_config['STOP_RADIUS'] * scale_unit
-    max_step_branch = global_config['MAX_STEPS_BRANCH']
+    max_step_branch = max_n_steps_per_branch
 
     # Assembly params
     use_buffer = global_config['USE_BUFFER']
@@ -678,9 +679,9 @@ def trace_centerline(
             # If already given chance, then move on
             else:
 
-                print("\n*** Error for surface: \n" + str(i))
+                print("\n*** Error for step: \n" + str(i))
                 print("Length of branch: ", len(vessel_tree.branches[branch]))
-                print("\n Moving onto another branch")
+                print("\n Moving onto another branch\n")
 
                 if len(vessel_tree.branches) <= 1 and step_seg['is_inside']:
                     print("\n\nWARNING: First branch is inside, so stopping\n\n")
@@ -735,8 +736,9 @@ def trace_centerline(
                     # print('Printing potentials')
                     list_pot = []
                     for pot in vessel_tree.potential_branches:
-                        list_pot.append(points2polydata([pot['point']
-                                                         .tolist()]))
+                        list_pot.append(points2polydata(
+                            [pot['point'].tolist()],
+                            attribute_float=[pot['radius']]))
                     final_pot = appendPolyData(list_pot)
 
                     if take_time:
@@ -819,7 +821,8 @@ def trace_centerline(
         print('Printing potentials')
         list_pot = []
         for pot in vessel_tree.potential_branches:
-            list_pot.append(points2polydata([pot['point'].tolist()]))
+            list_pot.append(points2polydata([pot['point'].tolist()],
+                                            attribute_float=[pot['radius']]))
         final_pot = appendPolyData(list_pot)
         write_vtk_polydata(final_pot,
                            output_folder+'/potentials_'+case+'_'+str(i)

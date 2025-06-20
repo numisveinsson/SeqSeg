@@ -710,11 +710,19 @@ def voi_contain_caps(voi_min, voi_max, caps_locations):
     return contain
 
 
-def points2polydata(xyz):
+def points2polydata(xyz, attribute_float=None):
     import vtk
     points = vtk.vtkPoints()
     # Create the topology of the point (a vertex)
     vertices = vtk.vtkCellArray()
+    if attribute_float is not None:
+        # Create a vtkFloatArray to hold the attribute values
+        attr = vtk.vtkFloatArray()
+        attr.SetName("Radius")
+        attr.SetNumberOfComponents(1)
+        attr.SetNumberOfTuples(len(xyz))
+        for i, val in enumerate(attribute_float):
+            attr.SetValue(i, val)
     # Add points
     for i in range(0, len(xyz)):
         try:
@@ -731,6 +739,10 @@ def points2polydata(xyz):
     # and topology of the polydata
     polydata.SetPoints(points)
     polydata.SetVerts(vertices)
+    # If we have an attribute, add it to the polydata
+    if attribute_float is not None:
+        polydata.GetPointData().AddArray(attr)
+        polydata.GetPointData().SetActiveScalars("Radius")
     polydata.Modified()
 
     return polydata
