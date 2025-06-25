@@ -114,8 +114,6 @@ seqseg \
     -outdir output/ # This will be created automatically 📂
     -unit cm \
     -scale 1 \
-    -start 0 \
-    -stop 1 \
     -write_steps 0 \
     -extract_global_centerline 0
 
@@ -135,8 +133,6 @@ seqseg `
     -outdir output/ `
     -unit cm `
     -scale 1 `
-    -start 0 `
-    -stop 1 `
     -write_steps 0 `
     -extract_global_centerline 0
 ```
