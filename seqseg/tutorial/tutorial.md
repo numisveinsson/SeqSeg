@@ -1,5 +1,7 @@
 # SeqSeg Segmentation Tutorial ✨
 
+See tutorial slides [here](https://drive.google.com/file/d/1wHvZVq8cWa-PKHSnmFK9_g3TTVNZLYV1/view?usp=share_link) for a visual guide. 📖
+
 This tutorial will guide you through installing the required software, downloading necessary resources, and running the segmentation pipeline on a medical image. 🏥
 
 This tutorial is based on the SimVascular tutorial, using the same MR medical image scan. The SimVascular project is under `data/`
