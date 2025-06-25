@@ -1079,7 +1079,8 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     success : bool
         Boolean indicating if the backtracking was successful.
     """
-    max_number_points = 1000000
+    print(f"   Backtracking from {target} to {seed}")
+    max_number_points = 100000
     use_gradient_grid = True
     step_size = 0.01
 
@@ -1225,7 +1226,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                             out_dir=out_dir,
                                             write_files=write_files)
     elif seed is None:
-        print("Need to create seed, targets given")
+        print(f"Need to create seed, targets given: {targets}")
         index = np.where(distance_map_surf_np == max_surf)
         # have same format as targets
         if isinstance(targets[0], np.ndarray):
@@ -1237,7 +1238,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
             # else list of indices
             seed = [int(index[0][0]), int(index[1][0]), int(index[2][0])]
     elif targets is None:
-        print("Need to create targets, seed given")
+        print(f"Need to create targets, seed given: {seed}")
         _, targets, output = cluster_map(segmentation,
                                          return_wave_distance_map=True,
                                          out_dir=out_dir,

@@ -156,7 +156,7 @@ def main():
                         help='Whether to cap surface centerline')
     args = parser.parse_args()
 
-    print(args)
+    # print(args)
 
     # Load configuration file
     global_config = load_yaml_config(args.config_name)
@@ -232,7 +232,7 @@ def main():
             # write to file
             sys.stdout = open(dir_output+"/out.txt", "w")
         else:
-            print("\nStart tracing with debug mode on")
+            print("\nStart tracking with debug mode on")
             # import pdb
             # pdb.set_trace()
         if json_file_present:
@@ -240,8 +240,8 @@ def main():
         else:
             print("\nWe did not get seed point from json file")
         print(test_case)
-        print(f"Initial points: {potential_branches}")
-        print(f"Time is: {time.time()}")
+        print(f"Number of initial points: {len(potential_branches)}")
+        print(f"Time is: {time.time() - start_time:.2f} sec")
 
         # Trace centerline
         (centerlines, surfaces, points, inside_pts, assembly_obj,

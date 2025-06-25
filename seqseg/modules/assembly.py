@@ -893,7 +893,9 @@ def calc_centerline_global(predicted_vessels, initial_seeds):
         predicted_vessel = keep_component_seeds(predicted_vessels, [seed])
         # calculate the centerline
         cent, success, targets = calc_centerline_fmm(predicted_vessel,
-                                                     seed,
+                                                     seed=seed,
+                                                     min_res=700,
+                                                     relax_factor=3,
                                                      return_target_all=True,
                                                      verbose=True,
                                                      return_failed=True)
