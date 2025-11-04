@@ -11,12 +11,15 @@ from .sitk_functions import (import_image, is_point_in_image,
 from .vtk_functions import (points2polydata, write_geo, smooth_surface,
                             exportSitk2VTK, bound_polydata_by_image,
                             get_largest_connected_polydata, write_vtk_polydata,
-                            calc_caps, evaluate_surface, appendPolyData)
+                            calc_caps, evaluate_surface, appendPolyData,
+                            get_points_cells)
 
 # from .vmtk_functions import write_centerline
 
 from .assembly import (Segmentation, VesselTree, print_error,
                        create_step_dict, get_old_ref_point)
+
+from .simvascular import create_pth
 
 from .local_assembly import construct_subvolume
 
@@ -762,6 +765,28 @@ def trace_centerline(
                                        + '/assembly/branch_'+case+'_'
                                        + str(branch)+'_'+str(i)
                                        + '_centerlines.vtp')
+                    
+                    # Create SimVascular .pth file for this branch
+                    try:
+                        centerline_points, _ = get_points_cells(
+                            final_points)
+                        if len(centerline_points) > 0:
+                            # Convert points to list of tuples for create_pth
+                            pth_points = [tuple(point)
+                                          for point in centerline_points]
+                            # remove identical points
+                            pth_points = list(dict.fromkeys(pth_points))
+                            pth_points = [list(point) for point in pth_points]
+                            pth_output_path = (
+                                output_folder
+                                + '/simvascular/Paths/branch_'+case+'_'
+                                + str(branch)+'_'+str(i)
+                                + '.pth')
+                            create_pth(pth_points, pth_output_path)
+                    except Exception as e:
+                        print(f"Warning: Could not create .pth file for "
+                              f"branch {branch}: {e}")
+                    
                     write_vtk_polydata(final_points,
                                        output_folder
                                        + '/assembly/branch_'+case+'_'

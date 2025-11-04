@@ -41,6 +41,23 @@ def create_directories(output_folder, write_samples):
         os.mkdir(output_folder+'assembly')
     except Exception as e:
         print(e)
+    try:
+        os.mkdir(output_folder+'simvascular')
+    except Exception as e:
+        print(e)
+    # and sub-directories for SimVascular: Images, Paths, Models
+    try:
+        os.mkdir(output_folder+'simvascular/Images')
+    except Exception as e:
+        print(e)
+    try:
+        os.mkdir(output_folder+'simvascular/Paths')
+    except Exception as e:
+        print(e)
+    try:
+        os.mkdir(output_folder+'simvascular/Models')
+    except Exception as e:
+        print(e)
 
     if write_samples:
         try:
