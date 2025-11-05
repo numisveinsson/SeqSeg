@@ -105,18 +105,21 @@ source seqseg/bin/activate
 seqseg \
     -data_dir seqseg/tutorial/data/ \
     -nnunet_results_path nnUNet_results/ \
-    -test_name 3d_fullres \
+    -nnunet_type 3d_fullres \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
-    -fold 0 \
+    -fold all \
     -img_ext .mha \
     -config_name aorta_tutorial \
     -max_n_steps 5 \
     -max_n_branches 2 \
+    -max_n_steps_per_branch 50 \
     -outdir output/ \
     -unit cm \
     -scale 1 \
     -start 0 \
-    -stop -1
+    -stop -1 \
+    -write_steps 0 \
+    -extract_global_centerline 0
 ```
 
 Note on units: typically the images used for training and tesing have the same units (e.g. mm or cm). If the units are different, you can set the `scale` argument to convert between the two. Here are the two examples where the units are different:
@@ -129,17 +132,19 @@ Note on units: typically the images used for training and tesing have the same u
 
 Arguments:
 
--`data_dir`: This argument specifies the name of the folder containing the testing data (and test.json if applicable).
+-`data_dir`: This argument specifies the path to the folder containing the testing data (and seeds.json if applicable).
 
--`test_name`: This argument specifies the name of the nnUNet test to use. The default value is '3d_fullres'. Other possible values could be '2d', etc.
+-`nnunet_results_path`: This argument specifies the path to the nnUNet results folder containing the pre-trained model weights.
 
--`train_dataset`: This argument specifies the name of the dataset used to train the nnUNet model. For example, 'Dataset010_SEQCOROASOCACT'.
+-`nnunet_type`: This argument specifies the type of nnUNet model to use. The default value is '3d_fullres'. Other possible values include '2d'.
 
--'config_name': This argument specifies the name of the config file to use. The default value is 'global.yml'.
+-`train_dataset`: This argument specifies the name of the dataset used to train the nnUNet model. For example, 'Dataset005_SEQAORTANDFEMOMR'.
 
 -`fold`: This argument specifies which fold to use for the nnUNet model. The default value is 'all'.
 
--`img_ext`: This argument specifies the image extension. For example, '.nii.gz'.
+-`img_ext`: This argument specifies the image extension. For example, '.nii.gz', '.mha', '.nrrd'.
+
+-`config_name`: This argument specifies the name of the config file to use. The default value is 'global'.
 
 -`outdir`: This argument specifies the output directory where the results will be saved.
 
@@ -151,7 +156,21 @@ Arguments:
 
 -`max_n_steps`: This argument specifies the maximum number of steps to run the algorithm. The default value is 1000.
 
+-`max_n_steps_per_branch`: This argument specifies the maximum number of steps to take per branch. The default value is 100.
+
+-`max_n_branches`: This argument specifies the maximum number of branches to take. The default value is 100.
+
 -`unit`: This argument specifies the unit of the image data. The default value is 'cm'.
+
+-`pt_centerline`: This argument specifies the use of point centerline. The default value is 50.
+
+-`num_seeds_centerline`: This argument specifies the number of seeds for centerline. The default value is 1.
+
+-`write_steps`: This argument specifies whether to write all intermediate steps (0 or 1). Useful for debugging. The default value is 0.
+
+-`extract_global_centerline`: This argument specifies whether to extract global centerline after segmentation (0 or 1). The default value is 0.
+
+-`cap_surface_cent`: This argument specifies whether to cap surface centerline (0 or 1). The default value is 0.
 
 ## Config file
 `config/xx.yml`: File contains config parameters, default is set but can be changed depending on task

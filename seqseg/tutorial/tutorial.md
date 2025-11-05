@@ -113,12 +113,11 @@ seqseg \
     -config_name aorta_tutorial \
     -max_n_steps 5 \
     -max_n_branches 2 \
-    -outdir output/ # This will be created automatically 📂
+    -outdir output/ \
     -unit cm \
     -scale 1 \
     -write_steps 0 \
     -extract_global_centerline 0
-
 ```
 Windows:
 ```bash
@@ -142,23 +141,27 @@ seqseg `
 
 - `-data_dir`: Path to the directory containing the medical images and `seeds.json` file. 📂
 - `-nnunet_results_path`: Path to the directory containing the pre-trained nnUNet model weights. 📁
-- `-nnunet_tpe`: Type of nnUNet model to use (e.g., `3d_fullres` or `2d`). 📊
+- `-nnunet_type`: Type of nnUNet model to use (e.g., `3d_fullres` or `2d`). 📊
 - `-train_dataset`: Name of the dataset used to train the nnUNet model (e.g., `Dataset005_SEQAORTANDFEMOMR`). 📚
 - `-fold`: Specifies which fold to use for the nnUNet model (e.g., `0` or `all` for all folds). 📅
-- `-img_ext`: File extension of the medical images (e.g., `.mha`). 📸
+- `-img_ext`: File extension of the medical images (e.g., `.mha`, `.nii.gz`, `.nrrd`). 📸
 - `-config_name`: Name of the configuration file to use (e.g., `aorta_tutorial`). 📄
 - `-max_n_steps`: Maximum number of steps for the segmentation algorithm (e.g., `5`). ⏳
+- `-max_n_steps_per_branch`: Maximum number of steps to take per branch (default: `100`). 🌲
 - `-max_n_branches`: Maximum number of branches to explore during segmentation (e.g., `2`). 🌿
 - `-outdir`: Directory where the output files will be saved (e.g., `output/`). (This will be created automatically) 📂
 - `-unit`: Unit of measurement for the coordinates (e.g., `cm`). 📏
 - `-scale`: Scale factor for the coordinates (e.g., `1`). 📐
 - `-start`: Starting index for processing images (e.g., `0`). 🔢
-- `-stop`: Stopping index for processing images (e.g., `1` to process only the first image). 🔚
-- `-write_steps`: If set to `1`, writes out all the steps. Useful for debugging. (default is `0`)
-- `-extract_global_centerline`: If set to `1`, extracts the global centerline of the segmented vessels. (default is `0`)
+- `-stop`: Stopping index for processing images (e.g., `-1` to process all images). 🔚
+- `-pt_centerline`: Use point centerline (default: `50`). 🎯
+- `-num_seeds_centerline`: Number of seeds for centerline (default: `1`). 🌱
+- `-write_steps`: If set to `1`, writes out all the steps. Useful for debugging. (default is `0`) 🛠️
+- `-extract_global_centerline`: If set to `1`, extracts the global centerline of the segmented vessels. (default is `0`) 🔗
+- `-cap_surface_cent`: If set to `1`, caps the surface centerline. (default is `0`) 🧢
 
 ### Debugging: 🐞🔍
-If you encounter any issues, you can set the `-write_samples` flag to `1` to write out the samples used for training. This can help in debugging the segmentation process. 🛠️🔧
+If you encounter any issues, you can set the `-write_steps` flag to `1` to write out the samples used for training. This can help in debugging the segmentation process. 🛠️🔧
 
 ```bash
 seqseg \
