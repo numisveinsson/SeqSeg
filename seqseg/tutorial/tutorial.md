@@ -1,107 +1,108 @@
-# SeqSeg Segmentation Tutorial ✨
+# SeqSeg Tutorial: Vessel Segmentation Guide
 
-See tutorial slides [here](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/SimVacscular_Workshop_slides.pdf) for a visual guide. 📖
+A practical guide for automatic vessel segmentation using SeqSeg on medical images.
 
-This tutorial will guide you through installing the required software, downloading necessary resources, and running the segmentation pipeline on a medical image. 🏥
+**Tutorial Dataset**: Abdominal aorta MR scan from SimVascular demo project  
+**Expected Time**: 15-20 minutes  
+**Expected Results**: Complete aortic segmentation with surface mesh and centerlines
 
-This tutorial is based on the SimVascular tutorial, using the same MR medical image scan. The SimVascular project is under `data/`
+## Quick Start Checklist
 
-## Installation 🚀
+- [ ] Python 3.11+ installed
+- [ ] SeqSeg package installed  
+- [ ] Model weights downloaded (~0.2GB)
+- [ ] Tutorial data available
+- [ ] Seed points configured
 
-### Prerequisites 🛠️
-This tutorial assumes you have Python and Git installed on your system. If you do not have Python installed, please refer to [Python Installation Guide](https://www.python.org/downloads/)
-and [Git Installation Guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+**Success Criteria**: Generate segmentation, surface mesh, and centerlines for abdominal aorta
 
-- MacOS users should have Python 3.11 and Git installed. Or you can install them using [Homebrew](https://brew.sh):
+## 1. Installation
+
+### Prerequisites
+Ensure you have Python 3.11+ and Git installed:
 ```bash
-brew install python@3.11
-brew install git
+python --version  # Should show 3.11+
+git --version
 ```
-- Windows users can download the installers from the official websites, see [here](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/windows.md) for detailed Windows SeqSeg installation.
 
-### Install SeqSeg 📦
-Now, first we install SeqSeg and its required dependencies using pip or conda. 📦
-
-Best practice is to create a virtual environment for the installation. You can use `venv` or `conda` for this purpose. See the [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/) for more information on creating virtual environments.
-
-Simply,
+### Install SeqSeg
 ```bash
+# Create environment (recommended)
+conda create -n seqseg python=3.11
+conda activate seqseg
+
+# Install SeqSeg
 pip install seqseg
-```
-Test the installation by running the following command in your terminal: 🖥️
 
-```bash
+# Verify installation
 seqseg --help
 ```
-If the installation was successful, you should see the help message for the SeqSeg command-line interface.
 
-## Download Neural Network Weights 📥
+**✅ Checkpoint**: Command should display SeqSeg help information
 
-Download the pre-trained neural network weights from the following link: 🔗⬇
+## 2. Download Required Files
 
-[Download Weights](<https://zenodo.org/records/15020477>)
-
-Note that the model was trained on a dataset of images in centimeters. If you are running inference on images in millimeters, you will need to specify the `-unit mm` and `-scale 0.1` flag when running the segmentation script.
-
-You will need to specify the path to the downloaded directory `nnUNet_results` when running the segmentation script.
-- For example, you can place the downloaded directory in the same directory as the `SeqSeg` cloned repository, and specify the path as `-nnunet_results_path ../nnUNet_results/`. See the example below for more details. 📂
-
-Note: make sure to unzip the downloaded file.
-- On windows, you can use the built-in unzip functionality by right-clicking the file and selecting "Extract All".
-- On macOS, you can double-click the file to unzip it.
-
-## Download Tutorial Data 📂
-
-You need to clone the SeqSeg repository from GitHub to get the tutorial data and scripts. This repository contains the medical image and seed points.
+### Model Weights
+Download pre-trained nnUNet weights (0.2GB):
 ```bash
-git clone https://github.com/numisveinsson/SeqSeg.git
+# Download and extract
+wget https://zenodo.org/records/15020477/files/nnUNet_results.zip
+unzip nnUNet_results.zip
 ```
-Note that this data is the Demo Project from the SimVascular project, you can find more information about the project [here](https://simvascular.github.io/). 📚🌐
+Alternative: [Manual download](https://zenodo.org/records/15020477)
 
-## Viewing the tutorial Medical Image 🔍
+### Tutorial Data
+```bash
+# Clone repository for tutorial data
+git clone https://github.com/numisveinsson/SeqSeg.git
+cd SeqSeg
 
-You can visualize the medical image in ParaView or VolView to identify a suitable seed point. 🎯
+# Verify data structure
+ls seqseg/tutorial/data/Images/  # Should show: 0110_0001.mha
+ls seqseg/tutorial/data/         # Should show: seeds.json
+```
 
-The medical image is located in the `tutorial/data/Images` directory and is named `0110_0001.mha`. This image is a 3D volume of a MR scan of a human abdominal aorta. 🧠
+**✅ Checkpoint**: Both model weights and tutorial data should be accessible
 
-Hint: if you do not wish to choose a seed point, one is given below.
+## 3. Understand the Data
 
-### Using ParaView:
-1. Open ParaView.
-2. Load the medical image (`0110_0001.mha`) from the `tutorial/data/Images` directory.
-3. Use the **Volume Rendering** option to inspect the image.
-4. Identify and note the seed point coordinates for segmentation.
+### Image Overview
+- **File**: `0110_0001.mha` (512×64×512 voxels, ~0.8,2,0.8 mm spacing)
+- **Anatomy**: Abdominal aorta MR scan
+- **Coordinates**: Physical coordinates in centimeters
 
-### Using VolView:
-1. Open VolView.
-2. Load the `0110_0001.mha` image from the `tutorial/data/Images` directory.
-3. Use the **Thresholding** and **Opacity Adjustments** to visualize structures.
-4. Pick a seed point and record its coordinates.
-
-## Running the Segmentation Pipeline 💻
-
-1. Define seed point coordinates in the ``tutorial/data/seeds.json`` file. 📍
-
-The file has default seed points you can use or you can specify your own. The coordinates should be in the format `[x, y, z]` and correspond to the physical coordinates in the 3D image, see the file for example. Note that each seed point requires ``two`` coordinates: to define a vector direction for the initialization. The ``third`` argument is a radius estimate, usually for aortas a radius=1.1cm is a good enough approximation. 🧭
-
-Example `seeds.json` file:
-
+### Seed Points Configuration
+The `seeds.json` file contains initialization points:
 ```json
 [
     {
         "name": "0110_0001",
         "seeds": [
-            [   [-2.07367, -2.1973, 13.4288] , [-1.17086, -1.33526, 12.2407] , 1.1  ]
+            [
+                [-2.07367, -2.1973, 13.4288],   # Start point
+                [-1.17086, -1.33526, 12.2407],  # Direction point  
+                1.1                              # Radius estimate (cm)
+            ]
         ]
     }
 ]
 ```
 
-2. Run the segmentation script `seqseg` with the required arguments: 🖥️
+**Format**: `[start_point, direction_point, radius_estimate]`
 
-Make sure to be inside the `SeqSeg` directory, and the following command will run the segmentation pipeline on the medical image using the pre-trained nnUNet model. The output will be saved in the `output/` directory that is created automatically. 📂
+### Optional: Visualize Data
+```bash
+# View in ParaView (if installed)
+paraview seqseg/tutorial/data/Images/0110_0001.mha
+```
 
-MacOS/Linux:
+**✅ Checkpoint**: Understand seed point format and data structure
+
+## 4. Run Segmentation
+
+### Basic Command
+
+**Linux/macOS:**
 ```bash
 seqseg \
     -data_dir seqseg/tutorial/data/ \
@@ -111,16 +112,17 @@ seqseg \
     -fold all \
     -img_ext .mha \
     -config_name aorta_tutorial \
-    -max_n_steps 5 \
-    -max_n_branches 2 \
-    -outdir output/ \
+    -max_n_steps 10 \
+    -max_n_branches 3 \
+    -max_n_steps_per_branch 5 \
+    -outdir tutorial_output/ \
     -unit cm \
     -scale 1 \
-    -write_steps 0 \
-    -extract_global_centerline 0
+    -extract_global_centerline 1
 ```
-Windows:
-```bash
+
+**Windows (PowerShell):**
+```powershell
 seqseg `
     -data_dir seqseg/tutorial/data/ `
     -nnunet_results_path ..\nnUNet_results\ `
@@ -129,92 +131,223 @@ seqseg `
     -fold all `
     -img_ext .mha `
     -config_name aorta_tutorial `
-    -max_n_steps 5 `
-    -max_n_branches 2 `
-    -outdir output/ `
+    -max_n_steps 10 `
+    -max_n_branches 3 `
+    -max_n_steps_per_branch 5 `
+    -outdir tutorial_output\ `
     -unit cm `
     -scale 1 `
-    -write_steps 0 `
-    -extract_global_centerline 0
+    -extract_global_centerline 1
 ```
-### Explanation of Arguments: 📜🔍
 
-- `-data_dir`: Path to the directory containing the medical images and `seeds.json` file. 📂
-- `-nnunet_results_path`: Path to the directory containing the pre-trained nnUNet model weights. 📁
-- `-nnunet_type`: Type of nnUNet model to use (e.g., `3d_fullres` or `2d`). 📊
-- `-train_dataset`: Name of the dataset used to train the nnUNet model (e.g., `Dataset005_SEQAORTANDFEMOMR`). 📚
-- `-fold`: Specifies which fold to use for the nnUNet model (e.g., `0` or `all` for all folds). 📅
-- `-img_ext`: File extension of the medical images (e.g., `.mha`, `.nii.gz`, `.nrrd`). 📸
-- `-config_name`: Name of the configuration file to use (e.g., `aorta_tutorial`). 📄
-- `-max_n_steps`: Maximum number of steps for the segmentation algorithm (e.g., `5`). ⏳
-- `-max_n_steps_per_branch`: Maximum number of steps to take per branch (default: `100`). 🌲
-- `-max_n_branches`: Maximum number of branches to explore during segmentation (e.g., `2`). 🌿
-- `-outdir`: Directory where the output files will be saved (e.g., `output/`). (This will be created automatically) 📂
-- `-unit`: Unit of measurement for the coordinates (e.g., `cm`). 📏
-- `-scale`: Scale factor for the coordinates (e.g., `1`). 📐
-- `-start`: Starting index for processing images (e.g., `0`). 🔢
-- `-stop`: Stopping index for processing images (e.g., `-1` to process all images). 🔚
-- `-pt_centerline`: Use point centerline (default: `50`). 🎯
-- `-num_seeds_centerline`: Number of seeds for centerline (default: `1`). 🌱
-- `-write_steps`: If set to `1`, writes out all the steps. Useful for debugging. (default is `0`) 🛠️
-- `-extract_global_centerline`: If set to `1`, extracts the global centerline of the segmented vessels. (default is `0`) 🔗
-- `-cap_surface_cent`: If set to `1`, caps the surface centerline. (default is `0`) 🧢
+**Windows (Command Prompt):**
+```cmd
+seqseg ^
+    -data_dir seqseg/tutorial/data/ ^
+    -nnunet_results_path ..\nnUNet_results\ ^
+    -nnunet_type 3d_fullres ^
+    -train_dataset Dataset005_SEQAORTANDFEMOMR ^
+    -fold all ^
+    -img_ext .mha ^
+    -config_name aorta_tutorial ^
+    -max_n_steps 10 ^
+    -max_n_branches 3 ^
+    -max_n_steps_per_branch 5 ^
+    -outdir tutorial_output\ ^
+    -unit cm ^
+    -scale 1 ^
+    -extract_global_centerline 1
+```
 
-### Debugging: 🐞🔍
-If you encounter any issues, you can set the `-write_steps` flag to `1` to write out the samples used for training. This can help in debugging the segmentation process. 🛠️🔧
+### Key Arguments
+| Argument | Purpose |
+|----------|---------|
+| `-data_dir` | Path to images and seeds.json |
+| `-nnunet_results_path` | Path to model weights |
+| `-max_n_steps` | Maximum tracking steps |
+| `-max_n_branches` | Maximum branches to follow |
+| `-max_n_steps_per_branch` | Max steps per branch |
+| `-extract_global_centerline` | Generate centerlines (1=yes) |
 
+### Expected Processing Time
+- **Initialization**: ~30 seconds
+- **Segmentation**: ~2-4 minutes  
+- **Post-processing**: ~1 minute
+- **Total**: ~3-5 minutes
+
+**✅ Checkpoint**: Process completes without errors
+## 5. Analyze Results
+
+### Output Files
+After successful completion, you'll find:
+```
+tutorial_output/
+├── 0110_0001_seg_containing_seeds_10_steps.mha     # Binary segmentation
+├── 0110_0001_surface_mesh_smooth_10_steps.vtp      # 3D surface mesh
+├── 0110_0001_centerline_10_steps.vtp               # Vessel centerlines
+└── out.txt                                         # Processing log
+```
+
+### Quick Quality Check
+```bash
+# Check segmentation volume (should be ~15-25 cm³ for aorta)
+python -c "
+import SimpleITK as sitk
+import numpy as np
+seg = sitk.ReadImage('tutorial_output/0110_0001_seg_containing_seeds_10_steps.mha')
+volume = np.sum(sitk.GetArrayFromImage(seg)) * np.prod(seg.GetSpacing()) / 1000
+print(f'Segmented volume: {volume:.1f} cm³')
+"
+```
+
+### Visualization
+```bash
+# View results in ParaView
+paraview tutorial_output/0110_0001_surface_mesh_smooth_10_steps.vtp
+
+# View centerlines
+paraview tutorial_output/0110_0001_centerline_10_steps.vtp
+```
+
+**✅ Checkpoint**: Output files exist and volume is reasonable (15-25 cm³)
+
+## 6. Troubleshooting
+
+### Common Issues
+
+**"No seeds found"**
+- Check `seeds.json` format and file location
+- Verify case name matches image filename
+
+**Poor segmentation quality**
+```bash
+# Increase steps and branches
+seqseg \
+    -max_n_steps 20 \
+    -max_n_branches 5 \
+    # ... other arguments
+```
+
+### Debug Mode
+For detailed analysis:
 ```bash
 seqseg \
     -write_steps 1 \
-    ...
+    -max_n_steps 3 \
+    # ... other arguments
 ```
-This will create folders with all the intermediate steps in the output directory, allowing you to inspect the segmentation process step-by-step. 📂🔍
+This creates intermediate files in: `volumes/`, `predictions/`, `centerlines/`, `surfaces/`
 
-- `volumes` : contains the subvolumes extracted from the original image.
-- 'surfaces` : contains the surfaces extracted from the segmentation predictions.
-- `centerlines` : contains the centerlines extracted from the segmentation predictions.
-- `predictions` : contains the segmentation predictions.
-- `points` : contains the points chosen to move to the next step.
+## Next Steps
 
-## Viewing the Output 📊🔬
+### SimVascular Integration
 
-After running the segmentation, the output will include: 🗂️✅
-- `0110_0001_seg_containing_seeds_X_steps.mha`: The segmented vessel structure.
-- `0110_0001_centerline_X_steps.vtp`: The extracted centerline of the vessels.
-- `0110_0001_surface_mesh_smooth_X_steps.vtp`: The reconstructed surface mesh.
+#### Step 1: Import SeqSeg Results
+1. **Open SimVascular**
+2. **Create New Project**: 
+   - File → New SV Project → Choose location
+   - Name: `SeqSeg_Aorta_Tutorial`
 
-where the `X` in the filenames corresponds to the number of steps taken in the segmentation process.
+3. **Import Surface Model**:
+   - Right-click **Models** tab → **Import Solid Model**
+   - Select: `tutorial_output/0110_0001_surface_mesh_smooth_10_steps.vtp`
+   - Name: `AortaModel_SeqSeg`
+   - **Import** → Should see model in 3D view
 
-The `0110_0001` prefix corresponds to the name of the medical image used for segmentation.
+#### Step 2: Model Preparation
+1. **Select Model**: Click `AortaModel_SeqSeg` in Models tab
 
-To view the outputs in ParaView:
-1. Open ParaView.
-2. Load the `.vtp` files via **File > Open**.
-3. Use the **Surface Rendering** mode for the surface mesh.
-4. Apply the **Tube Filter** to visualize the centerline more clearly.
+2. **Extract Faces**:
+   - **Face Ops** tab → **Extract Faces**
+   - Separation Angle: `90.0` (high value for single face)
+   - **Extract Faces** → Creates face list
 
-## Conclusion 🎯✅
+3. **Clean Model** (if needed):
+   - **Global Ops** tab:
+     - **Smooth**: Iterations=10, Relaxation=0.01
+     - **Decimate**: Target reduction=0.1
+     - **Remesh**: Edge size=0.5mm
 
-This tutorial covers the end-to-end workflow for vessel segmentation. You should now be able to install the software, process medical images, and analyze results using ParaView. 🏥🧠📊
+#### Step 3: Prepare for CFD
+1. **Trim Model** (create inlets/outlets):
+   - **Local Ops** tab → **Trim**
+   - Select cutting plane location
+   - **Trim** to create flat inlet/outlet faces
 
-## Next: Importing and Modeling in SimVascular 🛠️
+2. **Fill Holes**:
+   - **Face Ops** → **Fill Holes w IDs**
+   - Assigns face IDs for boundary conditions
 
-To import the segmented vessel into SimVascular for further modeling:
-1. Open SimVascular.
-2. Right click the `Models` tab and select `Import Solid Model`.
-3. Select the `0110_0001_surface_mesh_smooth_X_steps.vtp` file from the output directory.
-4. Name the model (e.g., `AortaModel_SeqSeg`).
-4. Click on the `AortaModel_SeqSeg` model in the `Models` tab to select it.
-5. Under `Face Ops`, select `Extract Faces` and choose Seqaration Angle as `90.0`. (High so we get one face for the whole aorta)
-6. Click `Extract Faces` to extract the faces.
-7. Now you can use `Global Ops` to
-    - `Smooth` the model
-    - `Decimate` the model
-    - `Remesh` the model
-8. Or use `Local Ops` to
-    - `Trim` the model to create inlets and outlets
-    - `Smooth` the model locally
-9. Once you have trimmed the model, you can use `Face Ops` to
-    - `Fill Holes w IDs` to fill the trimmed holes in the model
-    - Label the faces of the model for boundary conditions
-    10. Model is ready for meshing and simulation in SimVascular! 🎉
+3. **Label Faces**:
+   - Inlet: Face ID 1
+   - Outlet: Face ID 2  
+   - Wall: Face ID 3
+
+#### Step 4: Mesh Generation
+1. **Create Mesh**:
+   - **Meshes** tab → **Create Mesh**
+   - Select model: `AortaModel_SeqSeg`
+   - Mesh parameters:
+     - Global Edge Size: `0.5` mm
+     - Surface Mesh Flag: `1`
+     - Volume Mesh Flag: `1`
+
+2. **Generate Mesh**: **Run Mesher**
+
+#### Step 5: Simulation Setup
+1. **Create Simulation**:
+   - **Simulations** tab → **Create Simulation Job**
+   - Solver: **svSolver**
+
+2. **Boundary Conditions**:
+   - **Inlet** (Face 1): Prescribed velocities
+   - **Outlet** (Face 2): RCR boundary condition
+   - **Wall** (Face 3): No-slip
+
+3. **Material Properties**:
+   - Density: `1.06 g/cm³`
+   - Viscosity: `0.04 Poise`
+
+#### Step 6: Run Simulation
+1. **Pre-processor**: Generate solver input files
+2. **Run Simulation**: Execute CFD solver
+3. **Post-processing**: Analyze results in ParaView
+
+### Custom Data
+To use your own images:
+1. **Prepare Data Structure**:
+   ```
+   your_data/
+   ├── Images/
+   │   └── your_case.mha
+   └── seeds.json
+   ```
+
+2. **Create Seeds File**:
+   ```json
+   [
+       {
+           "name": "your_case",
+           "seeds": [
+               [[x1, y1, z1], [x2, y2, z2], radius_estimate]
+           ]
+       }
+   ]
+   ```
+
+3. **Run SeqSeg**:
+   ```bash
+   seqseg -data_dir your_data/ -nnunet_results_path ../nnUNet_results/ ...
+   ```
+
+### Additional Resources
+- **SeqSeg Documentation**: [GitHub Repository](https://github.com/numisveinsson/SeqSeg)
+- **SimVascular Tutorial**: [SimVascular.org](https://simvascular.github.io/)
+- **nnUNet Documentation**: [nnU-Net GitHub](https://github.com/MIC-DKFZ/nnUNet)
+- **ParaView User Guide**: [ParaView.org](https://www.paraview.org/documentation/)
+
+**Need help?** Check [GitHub Issues](https://github.com/numisveinsson/SeqSeg/issues) or [documentation](https://github.com/numisveinsson/SeqSeg)
+
+---
+
+**Tutorial Complete!** You should now have a segmented aorta ready for downstream analysis.
