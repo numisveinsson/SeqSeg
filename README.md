@@ -6,7 +6,7 @@
 > **Automatic tracking and segmentation of blood vessels in CT and MR images using deep learning and geometric tracking**
 
 [![Paper](https://img.shields.io/badge/Paper-Annals%20of%20BME-blue)](https://rdcu.be/dU0wy)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
 
 ## Abstract
