@@ -366,7 +366,7 @@ seqseg -train_dataset Dataset999_MYCUSTOM -fold 0
 from seqseg.analysis.compute_metrics import evaluate_segmentation
 
 # Compute standard metrics (basic evaluation)
-dice, hausdorff, centerline_overlap = evaluate_segmentation(
+dice, hausdorff, _ = evaluate_segmentation(
     prediction_path, ground_truth_path
 )
 
@@ -374,15 +374,6 @@ dice, hausdorff, centerline_overlap = evaluate_segmentation(
 dice, hausdorff, centerline_overlap = evaluate_segmentation(
     prediction_path, ground_truth_path, centerline_path
 )
-```
-
-#### Visualization Tools
-```python
-from seqseg.analysis.plotting import plot_results
-
-# Generate comparison plots
-plot_results.compare_segmentations(pred, gt, save_path="comparison.png")
-plot_results.plot_centerline_accuracy(centerlines, gt_centerlines)
 ```
 
 ### Integration with Other Tools
