@@ -215,7 +215,8 @@ class TestConfigFiles:
             with resources.files('seqseg.config').joinpath(yaml_file).open('r') as f:
                 try:
                     config = yaml.safe_load(f)
-                    assert config is not None or config == {}, f"Config file {yaml_file} loaded as None"
+                    # Config should be a dict (empty dict is acceptable for some configs)
+                    assert config is not None, f"Config file {yaml_file} loaded as None"
                 except yaml.YAMLError as e:
                     pytest.fail(f"Failed to parse {yaml_file}: {e}")
     
