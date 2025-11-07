@@ -185,6 +185,79 @@ def percent_centerline_length(pred, cent_truth):
     return cent_length_init/centerline_length
 
 
+def evaluate_segmentation(prediction_path, ground_truth_path, centerline_path=None):
+    """
+    Evaluate segmentation results using standard metrics.
+    
+    Parameters
+    ----------
+    prediction_path : str
+        Path to prediction segmentation file (.mha, .nii.gz, etc.)
+    ground_truth_path : str
+        Path to ground truth segmentation file (.mha, .nii.gz, etc.)
+    centerline_path : str, optional
+        Path to ground truth centerline file (.vtp, .vtk, etc.)
+        Required for centerline overlap metric
+    
+    Returns
+    -------
+    dice_score : float
+        Dice similarity coefficient (0-1, higher is better)
+    hausdorff_distance : float
+        Hausdorff distance in image units (lower is better) 
+    centerline_overlap : float or None
+        Percentage of centerline overlap (0-1, higher is better)
+        Returns None if centerline_path is not provided
+        
+    Examples
+    --------
+    >>> # Basic evaluation (dice and hausdorff only)
+    >>> dice, hausdorff, centerline_overlap = evaluate_segmentation(
+    ...     'prediction.mha', 'ground_truth.mha'
+    ... )
+    
+    >>> # Full evaluation including centerline overlap
+    >>> dice, hausdorff, centerline_overlap = evaluate_segmentation(
+    ...     'prediction.mha', 'ground_truth.mha', 'centerline.vtp'
+    ... )
+    """
+    # Load images
+    try:
+        pred = sitk.ReadImage(prediction_path)
+        truth = sitk.ReadImage(ground_truth_path)
+    except Exception as e:
+        raise ValueError(f"Error loading segmentation files: {e}")
+    
+    # Ensure binary segmentation
+    pred_binary = sitk.BinaryThreshold(pred, lowerThreshold=0.5, upperThreshold=1)
+    truth_binary = sitk.BinaryThreshold(truth, lowerThreshold=0.5, upperThreshold=1)
+    
+    # Calculate Dice score
+    try:
+        dice_score = dice(pred_binary, truth_binary)
+    except Exception as e:
+        print(f"Warning: Error calculating Dice score: {e}")
+        dice_score = 0.0
+    
+    # Calculate Hausdorff distance
+    try:
+        hausdorff_distance = hausdorff(pred_binary, truth_binary)
+    except Exception as e:
+        print(f"Warning: Error calculating Hausdorff distance: {e}")
+        hausdorff_distance = float('inf')
+    
+    # Calculate centerline overlap if centerline path provided
+    centerline_overlap_score = None
+    if centerline_path is not None:
+        try:
+            centerline_overlap_score = percent_centerline_length(pred_binary, centerline_path)
+        except Exception as e:
+            print(f"Warning: Error calculating centerline overlap: {e}")
+            centerline_overlap_score = 0.0
+    
+    return dice_score, hausdorff_distance, centerline_overlap_score
+
+
 def percent_centerline_points(pred, cent_truth):
 
     # check if cent_truth is string or sitk image

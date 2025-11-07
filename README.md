@@ -365,9 +365,14 @@ seqseg -train_dataset Dataset999_MYCUSTOM -fold 0
 ```python
 from seqseg.analysis.compute_metrics import evaluate_segmentation
 
-# Compute standard metrics
-dice, hausdorff, centerline_error = evaluate_segmentation(
+# Compute standard metrics (basic evaluation)
+dice, hausdorff, centerline_overlap = evaluate_segmentation(
     prediction_path, ground_truth_path
+)
+
+# Full evaluation including centerline overlap
+dice, hausdorff, centerline_overlap = evaluate_segmentation(
+    prediction_path, ground_truth_path, centerline_path
 )
 ```
 
