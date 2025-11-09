@@ -24,8 +24,20 @@ faulthandler.enable()
 
 
 def load_yaml_config(config_name):
-    with resources.files('seqseg.config').joinpath(f'{config_name}.yaml').open('r') as f:
-        return yaml.safe_load(f)
+    try:
+        # Try to use importlib.resources first (preferred method)
+        with resources.files('seqseg.config').joinpath(f'{config_name}.yaml').open('r') as f:
+            return yaml.safe_load(f)
+    except (ImportError, FileNotFoundError, ModuleNotFoundError):
+        # Fallback to direct file path
+        config_dir = os.path.join(os.path.dirname(__file__), 'config')
+        config_path = os.path.join(config_dir, f'{config_name}.yaml')
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        else:
+            raise FileNotFoundError(f"Configuration file '{config_name}.yaml' not found in {config_dir}")
 
 
 def create_directories(output_folder, write_samples):
