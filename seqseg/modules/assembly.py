@@ -786,10 +786,10 @@ def print_error(output_folder,
 
     try:
         if step_seg['img_file'] and not step_seg['is_inside']:
-            sitk.WriteImage(image, directory + 'img.vtk')
+            sitk.WriteImage(image, directory + 'img.mha')
 
             if step_seg['seg_file']:
-                sitk.WriteImage(predicted_vessel, directory + 'seg.vtk')
+                sitk.WriteImage(predicted_vessel, directory + 'seg.mha')
 
                 if step_seg['surf_file']:
                     write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
