@@ -163,13 +163,13 @@ def predict(output_folder, data_folder, model_folder,
 
         print('ALL done for case: ', case)
         print('Average dice: ', np.array(dice_list).mean())
-        sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly_'+case+'.vtk')
+        sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly_'+case+'.mha')
 
         if assembly_segs.weighted:
             sitk_n_upd = sf.numpy_to_sitk(assembly_segs.n_updates, assembly_segs.image_reader)
         else:
             sitk_n_upd = sf.numpy_to_sitk(assembly_segs.number_updates)
-        sitk.WriteImage(sitk_n_upd, output_folder +'assembly_N_updates_'+case+'.vtk')
+        sitk.WriteImage(sitk_n_upd, output_folder +'assembly_N_updates_'+case+'.mha')
 
         global_seg_truth = sitk.ReadImage(dir_seg)
         global_seg_truth_np = sitk.GetArrayFromImage(global_seg_truth)

@@ -332,10 +332,10 @@ def process_case_name(case_name):
 def read_truth(case, truth_folder):
 
     try:
-        truth = sitk.ReadImage(truth_folder+case+'.vtk')
+        truth = sitk.ReadImage(truth_folder+case+'.mha')
     except:
         try:
-            truth = sitk.ReadImage(truth_folder+case+'.mha')
+            truth = sitk.ReadImage(truth_folder+case+'.vtk')
         except:
             try:
                 truth = sitk.ReadImage(truth_folder+case+'.nii.gz')

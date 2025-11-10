@@ -175,7 +175,7 @@ def trace_centerline(output_folder, image_file, case, model_folder, modality, im
                 print("\n Adding to seg volume: " + str(time.time() - start_time_loc) + " s\n")
 
             if i % 20 == 0:
-                sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.vtk')
+                sitk.WriteImage(assembly_segs.assembly, output_folder +'assembly/assembly_'+case+'_'+str(i)+'.mha')
                 assembly = sitk.BinaryThreshold(assembly_segs.assembly, lowerThreshold=0.5, upperThreshold=1)
                 assembly = sf.remove_other_vessels(assembly, initial_seed)
                 surface_assembly = vf.evaluate_surface(assembly, 1)
@@ -316,7 +316,7 @@ if __name__=='__main__':
     final_points = vf.appendPolyData(points)
     vf.write_vtk_polydata(final_points, dir_output+'/final_'+case+'_'+str(i)+'_points.vtp')
 
-    sitk.WriteImage(assembly, dir_output+'/final_assembly_'+case+'_'+str(i)+'.vtk')
+    sitk.WriteImage(assembly, dir_output+'/final_assembly_'+case+'_'+str(i)+'.mha')
 
     ## Assembly work
     assembly = sitk.BinaryThreshold(assembly, lowerThreshold=0.5, upperThreshold=1)

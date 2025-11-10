@@ -85,10 +85,10 @@ def print_error(output_folder, i, step_seg, image=None, predicted_vessel=None):
     directory = output_folder + str(i) + '_error_'
 
     if step_seg['img_file']:
-        sitk.WriteImage(image, directory + 'img.vtk')
+        sitk.WriteImage(image, directory + 'img.mha')
 
         if step_seg['seg_file']:
-            sitk.WriteImage(predicted_vessel, directory + 'seg.vtk')
+            sitk.WriteImage(predicted_vessel, directory + 'seg.mha')
 
             if step_seg['surf_file']:
                 vf.write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
@@ -674,7 +674,7 @@ if __name__=='__main__':
 
     print("\nTotal calculation time is: " + str((time.time() - start_time)/60) + " min\n")
 
-    sitk.WriteImage(assembly, dir_output+'/final_assembly_'+case+'_'+'.vtk')
+    sitk.WriteImage(assembly, dir_output+'/final_assembly_'+case+'_'+'.mha')
 
     names = ['extraction     ',
              'prediction     ',
