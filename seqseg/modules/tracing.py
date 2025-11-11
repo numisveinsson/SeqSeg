@@ -51,53 +51,114 @@ def trace_centerline(
     start_seg=None,
     write_samples=False
 ):
+    """
+    Trace vessel centerlines using sequential segmentation and tracking.
+    
+    This function performs iterative vessel tracing by:
+    1. Taking steps along vessel centerlines
+    2. Extracting local volumes around each step
+    3. Predicting vessel segmentation using nnU-Net
+    4. Calculating vessel surfaces and centerlines
+    5. Finding next potential branch points
+    6. Assembling results into global segmentation
+    
+    Potential branches are tracked with attributes:
+    - Radius: Estimated vessel radius at branch point
+    - Number: Index in the potential branches list for debugging
+    
+    Parameters:
+    -----------
+    output_folder : str
+        Directory for output files
+    image_file : str
+        Path to input medical image
+    case : str
+        Case identifier for naming outputs
+    model_folder : str
+        Path to trained nnU-Net model
+    fold : str
+        Model fold to use ('all' or specific fold number)
+    potential_branches : list
+        Initial branch points to start tracing from
+    max_step_size : int
+        Maximum number of tracing steps
+    max_n_branches : int
+        Maximum number of branches to trace
+    max_n_steps_per_branch : int
+        Maximum steps per individual branch
+    global_config : dict
+        Configuration parameters
+    unit : str, optional
+        Image units ('cm' or 'mm'), default 'cm'
+    scale : float, optional
+        Scaling factor for image data, default 1
+    seg_file : str, optional
+        Pre-segmented file to trace (skips prediction)
+    start_seg : SimpleITK.Image, optional
+        Initial segmentation to start assembly
+    write_samples : bool, optional
+        Whether to write intermediate files, default False
+        
+    Returns:
+    --------
+    tuple
+        (centerlines, surfaces, points, inside_pts, assembly_segs, vessel_tree, n_steps)
+    """
 
+    # Convert unit scaling: cm requires 0.1 factor, mm uses 1.0
     if unit == 'cm':
         scale_unit = 0.1
     else:
         scale_unit = 1
 
-    # If tracing a an already segmented vasculature
+    # Configuration flags: determine if tracing pre-segmented data vs. raw images
     trace_seg = global_config['SEGMENTATION']
 
-    # Debugging
+    # Debug settings: enable breakpoints and specify debug step
     debug = global_config['DEBUG']
     debug_step = global_config['DEBUG_STEP']
 
+    # Analysis flags: enable centerline retracing and timing analysis
     retrace_cent = global_config['RETRACE']
     take_time = global_config['TIME_ANALYSIS']
 
-    # Animation params
+    # Animation settings: create progressive visualization files
     animation = global_config['ANIMATION']
     animation_steps = global_config['ANIMATION_STEPS']
 
-    # Tracing params
-    allowed_steps = global_config['NR_ALLOW_RETRACE_STEPS']
-    prevent_retracing = global_config['PREVENT_RETRACE']
-    sort_potentials = global_config['SORT_NEXT']
-    merge_potentials = global_config['MERGE_NEXT']
+    # Tracing behavior parameters
+    allowed_steps = global_config['NR_ALLOW_RETRACE_STEPS']     # Steps allowed inside existing vessels
+    prevent_retracing = global_config['PREVENT_RETRACE']        # Avoid tracing already segmented areas
+    sort_potentials = global_config['SORT_NEXT']                # Sort potential branches by radius
+    merge_potentials = global_config['MERGE_NEXT']              # Merge nearby potential points
 
-    volume_size_ratio = global_config['VOLUME_SIZE_RATIO']
-    perc_enlarge = global_config['MAX_PERC_ENLARGE']
-    magnify_radius = global_config['MAGN_RADIUS']
-    number_chances = global_config['NR_CHANCES']
-    min_radius = global_config['MIN_RADIUS'] * scale_unit
-    add_radius = global_config['ADD_RADIUS'] * scale_unit
-    run_time = global_config['TIME_ANALYSIS']
-    forceful_sidebranch = global_config['FORCEFUL_SIDEBRANCH']
+    # Volume extraction and processing parameters
+    volume_size_ratio = global_config['VOLUME_SIZE_RATIO']       # Ratio for local volume size vs radius
+    perc_enlarge = global_config['MAX_PERC_ENLARGE']            # Max percentage for bounding box enlargement
+    magnify_radius = global_config['MAGN_RADIUS']               # Radius magnification factor
+    number_chances = global_config['NR_CHANCES']                # Retry attempts for failed steps
+    min_radius = global_config['MIN_RADIUS'] * scale_unit       # Minimum allowable vessel radius
+    add_radius = global_config['ADD_RADIUS'] * scale_unit       # Additional radius for volume extraction
+    run_time = global_config['TIME_ANALYSIS']                   # Enable runtime profiling
+    
+    # Branch handling parameters
+    forceful_sidebranch = global_config['FORCEFUL_SIDEBRANCH']  # Force sidebranch separation
     forceful_sidebranch_magnify = (global_config
-                                   ["FORCEFUL_SIDEBRANCH_MAGN_RADIUS"])
-    stop_pre = global_config['STOP_PRE']
-    stop_radius = global_config['STOP_RADIUS'] * scale_unit
-    max_step_branch = max_n_steps_per_branch
+                                   ["FORCEFUL_SIDEBRANCH_MAGN_RADIUS"])  # Sidebranch radius multiplier
+    
+    # Stopping criteria
+    stop_pre = global_config['STOP_PRE']                        # Enable premature stopping conditions
+    stop_radius = global_config['STOP_RADIUS'] * scale_unit     # Minimum radius before stopping
+    max_step_branch = max_n_steps_per_branch                    # Max steps per branch (alias)
 
-    # Assembly params
-    use_buffer = global_config['USE_BUFFER']
-    N = global_config['ASSEMBLY_EVERY_N']
-    buffer = global_config['BUFFER_N']
-    weighted = global_config['WEIGHTED_ASSEMBLY']
-    weight_type = global_config['WEIGHT_TYPE']
+    # Global assembly parameters: control how local segmentations are combined
+    use_buffer = global_config['USE_BUFFER']                    # Enable buffered assembly (delayed combination)
+    N = global_config['ASSEMBLY_EVERY_N']                       # Combine every N steps
+    buffer = global_config['BUFFER_N']                          # Buffer delay to avoid interference
+    weighted = global_config['WEIGHTED_ASSEMBLY']               # Use weighted averaging vs simple averaging
+    weight_type = global_config['WEIGHT_TYPE']                  # Type of weighting ('radius', 'gaussian', etc.)
 
+    # Input data loading: handle either raw images or pre-segmented data
     if (seg_file and trace_seg):
         print("\nWe are tracing a segmented vasculature!")
         print("No need for prediction.")
@@ -119,65 +180,72 @@ def trace_centerline(
         image_file = seg_file
         reader_im = reader_seg
 
-    init_step = potential_branches[0]
+    # Initialize data structures for tracking vessel tree and global segmentation
+    init_step = potential_branches[0]                           # First branch point to start tracing
     vessel_tree = VesselTree(case, image_file, init_step, potential_branches)
     assembly_segs = Segmentation(case, image_file, weighted,
                                  weight_type=weight_type,
                                  start_seg=start_seg)
 
-    # Load model
+    # Load neural network model (nnU-Net) for vessel segmentation prediction
     if not (seg_file and trace_seg):
         predictor = initialize_predictor(model_folder, fold)
     else:
         print('No need to load model, we are using a given segmentation')
 
-    branch = 0
+    # Initialize tracking variables for the main tracing loop
+    branch = 0                                                  # Current active branch index
 
-    # Track combos of all polydata
-    list_centerlines, list_surfaces = [], []
-    list_points, list_inside_pts = [], []
-    surfaces_animation, cent_animation = [], []
+    # Collections for storing VTK polydata results from completed branches
+    list_centerlines, list_surfaces = [], []                   # Geometric results (centerlines, surfaces)
+    list_points, list_inside_pts = [], []                      # Point collections (regular, inside existing vessels)
+    surfaces_animation, cent_animation = [], []                # Animation frame data
 
-    num_steps_direction = 0
-    inside_branch = 0
-    i = 0  # numbering chronological order
+    # Loop control variables
+    num_steps_direction = 0                                     # Steps taken in current direction
+    inside_branch = 0                                          # Counter for steps inside existing vessels
+    i = 0                                                      # Global step counter (chronological order)
+    # Main tracing loop: continue while there are potential branches to explore
     while vessel_tree.potential_branches and i < (max_step_size + 1):
 
+        # Progress reporting: print step number and timestamp
         if i in range(0, max_step_size, max_step_size*0 + 1):
             print(f"\n*** Step number {i} ***")
-            # print real time
             print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
+        # Debug breakpoint: pause execution at specified step for inspection
         if debug and i >= debug_step:
             pdb.set_trace()
 
         try:
-
+            # Begin timing for this step's processing
             start_time_loc = time.time()
 
-            # Take next step
+            # Get current step information from vessel tree
             step_seg = vessel_tree.steps[i]
 
-            # Check if end prematurely
+            # Early termination checks: stop if conditions are met to avoid infinite loops
             if stop_pre:
-                # Check if radius is too small
+                # Check if vessel radius has become too small to continue
                 if step_seg['radius'] < stop_radius:
                     vessel_tree.steps[i]['chances'] = number_chances
                     raise SkipThisStepError(
                         "Radius estimate lower than allowed, stop here"
                     )
-                # Check if too many steps in current branch
+                # Check if this branch has taken too many steps (prevent runaway tracing)
                 if num_steps_direction > max_step_branch:
                     vessel_tree.steps[i]['chances'] = number_chances
                     raise SkipThisStepError(
                         "Too many steps in current branch, stop here"
                     )
 
-            # Check if retracing previously traced area
+            # Retrace prevention: avoid tracing areas that are already segmented
             if prevent_retracing:
+                # If we've been inside existing vessels for too many consecutive steps
                 if inside_branch == allowed_steps:
                     step_seg['is_inside'] = True
                     inside_branch = 0
+                    # Record this point as being inside existing segmentation
                     list_inside_pts.append(
                         points2polydata([step_seg['point'].tolist()]))
                     if write_samples:
@@ -187,46 +255,51 @@ def trace_centerline(
                                'points/inside_point_'+case+'_'+str(i)+'.vtp')
                         write_geo(pfn, polydata_point)
 
-                    # cause failure
+                    # Stop tracing this branch to avoid redundant work
                     raise SkipThisStepError(
                         "Inside already segmented vessel, stop here"
                     )
 
+                # Check if current point is inside existing global assembly
                 elif is_point_in_image(assembly_segs.assembly,
                                        step_seg['point']
                                        # + step_seg['radius']
                                        # * step_seg['tangent']
                                        ):
-                    inside_branch += 1
+                    inside_branch += 1                          # Increment counter for consecutive inside steps
                 else:
-                    inside_branch = 0
-            # print('\n The inside branch is ', inside_branch)
+                    inside_branch = 0                           # Reset counter if outside existing vessels
 
-            # Point
+            # Create VTK point data for current step location
             polydata_point = points2polydata([step_seg['point'].tolist()])
 
+            # Write point to file for visualization/debugging if requested
             if write_samples:
                 pfn = output_folder + 'points/point_'+case+'_'+str(i)+'.vtp'
                 write_geo(pfn, polydata_point)
 
-            mag = 1
-            perc = 1
-            continue_enlarge = True
-            max_mag = 1.3  # stops when reaches this
-            add_mag = 0.2
+            # Dynamic volume sizing: adjust extraction volume based on vessel occupancy
+            mag = 1                                             # Initial magnification factor
+            perc = 1                                           # Percentage of volume occupied by vessel
+            continue_enlarge = True                            # Flag to continue enlarging if needed
+            max_mag = 1.3                                      # Maximum magnification (stops enlarging at 130%)
+            add_mag = 0.2                                      # Magnification increment per iteration
 
+            # Skip dynamic sizing for large vessels (>3mm) to avoid excessive computation
             if step_seg['radius'] > 3 * scale_unit:
-                mag = max_mag  # if above 3mm then dont change size
+                mag = max_mag
 
+            # Adaptive volume extraction: enlarge bounding box if vessel occupancy is too high
             while perc > perc_enlarge and continue_enlarge:
                 if mag > 1 and mag < max_mag:
                     print("""Enlarging bounding box because
                            percentage vessel > 0.33""")
                 if mag >= max_mag:
                     print("Keeping original size")
-                    mag = 1
+                    mag = 1                                     # Reset to original size if max reached
                     continue_enlarge = False
-                # Extract Volume
+                    
+                # Volume extraction: get local image region around current point
                 (size_extract,
                  index_extract,
                  border) = map_to_image(step_seg['point'],
@@ -259,15 +332,16 @@ def trace_centerline(
                     step_seg['time'].append(time.time()-start_time_loc)
                     start_time_loc = time.time()
 
+                # Vessel segmentation: either predict using nnU-Net or use pre-segmented data
                 if not (seg_file and trace_seg):
-                    # Prediction
-                    spacing = (spacing_im * scale).tolist()
-                    spacing = spacing[::-1]
+                    # Neural network prediction pipeline for raw medical images
+                    spacing = (spacing_im * scale).tolist()       # Convert spacing for nnU-Net format
+                    spacing = spacing[::-1]                      # Reverse order for nnU-Net convention
                     props = {}
                     props['spacing'] = spacing
                     img_np = sitk.GetArrayFromImage(cropped_volume)
-                    img_np = img_np[None]
-                    img_np = img_np.astype('float32')
+                    img_np = img_np[None]                        # Add batch dimension
+                    img_np = img_np.astype('float32')            # Convert to float32 for network
 
                     start_time_pred = time.time()
                     prediction = predictor.predict_single_npy_array(img_np,
@@ -278,39 +352,37 @@ def trace_centerline(
                     print(f"""Prediction time:
                           {(time.time() - start_time_pred):.3f} s""")
 
-                    # Create probability prediction
-                    prob_prediction = sitk.GetImageFromArray(prediction[1][1])
-
-                    # Create segmentation prediction (binary)
-                    predicted_vessel = prediction[0]
+                    # Extract results: probability map and binary segmentation
+                    prob_prediction = sitk.GetImageFromArray(prediction[1][1])  # Probability map
+                    predicted_vessel = prediction[0]                           # Binary segmentation
                     pred_img = sitk.GetImageFromArray(predicted_vessel)
-                    pred_img = copy_settings(pred_img, cropped_volume)
+                    pred_img = copy_settings(pred_img, cropped_volume)         # Copy image metadata
 
                 else:
-                    # Use the given segmentation
+                    # Use pre-segmented data (skip neural network prediction)
                     pred_img = extract_volume(reader_seg,
                                               index_extract,
                                               size_extract)
                     predicted_vessel = sitk.GetArrayFromImage(pred_img)
 
-                    # in this case, the probability is the same
-                    # as the segmentation
+                    # For pre-segmented data, probability equals binary segmentation
                     prob_prediction = pred_img
                     # seg_fn = (output_folder
                     #           + 'volumes/volume_'+case+'_'
                     #           + str(i)+'_truth.mha')
 
+                # Calculate vessel occupancy percentage for volume sizing decision
                 perc = predicted_vessel.mean()
                 print(f"Perc as 1: {perc:.3f}, mag: {mag}")
-                mag += add_mag
+                mag += add_mag                                  # Increase magnification for next iteration
 
-            # Probabilities prediction
+            # Finalize probability prediction with proper image metadata
             prob_prediction = copy_settings(prob_prediction, cropped_volume)
             step_seg['prob_predicted_vessel'] = prob_prediction
 
-            seed = np.rint(np.array(size_extract)/2).astype(int).tolist()
-
-            predicted_vessel = remove_other_vessels(pred_img, seed)
+            # Connected component filtering: keep only vessel connected to center point
+            seed = np.rint(np.array(size_extract)/2).astype(int).tolist()  # Center of extracted volume
+            predicted_vessel = remove_other_vessels(pred_img, seed)        # Remove disconnected components
 
             # print("Now the components are: ")
             # labels, means = connected_comp_info(predicted_vessel, True)
@@ -340,38 +412,32 @@ def trace_centerline(
                                     pd_fn.replace('.mha', '_mega' +
                                                   str(time.time())+'.mha'))
 
-            # Surface
-
-            # if seg_file:
-            #     surface = evaluate_surface(predict.seg_vol)
-            #     if write_samples:
-            #         write_vtk_polydata(surface_smooth, seg_fn)
-
-            # surface = evaluate_surface(predicted_vessel) # Marching cubes
-
+            # Surface generation: convert binary segmentation to 3D mesh using marching cubes
             surface = convert_seg_to_surfs(predicted_vessel,
                                            mega_sub=global_config
                                            ['MEGA_SUBVOLUME'],
                                            ref_min_dims=size_extract)
 
+            # Surface processing: smooth and refine the mesh
             num_iterations = get_smoothing_params(step_seg['radius'],
                                                   scale_unit,
                                                   mega_sub=global_config
                                                   ['MEGA_SUBVOLUME'],
                                                   already_seg=trace_seg)
 
+            # Apply smoothing to reduce marching cubes artifacts
             surface_smooth = smooth_surface(surface,
-                                            smoothingIterations=num_iterations
-                                            )  # Smooth marching cubes
+                                            smoothingIterations=num_iterations)
 
+            # Clip surface to image bounds and extract largest connected component
             vtkimage = exportSitk2VTK(cropped_volume)
             length = (predicted_vessel.GetSize()[0]
                       * predicted_vessel.GetSpacing()[0])
             surface_smooth = bound_polydata_by_image(vtkimage[0],
                                                      surface_smooth,
-                                                     length*1/40)
+                                                     length*1/40)       # Clip with small tolerance
 
-            surface_smooth = get_largest_connected_polydata(surface_smooth)
+            surface_smooth = get_largest_connected_polydata(surface_smooth)  # Keep only main component
 
             if take_time:
                 print("\n Calc and smooth surface: "
@@ -405,9 +471,11 @@ def trace_centerline(
                        + case + '_'+str(i)+'_ref.vtp')
                 write_geo(pfn, polydata_point)
 
+            # Vessel endpoint detection: find caps (openings) at vessel ends for centerline calculation
             caps = calc_caps(surface_smooth)
 
             step_seg['caps'] = caps
+            # Orient caps to identify source (entry) and targets (exits) for centerline tracing
             sorted_targets, source_id = orient_caps(caps,
                                                     step_seg['point'],
                                                     old_point_ref,
@@ -415,6 +483,7 @@ def trace_centerline(
             print(f"Source id: {source_id}")
 
             print('Number of caps: ', len(caps))
+            # Require at least 2 caps (inlet and outlet) for meaningful centerline after initial steps
             if len(caps) < 2 and i > 1:
                 raise SkipThisStepError(
                     "Less than 2 caps, stop here"
@@ -424,21 +493,21 @@ def trace_centerline(
             # pfn = '/Users/numisveinsson/Downloads/point.vtp'
             # write_geo(pfn, polydata_point)
 
-            # Centerline
+            # Centerline extraction: calculate vessel centerline using selected algorithm
             if not global_config['CENTERLINE_EXTRACTION_VMTK']:
                 print("Calculating centerline using FMM + Gradient Stepping")
-                # if first steps and only one cap, use point as source
+                # Handle special case: initial steps with single cap use current point as source
                 if i <= 1 and len(caps) == 1:
-                    seed = step_seg['point']
-                    targets = caps  # [cap for ind, cap in enumerate(caps)
-                    #  if ind != source_id] #caps
-                # else use info from orientation
+                    seed = step_seg['point']                    # Use current tracing point as seed
+                    targets = caps                              # Single cap becomes target
+                # Standard case: use oriented caps to define source and targets
                 else:
                     source = source_id
-                    seed = caps[source]
+                    seed = caps[source]                         # Entry point from oriented caps
                     targets = [cap for ind, cap in enumerate(caps)
-                               if ind != source]
-                # calculate centerline
+                               if ind != source]                # All non-source caps are targets
+                               
+                # Calculate centerline using Fast Marching Method
                 (centerline_poly,
                  success) = calc_centerline_fmm(predicted_vessel,
                                                 seed,
@@ -447,6 +516,7 @@ def trace_centerline(
 
             else:
                 print("Calculating centerline using VMTK")
+                # Alternative: use VMTK (Vascular Modeling Toolkit) for centerline extraction
                 (centerline_poly,
                  success) = calc_centerline_vmtk(surface_smooth,
                                                  vtkimage,
@@ -470,21 +540,25 @@ def trace_centerline(
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
 
-            # Save step information
+            # Store computed geometry in step data structure for later use
             step_seg['point_pd'] = polydata_point
             step_seg['surface'] = surface_smooth
             step_seg['centerline'] = centerline_poly
 
+            # Verify centerline calculation succeeded before continuing
             if not success:
                 raise SkipThisStepError(
                     "Centerline calculation failed, stop here"
                 )
 
-            # Assembly
+            # Assembly: Combine local segmentations into global vessel segmentation
+            # Use buffering to delay assembly and avoid interference with active tracing
             if use_buffer:
+                # Add segmentations every N steps, with a buffer delay
                 if (len(vessel_tree.steps) % N == 0
                    and len(vessel_tree.steps) >= (N+buffer)):
 
+                    # Process buffered segmentation steps
                     for j in range(1, N+1):
                         if (vessel_tree.steps[-(j+buffer)]
                            ['prob_predicted_vessel']):
@@ -575,7 +649,7 @@ def trace_centerline(
 
             vessel_tree.steps[i] = step_seg
 
-            # end if on border and segmentation is on border
+            # Border checking: stop tracing if segmentation reaches image boundary
             if border:
                 print("Checking if segmentation has reached the border")
                 if check_seg_border(size_extract,
@@ -586,16 +660,19 @@ def trace_centerline(
                         "Segmentation has reached border, stop here"
                     )
 
+            # Continue tracing if valid next points were found
             if point_tree.size != 0:
 
                 i += 1
                 num_steps_direction += 1
+                # Create next tracing step from best candidate point
                 next_step = create_step_dict(step_seg['point'],
                                              step_seg['radius'],
                                              point_tree[0],
                                              radius_tree[0],
                                              angle_change[0])
 
+                # Forceful sidebranch handling: adjust position and radius for difficult branches
                 if len(radius_tree) > 1 and forceful_sidebranch:
                     print('Forceful sidebranch -  adding vector')
                     next_step['point'] += (next_step['radius']
@@ -606,24 +683,30 @@ def trace_centerline(
                 print(f"Next radius is {radius_tree[0]:.3f}")
                 vessel_tree.add_step(i, next_step, branch)
 
+                # Bifurcation handling: process multiple branches when detected
                 if len(radius_tree) > 1:
                     print('\n _ \n')
                     print(f"\n BIFURCATION - {len(radius_tree)} BRANCHES \n")
                     print('\n _ \n')
 
+                    # Create new potential branch points for each detected bifurcation
+                    # Skip index 0 (main branch continuation) and process side branches
                     for j in range(1, len(radius_tree)):
                         dict = create_step_dict(step_seg['point'],
                                                 step_seg['radius'],
                                                 point_tree[j],
                                                 radius_tree[j],
                                                 angle_change[j])
-                        dict['connection'] = [branch, i-1]
+                        dict['connection'] = [branch, i-1]  # Track where this branch originated
                         if forceful_sidebranch:
+                            # Offset point along tangent for better branch separation
                             dict['point'] += dict['radius']*dict['tangent']
                             dict['radius'] = (dict['radius']
                                               * forceful_sidebranch_magnify)
 
                         vessel_tree.potential_branches.append(dict)
+                    
+                    # Visualization: save potential branch points for debugging
                     list_points_pot = []
                     for pot in point_tree:
                         list_points_pot.append(points2polydata([pot.tolist()]))
@@ -634,6 +717,7 @@ def trace_centerline(
                                             + '/points/bifurcation_'+case+'_'
                                             + str(branch)+'_'+str(i-1)
                                             + '_points.vtp'))
+            # Termination condition: no valid next points found
             else:
                 print('point_tree.size is 0')
                 raise SkipThisStepError(
@@ -642,11 +726,11 @@ def trace_centerline(
             print("\n   This location done: "
                   + f"{time.time() - start_time_loc:.3f} s\n")
 
-        # This step failed for some reason
+        # Exception handling: process failed steps and attempt recovery
         except Exception as e:
             print(e)
 
-            # Print error
+            # Save debug information with available data for error analysis
             if step_seg['centerline']:
                 print_error(output_folder, i, step_seg, cropped_volume,
                             predicted_vessel, old_point_ref, centerline_poly)
@@ -660,17 +744,19 @@ def trace_centerline(
                 print("Didnt work for first surface")
                 # break
 
-            # Allow for another chance, if not already given
+            # Retry logic: allow multiple attempts for failed steps
             if (vessel_tree.steps[i]['chances'] < number_chances
                and not step_seg['is_inside']):
                 print("Giving chance for surface: " + str(i))
                 if take_time:
                     print('Radius is ', step_seg['radius'])
+                # Adaptive radius adjustment for high vessel percentage
                 if (step_seg['seg_file'] and perc > 0.33
                    and vessel_tree.steps[i]['chances'] > 0):
                     print(f"""Magnifying radius by 1.2 because percentage
                           vessel is above 0.33: {perc:.3f}""")
                     vessel_tree.steps[i]['radius'] *= 1.2
+                # Move point forward along tangent for next attempt
                 (vessel_tree.steps[i]['point']) = ((vessel_tree.steps[i]
                                                     ['point'])
                                                    + (vessel_tree.steps[i]
@@ -679,21 +765,22 @@ def trace_centerline(
                                                       ['tangent']))
                 vessel_tree.steps[i]['chances'] += 1
 
-            # If already given chance, then move on
+            # Branch termination: exceeded retry attempts, switch branches
             else:
 
                 print("\n*** Error for step: \n" + str(i))
                 print("Length of branch: ", len(vessel_tree.branches[branch]))
                 print("\n Moving onto another branch\n")
 
+                # Early termination for initial branch failure
                 if len(vessel_tree.branches) <= 1 and step_seg['is_inside']:
                     print("\n\nWARNING: First branch is inside, so stopping\n\n")
 
-                # If inside, then restart branch and i is not 0
+                # Branch restart conditions: inside vessel or short branch
                 if i != 0 and len(vessel_tree.branches) > 1 and ((step_seg['is_inside'] and global_config['RESTART_BRANCH'])
                    or len(vessel_tree.branches[branch]) <= 2):
-                    # If inside, then move on to next branch
-                    # and remove allowed_steps
+                    # Switch to next available branch and reset step counter
+                    # Remove current branch from allowed steps to prevent infinite loops
 
                     if len(vessel_tree.branches[branch]) <= 2:
                         print("Branch length is 1 or 0, so restarting")
@@ -714,12 +801,16 @@ def trace_centerline(
                     i = vessel_tree.branches[-1][-1] + 1
                     print(f"i is now {i}")
 
+                # Standard branch completion: collect results and clean up
                 else:
 
                     if debug:
                         print("Debugging")
 
+                    # Remove failed step from current branch
                     del vessel_tree.branches[branch][-1]
+                    
+                    # Collect all valid results from completed branch steps
                     (list_surf_branch, list_cent_branch,
                      list_pts_branch) = [], [], []
                     for id in vessel_tree.branches[branch][1:]:
@@ -729,21 +820,25 @@ def trace_centerline(
                                                  ['centerline']))
                         list_pts_branch.append((vessel_tree.steps[id]
                                                 ['point_pd']))
+                        # Clear references to prevent memory leaks
                         vessel_tree.steps[id]['surface'] = None
                         vessel_tree.steps[id]['centerline'] = None
                         vessel_tree.steps[id]['point_pd'] = None
+                    
+                    # Add branch results to global collections
                     list_centerlines.extend(list_cent_branch)
                     list_surfaces.extend(list_surf_branch)
                     list_points.extend(list_pts_branch)
 
-                    # print('Printing potentials')
+                    # Create VTK polydata for visualization of remaining potential branch points
+                    # Each point includes radius and index number for debugging/analysis
                     list_pot = []
                     for idx, pot in enumerate(vessel_tree.potential_branches):
                         list_pot.append(points2polydata(
                             [pot['point'].tolist()],
                             attributes={
-                                'Radius': ([pot['radius']], 'float'),
-                                'Number': ([idx], 'int')
+                                'Radius': ([pot['radius']], 'float'),  # Vessel radius at this point
+                                'Number': ([idx], 'int')               # Index in potential branches list
                             }))
                     final_pot = appendPolyData(list_pot)
 
@@ -796,32 +891,33 @@ def trace_centerline(
                                        + str(branch)+'_'+str(i)
                                        + '_points.vtp')
 
+                    # Record terminal cap positions for mesh capping
                     vessel_tree.caps = (vessel_tree.caps
                                         + [step_seg['point']
                                            + volume_size_ratio
                                            * step_seg['radius']
                                            * step_seg['tangent']])
 
+                    # Retrace centerline option: add completed branch for re-processing
                     if retrace_cent:
-                        # second step on this branch
-                        ind = vessel_tree.branches[branch][1]
+                        ind = vessel_tree.branches[branch][1]  # Get second step on this branch
                         step_to_add = vessel_tree.steps[ind]
-                        # add connection that says retrace
-                        step_to_add['connection'] = [-branch+1, ind]
+                        step_to_add['connection'] = [-branch+1, ind]  # Mark as retrace
                         vessel_tree.potential_branches.append(step_to_add)
 
-                # Merge potentials
+                # Potential branch management: organize remaining branches for processing
                 if merge_potentials:
-                    vessel_tree.merge_pots_radius()
+                    vessel_tree.merge_pots_radius()  # Combine nearby potential points
 
-                # Sort the potentials by radius
+                # Branch selection strategy: prioritize by size or randomize
                 if sort_potentials:
-                    vessel_tree.sort_potential_radius()
+                    vessel_tree.sort_potential_radius()  # Largest radius first
                 else:
-                    vessel_tree.shuffle_potential()
+                    vessel_tree.shuffle_potential()  # Random order
 
+                # Continue with next available branch
                 if len(vessel_tree.potential_branches) == 1:
-                    break
+                    break  # No more branches to process
                 next_step = vessel_tree.potential_branches.pop(1)
                 if next_step['point'][0] == vessel_tree.steps[0]['point'][0]:
                     next_step = vessel_tree.potential_branches.pop(1)
@@ -845,26 +941,30 @@ def trace_centerline(
                     print(f"Max number of branches reached: {max_n_branches}")
                     break
 
+    # Write out remaining unprocessed potential branch points for analysis
     if len(vessel_tree.potential_branches) > 0:
         print('Printing potentials')
         list_pot = []
         for idx, pot in enumerate(vessel_tree.potential_branches):
+            # Create point with both radius and index attributes for tracking
             list_pot.append(points2polydata([pot['point'].tolist()],
                                             attributes={
-                                                'Radius': ([pot['radius']], 'float'),
-                                                'Number': ([idx], 'int')
+                                                'Radius': ([pot['radius']], 'float'),  # Vessel radius estimate
+                                                'Number': ([idx], 'int')               # Original index in list
                                             }))
         final_pot = appendPolyData(list_pot)
         write_vtk_polydata(final_pot,
                            output_folder+'/potentials_'+case+'_'+str(i)
                            + '_points.vtp')
 
+    # Final cleanup: add remaining segmentations to global assembly
     if use_buffer:
         print("Adding rest of segs to global")
-        # Add rest of local segs to global before returning
+        # Process remaining valid segmentations in reverse order
         check = 2
         while (check <= len(vessel_tree.steps)
                and vessel_tree.steps[-check]['prob_predicted_vessel']):
+            # Add segmentation with weighted contribution based on radius
             assembly_segs.add_segmentation((vessel_tree.steps[-check]
                                             ['prob_predicted_vessel']),
                                            (vessel_tree.steps[-check]
@@ -872,14 +972,15 @@ def trace_centerline(
                                            (vessel_tree.steps[-check]
                                             ['img_size']),
                                            (1/vessel_tree.steps[-check]
-                                            ['radius'])**2)
-            vessel_tree.steps[-check]['prob_predicted_vessel'] = None
+                                            ['radius'])**2)  # Smaller radii get higher weight
+            vessel_tree.steps[-check]['prob_predicted_vessel'] = None  # Free memory
             check += 1
 
-    return (list_centerlines,
-            list_surfaces,
-            list_points,
-            list_inside_pts,
-            assembly_segs,
-            vessel_tree,
-            i)
+    # Return all collected results and final state
+    return (list_centerlines,    # VTK polydata centerlines for each branch
+            list_surfaces,       # VTK polydata surfaces for each step  
+            list_points,         # VTK polydata points for each step
+            list_inside_pts,     # Points that were detected inside vessels
+            assembly_segs,       # Global segmentation assembly object
+            vessel_tree,         # Complete tree structure with all steps
+            i)                   # Final step counter
