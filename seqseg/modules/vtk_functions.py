@@ -710,11 +710,35 @@ def voi_contain_caps(voi_min, voi_max, caps_locations):
     return contain
 
 
-def points2polydata(xyz, attribute_float=None):
+def points2polydata(xyz, attribute_float=None, attributes=None):
+    """
+    Create VTK polydata from points with optional attributes.
+    
+    Parameters:
+    -----------
+    xyz : array-like
+        Point coordinates
+    attribute_float : array-like, optional
+        Legacy parameter for backward compatibility. Creates "Radius" attribute.
+    attributes : dict, optional
+        Dictionary of attributes where key is attribute name and value is 
+        (data_list, data_type). data_type can be 'float' or 'int'.
+        Example: {'Radius': ([1.0, 2.0], 'float'), 'Number': ([0, 1], 'int')}
+    
+    Returns:
+    --------
+    vtk.vtkPolyData
+        VTK polydata object with points and attributes
+    """
     import vtk
     points = vtk.vtkPoints()
     # Create the topology of the point (a vertex)
     vertices = vtk.vtkCellArray()
+    
+    # Store attributes to add later
+    attrs_to_add = []
+    
+    # Handle legacy attribute_float parameter for backward compatibility
     if attribute_float is not None:
         # Create a vtkFloatArray to hold the attribute values
         attr = vtk.vtkFloatArray()
@@ -723,6 +747,25 @@ def points2polydata(xyz, attribute_float=None):
         attr.SetNumberOfTuples(len(xyz))
         for i, val in enumerate(attribute_float):
             attr.SetValue(i, val)
+        attrs_to_add.append(("Radius", attr))
+    
+    # Handle new attributes parameter
+    if attributes is not None:
+        for attr_name, (attr_data, attr_type) in attributes.items():
+            if attr_type.lower() == 'float':
+                attr = vtk.vtkFloatArray()
+            elif attr_type.lower() == 'int':
+                attr = vtk.vtkIntArray()
+            else:
+                raise ValueError(f"Unsupported attribute type: {attr_type}. Use 'float' or 'int'.")
+            
+            attr.SetName(attr_name)
+            attr.SetNumberOfComponents(1)
+            attr.SetNumberOfTuples(len(xyz))
+            for i, val in enumerate(attr_data):
+                attr.SetValue(i, val)
+            attrs_to_add.append((attr_name, attr))
+    
     # Add points
     for i in range(0, len(xyz)):
         try:
@@ -733,16 +776,21 @@ def points2polydata(xyz, attribute_float=None):
         point_id = points.InsertNextPoint(p)
         vertices.InsertNextCell(1)
         vertices.InsertCellPoint(point_id)
+    
     # Create a poly data object
     polydata = vtk.vtkPolyData()
     # Set the points and vertices we created as the geometry
     # and topology of the polydata
     polydata.SetPoints(points)
     polydata.SetVerts(vertices)
-    # If we have an attribute, add it to the polydata
-    if attribute_float is not None:
+    
+    # Add all attributes to the polydata
+    for attr_name, attr in attrs_to_add:
         polydata.GetPointData().AddArray(attr)
-        polydata.GetPointData().SetActiveScalars("Radius")
+        # Set the first attribute as active scalars (for backward compatibility)
+        if len(attrs_to_add) == 1 or attr_name == "Radius":
+            polydata.GetPointData().SetActiveScalars(attr_name)
+    
     polydata.Modified()
 
     return polydata

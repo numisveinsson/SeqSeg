@@ -738,10 +738,13 @@ def trace_centerline(
 
                     # print('Printing potentials')
                     list_pot = []
-                    for pot in vessel_tree.potential_branches:
+                    for idx, pot in enumerate(vessel_tree.potential_branches):
                         list_pot.append(points2polydata(
                             [pot['point'].tolist()],
-                            attribute_float=[pot['radius']]))
+                            attributes={
+                                'Radius': ([pot['radius']], 'float'),
+                                'Number': ([idx], 'int')
+                            }))
                     final_pot = appendPolyData(list_pot)
 
                     if take_time:
@@ -845,9 +848,12 @@ def trace_centerline(
     if len(vessel_tree.potential_branches) > 0:
         print('Printing potentials')
         list_pot = []
-        for pot in vessel_tree.potential_branches:
+        for idx, pot in enumerate(vessel_tree.potential_branches):
             list_pot.append(points2polydata([pot['point'].tolist()],
-                                            attribute_float=[pot['radius']]))
+                                            attributes={
+                                                'Radius': ([pot['radius']], 'float'),
+                                                'Number': ([idx], 'int')
+                                            }))
         final_pot = appendPolyData(list_pot)
         write_vtk_polydata(final_pot,
                            output_folder+'/potentials_'+case+'_'+str(i)
