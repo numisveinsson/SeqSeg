@@ -1,3 +1,16 @@
+"""
+SeqSeg: Sequential Vessel Segmentation and Centerline Tracing
+
+Main entry point for the SeqSeg vessel tracing pipeline that combines:
+- nnU-Net deep learning segmentation
+- Sequential volume extraction and processing
+- Centerline tracing with bifurcation detection
+- Global assembly and post-processing
+
+This script processes medical images to extract vessel centerlines and create
+segmentations suitable for computational fluid dynamics and medical analysis.
+"""
+
 import faulthandler
 import time
 
@@ -17,19 +30,34 @@ from seqseg.modules.capping import cap_surface
 from importlib import resources
 import yaml
 
-
+# Initialize global settings for error handling and timing
 sys.stdout.flush()
 start_time = time.time()
-faulthandler.enable()
+faulthandler.enable()  # Enable traceback on segfaults for debugging
 
 
 def load_yaml_config(config_name):
+    """
+    Load YAML configuration file with fallback mechanism.
+    
+    Attempts to load configuration using importlib.resources (package-aware),
+    then falls back to direct file path for development environments.
+    
+    Args:
+        config_name (str): Name of the config file without .yaml extension
+        
+    Returns:
+        dict: Parsed YAML configuration
+        
+    Raises:
+        FileNotFoundError: If configuration file cannot be found
+    """
     try:
-        # Try to use importlib.resources first (preferred method)
+        # Try to use importlib.resources first (preferred method for installed packages)
         with resources.files('seqseg.config').joinpath(f'{config_name}.yaml').open('r') as f:
             return yaml.safe_load(f)
     except (ImportError, FileNotFoundError, ModuleNotFoundError):
-        # Fallback to direct file path
+        # Fallback to direct file path for development/editable installs
         config_dir = os.path.join(os.path.dirname(__file__), 'config')
         config_path = os.path.join(config_dir, f'{config_name}.yaml')
         
@@ -41,66 +69,59 @@ def load_yaml_config(config_name):
 
 
 def create_directories(output_folder, write_samples):
-    try:
-        os.mkdir(output_folder)
-    except Exception as e:
-        print(e)
-    try:
-        os.mkdir(output_folder+'errors')
-    except Exception as e:
-        print(e)
-    try:
-        os.mkdir(output_folder+'assembly')
-    except Exception as e:
-        print(e)
-    try:
-        os.mkdir(output_folder+'simvascular')
-    except Exception as e:
-        print(e)
-    # and sub-directories for SimVascular: Images, Paths, Models
-    try:
-        os.mkdir(output_folder+'simvascular/Images')
-    except Exception as e:
-        print(e)
-    try:
-        os.mkdir(output_folder+'simvascular/Paths')
-    except Exception as e:
-        print(e)
-    try:
-        os.mkdir(output_folder+'simvascular/Models')
-    except Exception as e:
-        print(e)
-
+    """
+    Create directory structure for SeqSeg output files.
+    
+    Sets up organized folders for different types of outputs including
+    final results, debug information, and optional intermediate files.
+    
+    Args:
+        output_folder (str): Base output directory path
+        write_samples (bool): Whether to create directories for intermediate files
+    """
+    # Core directories for all runs
+    directories = [
+        output_folder,                    # Main output folder
+        output_folder + 'errors',         # Error debugging files
+        output_folder + 'assembly',       # Assembly process outputs
+        output_folder + 'simvascular',    # SimVascular-compatible outputs
+        output_folder + 'simvascular/Images',  # Medical images
+        output_folder + 'simvascular/Paths',   # Centerline paths (.pth files)
+        output_folder + 'simvascular/Models'   # 3D models
+    ]
+    
+    # Additional directories for detailed intermediate outputs
     if write_samples:
+        directories.extend([
+            output_folder + 'volumes',        # Extracted volume samples
+            output_folder + 'predictions',    # nnU-Net prediction outputs
+            output_folder + 'centerlines',    # Step-by-step centerlines
+            output_folder + 'surfaces',       # Generated surface meshes
+            output_folder + 'points',         # Point clouds and markers
+            output_folder + 'animation'       # Animation/visualization files
+        ])
+    
+    # Create each directory, silently continuing if it already exists
+    for directory in directories:
         try:
-            os.mkdir(output_folder+'volumes')
+            os.mkdir(directory)
         except Exception as e:
-            print(e)
-        try:
-            os.mkdir(output_folder+'predictions')
-        except Exception as e:
-            print(e)
-        try:
-            os.mkdir(output_folder+'centerlines')
-        except Exception as e:
-            print(e)
-        try:
-            os.mkdir(output_folder+'surfaces')
-        except Exception as e:
-            print(e)
-        try:
-            os.mkdir(output_folder+'points')
-        except Exception as e:
-            print(e)
-        try:
-            os.mkdir(output_folder+'animation')
-        except Exception as e:
-            print(e)
+            print(e)  # Print error but continue execution
 
 
 def main():
-    """ Set up"""
-    parser = argparse.ArgumentParser()
+    """
+    Main function for SeqSeg vessel tracing pipeline.
+    
+    Processes command line arguments, initializes nnU-Net models, and runs
+    sequential vessel segmentation and centerline tracing on medical images.
+    Outputs include vessel segmentations, centerlines, and 3D surface meshes.
+    """
+    # Configure command line argument parser
+    parser = argparse.ArgumentParser(
+        description='SeqSeg: Sequential vessel segmentation and centerline tracing',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument('-data_dir', '--data_directory',
                         type=str,
                         help='Name of the folder containing the testing data')
@@ -185,52 +206,55 @@ def main():
                         help='Whether to cap surface centerline')
     args = parser.parse_args()
 
-    # print(args)
-
-    # Load configuration file
+    # Load algorithm configuration from YAML file
     global_config = load_yaml_config(args.config_name)
     print(f"\nUsing config file: {args.config_name}")
 
+    # Set up directory paths
     dir_output0 = args.outdir
     data_dir = args.data_directory
 
-    # Make sure the output directory exists
+    # Ensure the main output directory exists
     try:
         os.mkdir(dir_output0)
     except Exception as e:
         print(e)
 
-    unit = args.unit
-    max_step_size = args.max_n_steps
-    max_n_branches = args.max_n_branches
-    max_n_steps_per_branch = args.max_n_steps_per_branch
-    write_samples = args.write_steps
-    take_time = global_config['TIME_ANALYSIS']
-    calc_global_centerline = args.extract_global_centerline
-    cap_surface_cent = args.cap_surface_cent
+    # Extract and organize configuration parameters
+    # Tracing control parameters
+    unit = args.unit                                    # Physical units (cm/mm)
+    max_step_size = args.max_n_steps                   # Total iteration limit
+    max_n_branches = args.max_n_branches               # Maximum vessel branches
+    max_n_steps_per_branch = args.max_n_steps_per_branch  # Steps per branch
+    write_samples = args.write_steps                   # Save intermediate files
+    take_time = global_config['TIME_ANALYSIS']         # Performance timing
+    calc_global_centerline = args.extract_global_centerline  # Post-process centerline
+    cap_surface_cent = args.cap_surface_cent           # Cap surface ends
 
-    dataset = args.train_dataset
-    fold = args.fold
-    img_format = args.img_ext
-    scale = args.scale
-    test_name = args.nnunet_type
-    pt_centerline = args.pt_centerline
-    num_seeds = args.num_seeds_centerline
+    # nnU-Net model configuration
+    dataset = args.train_dataset                       # Training dataset name
+    fold = args.fold                                   # Cross-validation fold
+    img_format = args.img_ext                          # Image file extension
+    scale = args.scale                                 # Unit scaling factor
+    test_name = args.nnunet_type                       # Model type (3d_fullres/2d)
+    pt_centerline = args.pt_centerline                 # Centerline point spacing
+    num_seeds = args.num_seeds_centerline              # Number of seed points
 
-    # Weight directory
-    dir_model_weights = dataset+'/nnUNetTrainer__nnUNetPlans__'+test_name
+    # Construct nnU-Net model weights directory path
+    dir_model_weights = dataset + '/nnUNetTrainer__nnUNetPlans__' + test_name
     if args.nnunet_results_path is not None:
         weight_dir_nnunet = args.nnunet_results_path
-        dir_model_weights = os.path.join(weight_dir_nnunet, dir_model_weights,)
+        dir_model_weights = os.path.join(weight_dir_nnunet, dir_model_weights)
 
+    # Load testing dataset and determine which samples to process
     testing_samples, directory_data = get_testing_samples(dataset, data_dir)
     print("Testing samples about to run:")
     for sample in testing_samples:
         print(sample)
 
-    # Choose testing samples
+    # Determine sample range for batch processing
     if args.stop == -1:
-        args.stop = len(testing_samples)
+        args.stop = len(testing_samples)  # Process all samples if no stop specified
 
     print(f"Running from {args.start} to {args.stop} of {len(testing_samples)} samples")
 
@@ -256,14 +280,14 @@ def main():
                                               pt_centerline, num_seeds,
                                               write_samples)
 
-        # print to .txt file all outputs
+        # Configure output logging (redirect to file unless debugging)
         if not global_config['DEBUG']:
-            # write to file
             sys.stdout = open(dir_output+"/out.txt", "w")
         else:
             print("\nStart tracking with debug mode on")
-            # import pdb
-            # pdb.set_trace()
+            # Debugger can be enabled here for step-through debugging
+        
+        # Log initialization status and parameters
         if json_file_present:
             print("\nWe got seed point from json file")
         else:
@@ -272,23 +296,24 @@ def main():
         print(f"Number of initial points: {len(potential_branches)}")
         print(f"Time is: {time.time() - start_time:.2f} sec")
 
-        # Trace centerline
+        # Execute main vessel tracing algorithm
+        # This is the core SeqSeg pipeline that performs sequential segmentation
         (centerlines, surfaces, points, inside_pts, assembly_obj,
          vessel_tree, n_steps_taken) = trace_centerline(
-            dir_output,
-            dir_image,
-            case,
-            dir_model_weights,
-            fold,
-            potential_branches,
-            max_step_size,
-            max_n_branches,
-            max_n_steps_per_branch,
-            global_config,
-            unit,
-            scale,
-            dir_seg,
-            write_samples=write_samples
+            dir_output,              # Output directory for this case
+            dir_image,               # Input medical image path
+            case,                    # Case identifier/name
+            dir_model_weights,       # nnU-Net model weights directory
+            fold,                    # Cross-validation fold
+            potential_branches,      # Initial seed points for tracing
+            max_step_size,           # Maximum total steps
+            max_n_branches,          # Maximum vessel branches
+            max_n_steps_per_branch,  # Maximum steps per branch
+            global_config,           # Algorithm configuration parameters
+            unit,                    # Physical units
+            scale,                   # Image scaling factor
+            dir_seg,                 # Segmentation reference (if available)
+            write_samples=write_samples  # Save intermediate outputs
         )
 
         print("\nTotal calculation time is:"
@@ -314,41 +339,53 @@ def main():
             vessel_tree.create_tree_polydata_v2(dir_output)
             vessel_tree.plot_radius_distribution(dir_output)
 
-        # Assembly work
+        # Process and save final segmentation results
+        # Global assembly contains accumulated segmentations from all tracing steps
         assembly_org = assembly_obj.assembly
-        # assembly_ups = assembly_obj.upsample_sitk()
-        # sitk.WriteImage(assembly_org, dir_output+'/'+case+'_assembly_'
-        #                 + test_name + '_'+str(i)+'.mha')
-
         assembly = assembly_org
 
+        # Create binary segmentation by thresholding probability map
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5,
                                                upperThreshold=1)
+        
+        # Save intermediate segmentation results
         sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_binary_seg_'
                         + test_name + '_' + str(i) + '.mha')
         sitk.WriteImage(assembly, dir_output+'/'+case+'_prob_seg_'
                         + test_name + '_' + str(i) + '.mha')
 
+        # Filter segmentation to keep only components connected to seed points
+        # This removes disconnected vessel segments that may be artifacts
         assembly_binary = sf.keep_component_seeds(assembly_binary,
                                                   initial_seeds)
+        
+        # Save final cleaned segmentation
         sitk.WriteImage(assembly_binary, dir_output0+'/'+case
-                        + '_seg_containing_seeds_'
+                        + '_segmentation_' + test_name + '_'
                         + str(n_steps_taken) + '_steps' + '.mha')
 
+        # Generate 3D surface meshes from binary segmentation
         assembly_surface = vf.evaluate_surface(assembly_binary, 1)
+        
+        # Save raw surface mesh (may have irregular geometry)
         vf.write_vtk_polydata(assembly_surface, dir_output + '/' + case
-                              + '_surface_mesh_nonsmooth_' + str(n_steps_taken)
-                              + '_steps' + '.vtp')
+                              + '_surface_mesh_nonsmooth_' + test_name + '_'
+                              + str(n_steps_taken) + '_steps' + '.vtp')
+        
+        # Apply smoothing to create high-quality surface for CFD/analysis
         surface_smooth = vf.smooth_polydata(assembly_surface, iteration=75, smoothingFactor=0.1)
         vf.write_vtk_polydata(surface_smooth, dir_output0 + '/' + case
-                              + '_surface_mesh_smooth_' + str(n_steps_taken)
-                              + '_steps' + '.vtp')
+                              + '_surface_mesh_' + test_name + '_'
+                              + str(n_steps_taken) + '_steps' + '.vtp')
 
+        # Combine and save tracing step results if any centerlines were found
         if len(centerlines) > 0:
-            final_surface = vf.appendPolyData(surfaces)
-            final_centerline = vf.appendPolyData(centerlines)
-            final_points = vf.appendPolyData(points)
+            # Merge all individual step results into single datasets
+            final_surface = vf.appendPolyData(surfaces)       # All surface patches
+            final_centerline = vf.appendPolyData(centerlines) # All centerline segments
+            final_points = vf.appendPolyData(points)          # All tracing points
 
+            # Save combined step-by-step results for analysis
             vf.write_vtk_polydata(final_surface,    dir_output+'/all_'+case+'_'
                                   + test_name + '_'+str(i)+'_'
                                   + str(n_steps_taken)
@@ -361,18 +398,21 @@ def main():
                                   + test_name + '_'+str(i)+'_'
                                   + str(n_steps_taken)
                                   + '_points.vtp')
+        # Optional: Extract global centerline using distance-based methods
+        # This provides a single continuous centerline through the entire vessel tree
         if calc_global_centerline:
-            # Calculate global centerline
             global_centerline, targets, success = calc_centerline_global(
                 assembly_binary,
                 initial_seeds)
-            # if centerline is not None
+            
             if success or len(targets) > 0:
+                # Save main centerline for CFD inlet/outlet definition
                 vf.write_vtk_polydata(global_centerline, dir_output0 + '/'
-                                      + case + '_centerline_'
+                                      + case + '_centerline_' + test_name + '_'
                                       + str(n_steps_taken)
                                       + '_steps' + '.vtp')
-                # write targets
+                
+                # Save target points (vessel endpoints) for boundary condition setup
                 targets_pd = vf.points2polydata([target.tolist()
                                                 for target in targets])
                 vf.write_vtk_polydata(targets_pd, dir_output+'/'
@@ -380,6 +420,7 @@ def main():
                                       + str(n_steps_taken)
                                       + '_targets.vtp')
 
+                # Optional: Cap vessel ends for CFD-ready geometry
                 if cap_surface_cent:
                     capped_surface, capped_seg = cap_surface(
                         pred_surface=assembly_surface,
@@ -388,14 +429,19 @@ def main():
                         file_name=case,
                         outdir=dir_output,
                         targets=targets)
+                    
+                    # Save capped surface (ready for mesh generation)
                     vf.write_vtk_polydata(capped_surface, dir_output+'/'
                                         + case + '_' + test_name + '_'+str(i)+'_'
                                         + str(n_steps_taken)
                                         + '_capped_surface.vtp')
+                    
+                    # Save capped segmentation (binary image with caps)
                     sitk.WriteImage(capped_seg, dir_output+'/'
-                                    + case + '_' + str(n_steps_taken)
-                                    + '_capped_seg.mha')
+                                    + case + '_' + test_name + '_'
+                                    + str(n_steps_taken) + '_capped_seg.mha')
 
+        # Save points detected inside existing vessels (for debugging retrace prevention)
         if global_config['PREVENT_RETRACE']:
             if len(inside_pts) > 0:
                 final_inside_pts = vf.appendPolyData(inside_pts)
@@ -404,8 +450,8 @@ def main():
                                       + str(n_steps_taken)
                                       + '_inside_points.vtp')
 
+        # Restore stdout from file redirection
         if not global_config['DEBUG']:
-            # close the file
             sys.stdout.close()
             sys.stdout = sys.__stdout__
 
