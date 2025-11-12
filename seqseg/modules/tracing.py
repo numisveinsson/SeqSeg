@@ -489,10 +489,6 @@ def trace_centerline(
                     "Less than 2 caps, stop here"
                 )
 
-            # polydata_point = points2polydata([step_seg['caps'][0]])
-            # pfn = '/Users/numisveinsson/Downloads/point.vtp'
-            # write_geo(pfn, polydata_point)
-
             # Centerline extraction: calculate vessel centerline using selected algorithm
             if not global_config['CENTERLINE_EXTRACTION_VMTK']:
                 print("Calculating centerline using FMM + Gradient Stepping")
@@ -920,7 +916,10 @@ def trace_centerline(
                     break  # No more branches to process
                 next_step = vessel_tree.potential_branches.pop(1)
                 if next_step['point'][0] == vessel_tree.steps[0]['point'][0]:
-                    next_step = vessel_tree.potential_branches.pop(1)
+                    if len(vessel_tree.potential_branches) > 1:
+                        next_step = vessel_tree.potential_branches.pop(1)
+                    else:
+                        break  # No more branches to process
 
                 branch += 1
                 vessel_tree.add_branch(next_step['connection'][1], i)
