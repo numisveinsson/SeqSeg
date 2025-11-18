@@ -1161,6 +1161,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         relax_factor=1, return_target=False,
                         return_target_all=False,
                         verbose=False, return_failed=False,
+                        return_success_list=False,
                         ):
     """
     Function to calculate the centerline of a segmentation
@@ -1370,7 +1371,10 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     elif return_target_all:
         # return all targets, even if not successful
         return centerline, success_overall, targets_np
-    # else return only centerline and success
+    elif return_success_list:
+        # return success list
+        return centerline, success_overall, success_list
+    # else return only centerline and success overall
     else:
         return centerline, success_overall
 
@@ -2322,6 +2326,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     # Step 2: Calculate centerlines for each seed
     centerlines = []
     success_list = []
+    component_ratios = []
     
     for i, seed in enumerate(seeds):
         if verbose:
@@ -2376,7 +2381,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
                 segmentation, seed, verbose=verbose)
             
             # Calculate centerline using fast marching method
-            centerline, success = calc_centerline_fmm(
+            centerline, success, target_success_list = calc_centerline_fmm(
                 segmentation_body, 
                 seed=seed,
                 targets=None,  # Let calc_centerline_fmm find targets automatically
@@ -2386,11 +2391,20 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
                 move_target_if_fail=move_target_if_fail,
                 relax_factor=relax_factor,
                 verbose=verbose,
-                return_failed=return_failed
+                return_failed=return_failed,
+                return_success_list=True
             )
             
             centerlines.append(centerline)
             success_list.append(success)
+            
+            # Store component success ratio for detailed reporting
+            if target_success_list and len(target_success_list) > 0:
+                component_success_ratio = target_success_list.count(True) / len(target_success_list)
+            else:
+                component_success_ratio = 0.0
+            
+            component_ratios.append(component_success_ratio)
             
             if verbose:
                 if success:
@@ -2420,6 +2434,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
             empty_centerline = vtk.vtkPolyData()
             centerlines.append(empty_centerline)
             success_list.append(False)
+            component_ratios.append(0.0)  # Add 0.0 ratio for failed case
     
     # Step 3: Combine all centerlines into unified polydata
     if verbose:
@@ -2446,6 +2461,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     success_info = {
         'overall_success': successful_centerlines_count > 0,
         'component_successes': success_list,
+        'component_ratios': component_ratios,
         'num_components': component_info['num_components'],
         'num_successful': successful_centerlines_count,
         'seeds_used': seeds
@@ -2510,7 +2526,7 @@ if __name__ == '__main__':
     # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/truths/'
 
     # Output directory
-    out_dir = path_segs + '/centerlines_fmm/'
+    out_dir = path_segs + '/centerlines_fmm_only_successful/'
     os.makedirs(out_dir, exist_ok=True)
 
     # Image extension
@@ -2518,6 +2534,7 @@ if __name__ == '__main__':
     # img_ext = '.mha'
 
     # Verbose
+    return_failed = False
     write_files = False
     verbose = True
 
@@ -2561,9 +2578,11 @@ if __name__ == '__main__':
         # skip if already done
         if os.path.exists(os.path.join(out_dir, 'done.txt')):
             with open(os.path.join(out_dir, 'done.txt'), 'r') as f:
-                done = f.read().splitlines()
+                done_lines = f.read().splitlines()
                 f.close()
-            if name in done:
+            # Extract case names from lines (format: "name: success_info")
+            done_names = [line.split(':')[0].strip() for line in done_lines if ':' in line]
+            if name in done_names:
                 print(f"Already done with: {seg}")
                 continue
     
@@ -2639,7 +2658,7 @@ if __name__ == '__main__':
             move_target_if_fail=False,
             relax_factor=1,
             verbose=verbose,
-            return_failed=True
+            return_failed=return_failed
         )
 
         print(f"Time in seconds: {time.time() - time_start:0.3f}")
@@ -2653,8 +2672,24 @@ if __name__ == '__main__':
         print(f"Multi-component centerline written to: {pfn}")
         print(f"Success info: {success_info}")
 
-        # write to done.txt
+        # Calculate success ratio
+        success_ratio = success_info['num_successful'] / success_info['num_components'] if success_info['num_components'] > 0 else 0.0
+        
+        # Create component success info with ratios
+        component_details = []
+        for i, component_success in enumerate(success_info['component_successes']):
+            # Get component success ratio if available
+            if 'component_ratios' in success_info and i < len(success_info['component_ratios']):
+                ratio = success_info['component_ratios'][i]
+                component_details.append(f"C{i+1}:{ratio:.3f}")
+            else:
+                # Fallback to binary status
+                status = "✓" if component_success else "✗"
+                component_details.append(f"C{i+1}:{status}")
+        component_detail_str = " ".join(component_details)
+        
+        # write to done.txt with success ratio
         with open(os.path.join(out_dir, 'done.txt'), 'a') as f:
-            f.write(name+'\n')
+            f.write(f"{name}: {success_info['num_successful']}/{success_info['num_components']} ({success_ratio:.3f}) [{component_detail_str}]\n")
             f.close()
-        print(f"Done with: {name}")
+        print(f"Done with: {name} - Success ratio: {success_ratio:.3f} - Components: {component_detail_str}")
