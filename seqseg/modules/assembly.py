@@ -214,6 +214,19 @@ class Segmentation:
         resampled, _ = resample_spacing(self.assembly,
                                         template_size=template_size)
         return resampled
+    
+    def get_n_updates_image(self):
+        "Function to get the n_updates as a sitk image"
+        return numpy_to_sitk(self.number_updates, self.image_reader)
+    
+    def calc_ratio_updates(self):
+        "Function to calculate ratio of voxels updated at least once"
+        n_updates = self.number_updates
+        total_voxels = np.prod(n_updates.shape)
+        processed_voxels = np.count_nonzero(n_updates)
+        ratio = processed_voxels/total_voxels
+        print(f"\n Ratio of processed voxels: {ratio:.2%}\n")
+        return ratio
 
 
 class VesselTree:
@@ -866,7 +879,7 @@ def get_old_ref_point(vessel_tree,
     return old_point_ref
 
 
-def calc_centerline_global(predicted_vessels, initial_seeds):
+def calc_centerline_global(predicted_vessels, initial_seeds, verbose=False):
     """
     Function to loop over inital seeds and construct global centerline(s)
 
@@ -897,7 +910,7 @@ def calc_centerline_global(predicted_vessels, initial_seeds):
                                                      min_res=700,
                                                      relax_factor=3,
                                                      return_target_all=True,
-                                                     verbose=True,
+                                                     verbose=verbose,
                                                      return_failed=True)
         centerline_poly.append(cent)
         targets_list.append(targets)
