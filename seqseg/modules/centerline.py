@@ -2327,6 +2327,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     centerlines = []
     success_list = []
     component_ratios = []
+    component_target_counts = []  # Store actual target counts for each component
     
     for i, seed in enumerate(seeds):
         if verbose:
@@ -2398,11 +2399,15 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
             centerlines.append(centerline)
             success_list.append(success)
             
-            # Store component success ratio for detailed reporting
+            # Store component success ratio and counts for detailed reporting
             if target_success_list and len(target_success_list) > 0:
-                component_success_ratio = target_success_list.count(True) / len(target_success_list)
+                successful_targets = target_success_list.count(True)
+                total_targets = len(target_success_list)
+                component_success_ratio = successful_targets / total_targets
+                component_target_counts.append((successful_targets, total_targets))
             else:
                 component_success_ratio = 0.0
+                component_target_counts.append((0, 1))  # Default to 0/1 for failed cases
             
             component_ratios.append(component_success_ratio)
             
@@ -2435,6 +2440,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
             centerlines.append(empty_centerline)
             success_list.append(False)
             component_ratios.append(0.0)  # Add 0.0 ratio for failed case
+            component_target_counts.append((0, 1))  # Add 0/1 for failed case
     
     # Step 3: Combine all centerlines into unified polydata
     if verbose:
@@ -2462,6 +2468,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
         'overall_success': successful_centerlines_count > 0,
         'component_successes': success_list,
         'component_ratios': component_ratios,
+        'component_target_counts': component_target_counts,
         'num_components': component_info['num_components'],
         'num_successful': successful_centerlines_count,
         'seeds_used': seeds
@@ -2675,13 +2682,13 @@ if __name__ == '__main__':
         # Calculate success ratio
         success_ratio = success_info['num_successful'] / success_info['num_components'] if success_info['num_components'] > 0 else 0.0
         
-        # Create component success info with ratios
+        # Create component success info with ratios as fractions
         component_details = []
         for i, component_success in enumerate(success_info['component_successes']):
-            # Get component success ratio if available
-            if 'component_ratios' in success_info and i < len(success_info['component_ratios']):
-                ratio = success_info['component_ratios'][i]
-                component_details.append(f"C{i+1}:{ratio:.3f}")
+            # Get component target counts if available
+            if 'component_target_counts' in success_info and i < len(success_info['component_target_counts']):
+                successful, total = success_info['component_target_counts'][i]
+                component_details.append(f"C{i+1}:{successful}/{total}")
             else:
                 # Fallback to binary status
                 status = "✓" if component_success else "✗"
