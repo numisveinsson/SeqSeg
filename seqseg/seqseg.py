@@ -341,8 +341,8 @@ def main():
 
         # Process and save final segmentation results
         # Global assembly contains accumulated segmentations from all tracing steps
-        assembly_org = assembly_obj.assembly
-        assembly = assembly_org
+        assembly = assembly_obj.assembly
+        n_udpates = assembly_obj.get_n_updates_image()
 
         # Create binary segmentation by thresholding probability map
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5,
@@ -353,6 +353,11 @@ def main():
                         + test_name + '_' + str(i) + '.mha')
         sitk.WriteImage(assembly, dir_output+'/'+case+'_prob_seg_'
                         + test_name + '_' + str(i) + '.mha')
+        sitk.WriteImage(n_udpates, dir_output+'/'+case+'_n_updates_'
+                        + test_name + '_' + str(i) + '.mha')
+        
+        # Print out ratio of voxels processed by SeqSeg (the non-zero updates)
+        assembly_obj.calc_ratio_updates()
 
         # Filter segmentation to keep only components connected to seed points
         # This removes disconnected vessel segments that may be artifacts
