@@ -9,7 +9,7 @@ import numpy as np
 sys.path.insert(0, './')
 from seqseg.modules.sitk_functions import create_new, distance_map_from_seg
 from seqseg.modules.vtk_functions import (calc_caps, evaluate_surface, 
-                                   points2polydata, write_geo)
+                                   points2polydata, write_geo, appendPolyData)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -1114,10 +1114,14 @@ def backtracking_gradient(gradient, distance_map_surf_np,
                                         current_index[2]]
         else:
             gradient_current = interpolate_gradient(gradient, current, seg_img)
-        # print(f"Gradient norm: {np.linalg.norm(gradient_current)}")
-        # print(f"Gradient: {gradient_current}")
+        
+        # Calculate gradient magnitude before normalization
+        gradient_magnitude = np.linalg.norm(gradient_current)
+        # if verbose:
+        #     print(f"      Step {len(points)}: gradient magnitude = {gradient_magnitude:.6f}")
+        
         # Normalize gradient
-        gradient_current = gradient_current / np.linalg.norm(gradient_current)
+        gradient_current = gradient_current / gradient_magnitude
         # Move in the direction of the gradient
         current = current - step_size * gradient_current
         # Get index of current point
@@ -1156,7 +1160,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         move_target_if_fail=False,
                         relax_factor=1, return_target=False,
                         return_target_all=False,
-                        verbose=False, return_failed=False):
+                        verbose=False, return_failed=False,
+                        ):
     """
     Function to calculate the centerline of a segmentation
     using the fast marching method. The method goes as follows:
@@ -1271,6 +1276,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                       for target in targets]
 
     if not output:
+        if verbose:
+            print("Still need to calculate fast marching method") 
         # Mask distance map with segmentation
         distance_map = sitk.Mask(distance_map_surf, segmentation)
         # print(f"Max: {sitk.GetArrayFromImage(distance_map).max()}")
@@ -1297,13 +1304,20 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         print(f"Max of output mask: {sitk.GetArrayFromImage(output_mask).max()}")
         print(f"Min: {sitk.GetArrayFromImage(output_mask).min()}")
     if out_dir and write_files:
+        sitk.WriteImage(output,
+                        os.path.join(out_dir, 'out_fmm.mha'))
         sitk.WriteImage(output_mask,
                         os.path.join(out_dir, 'masked_out_fmm.mha'))
+        sitk.WriteImage(segmentation,
+                        os.path.join(out_dir, 'segmentation_from_fmm.mha'))
     # Get gradient of distance map
     gradient = gradient_matrix(
         sitk.GetArrayFromImage(output).transpose(2, 1, 0))
     if verbose:
+        # Calculate and print gradient magnitude statistics
+        gradient_magnitude = np.sqrt(np.sum(gradient**2, axis=0))
         print("Gradient calculated")
+        print(f"    Gradient magnitude - Min: {gradient_magnitude.min():.6f}, Max: {gradient_magnitude.max():.6f}, Mean: {gradient_magnitude.mean():.6f}")
 
     points_list, success_list = [], []
     for t_num, target_np in enumerate(targets_np):
@@ -1314,7 +1328,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                                 distance_map_surf_np,
                                                 segmentation,
                                                 seed_np, target_np,
-                                                relax_factor=relax_factor)
+                                                relax_factor=relax_factor,
+                                                verbose=verbose)
         if not success and move_target_if_fail:
             print("\n   Trying to move target inside segmentation")
             pot_point = calc_points_target(max_surf, distance_map_surf,
@@ -1326,7 +1341,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                                         distance_map_surf_np,
                                                         segmentation,
                                                         seed_np, pot_point,
-                                                        relax_factor=relax_factor)
+                                                        relax_factor=relax_factor,
+                                                        verbose=verbose)
         # Add points to list
         points_list.append(points)
         success_list.append(success)
@@ -1758,8 +1774,16 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     # Convert wave distance map to integers
     wave_distance_map = sitk.Cast(wave_distance_map, sitk.sitkInt32)
     if out_dir and write_files:
+        sitk.WriteImage(segmentation,
+                        os.path.join(out_dir, 'segmentation_from_cluster.mha'))
         sitk.WriteImage(wave_distance_map,
                         os.path.join(out_dir, 'wave_distance_map.mha'))
+        sitk.WriteImage(speed_image,
+                        os.path.join(out_dir, 'speed_image.mha'))
+        sitk.WriteImage(wave_distance_map_output,
+                        os.path.join(out_dir,
+                                     'wave_distance_map_output.mha'))
+    print("Converted wave distance map to integers")
 
     # Get unique values in wave distance map
     unique_values = np.unique(
@@ -1865,6 +1889,293 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     return seed_np, end_points_phys_np
 
 
+def extract_disconnected_body_around_seed(segmentation, seed, verbose=False):
+    """
+    Extract the disconnected body (connected component) that contains the given seed point.
+    
+    This function isolates a single connected component from a multi-component segmentation
+    by finding the component that contains the specified seed point. This is useful for
+    calculating centerlines on individual components rather than the entire segmentation.
+    
+    Parameters
+    ----------
+    segmentation : sitk.Image
+        Binary segmentation image that may contain multiple disconnected bodies
+    seed : np.array
+        Seed point in physical coordinates that should be contained within the
+        extracted component
+    verbose : bool, optional
+        If True, prints detailed information about the extraction process. Defaults to False.
+        
+    Returns
+    -------
+    component_segmentation : sitk.Image
+        Binary segmentation containing only the connected component that contains
+        the seed point. Has the same properties (size, spacing, origin, direction)
+        as the input segmentation.
+        
+    Raises
+    ------
+    ValueError
+        If the seed point is not within any connected component of the segmentation
+        
+    Example
+    -------
+    >>> segmentation = sitk.ReadImage("multi_vessel.nii.gz")
+    >>> seed = np.array([10.5, 20.3, 15.7])  # Physical coordinates
+    >>> single_component = extract_disconnected_body_around_seed(segmentation, seed, verbose=True)
+    >>> print(f"Original volume: {np.sum(sitk.GetArrayFromImage(segmentation))}")
+    >>> print(f"Component volume: {np.sum(sitk.GetArrayFromImage(single_component))}")
+    """
+    if verbose:
+        print(f"Extracting disconnected body around seed: {seed}")
+    
+    # Convert seed to index coordinates
+    try:
+        seed_index = segmentation.TransformPhysicalPointToIndex(seed.tolist())
+    except Exception as e:
+        raise ValueError(f"Failed to convert seed point to image coordinates: {e}")
+    
+    # Validate seed is within image bounds
+    seg_size = segmentation.GetSize()
+    if (seed_index[0] < 0 or seed_index[1] < 0 or seed_index[2] < 0 or
+        seed_index[0] >= seg_size[0] or seed_index[1] >= seg_size[1] or seed_index[2] >= seg_size[2]):
+        # Try to clamp to bounds
+        seed_index = [max(0, min(seed_index[0], seg_size[0]-1)),
+                     max(0, min(seed_index[1], seg_size[1]-1)),
+                     max(0, min(seed_index[2], seg_size[2]-1))]
+        if verbose:
+            print(f"  Warning: Seed was outside bounds, clamped to: {seed_index}")
+    
+    # Check if seed is within segmentation mask
+    seg_value = segmentation.GetPixel(seed_index)
+    if seg_value == 0:
+        if verbose:
+            print(f"  Warning: Seed at index {seed_index} is outside segmentation mask")
+        # Find nearest non-zero voxel
+        seg_array = sitk.GetArrayFromImage(segmentation).transpose(2, 1, 0)
+        nonzero_indices = np.argwhere(seg_array > 0)
+        if len(nonzero_indices) == 0:
+            raise ValueError("No non-zero voxels found in segmentation")
+        
+        distances = np.linalg.norm(nonzero_indices - np.array(seed_index), axis=1)
+        nearest_idx = nonzero_indices[np.argmin(distances)]
+        seed_index = nearest_idx.tolist()
+        if verbose:
+            print(f"  Moved seed to nearest segmentation voxel: {seed_index}")
+    
+    if verbose:
+        print(f"  Seed index: {seed_index}")
+        print(f"  Original segmentation volume: {np.sum(sitk.GetArrayFromImage(segmentation))}")
+    
+    # Find connected components
+    connected_filter = sitk.ConnectedComponentImageFilter()
+    connected_filter.SetFullyConnected(True)  # Include diagonal connections
+    connected_components = connected_filter.Execute(segmentation)
+    
+    # Get the label of the component containing the seed
+    seed_label = connected_components.GetPixel(seed_index)
+    
+    if seed_label == 0:
+        raise ValueError(f"Seed point at {seed} (index {seed_index}) is not within any connected component")
+    
+    if verbose:
+        # Get component statistics for reporting
+        label_stats = sitk.LabelShapeStatisticsImageFilter()
+        label_stats.Execute(connected_components)
+        num_components = label_stats.GetNumberOfLabels()
+        seed_component_size = label_stats.GetNumberOfPixels(seed_label)
+        
+        print(f"  Found {num_components} total components")
+        print(f"  Seed is in component {seed_label} with {seed_component_size} voxels")
+    
+    # Create binary mask for the component containing the seed
+    component_mask = sitk.BinaryThreshold(connected_components,
+                                        lowerThreshold=seed_label,
+                                        upperThreshold=seed_label,
+                                        insideValue=1,
+                                        outsideValue=0)
+    
+    # Apply mask to original segmentation to extract just this component
+    component_segmentation = sitk.Mask(segmentation, component_mask)
+    
+    # Ensure the result is binary
+    component_segmentation = sitk.BinaryThreshold(component_segmentation,
+                                                lowerThreshold=1,
+                                                upperThreshold=255,
+                                                insideValue=1,
+                                                outsideValue=0)
+    
+    if verbose:
+        component_volume = np.sum(sitk.GetArrayFromImage(component_segmentation))
+        print(f"  Extracted component volume: {component_volume}")
+        reduction_ratio = component_volume / np.sum(sitk.GetArrayFromImage(segmentation))
+        print(f"  Volume reduction: {reduction_ratio:.3f} ({100*(1-reduction_ratio):.1f}% reduction)")
+    
+    return component_segmentation
+
+
+def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=False):
+    """
+    Create seeds based on disconnected bodies in the segmentation.
+    For each disconnected body, pick the point with the highest surface distance value.
+    
+    Parameters
+    ----------
+    segmentation : sitk image
+        Input segmentation with potentially multiple disconnected bodies
+    nr_seeds : int, optional
+        Number of seeds to create. If None, creates one seed per disconnected body.
+        If the requested number exceeds the number of disconnected bodies, it will be
+        automatically reduced to match the number of available bodies with a warning.
+        Seeds are created from the largest disconnected bodies when fewer than all are requested.
+    verbose : bool
+        Print detailed information
+        
+    Returns
+    -------
+    seeds : list of np.array
+        List of seed points in physical coordinates
+    component_info : dict
+        Information about the connected components
+        
+    Example
+    -------
+    >>> segmentation = sitk.ReadImage("multi_vessel.nii.gz")
+    >>> seeds, info = create_seeds_from_disconnected_bodies(segmentation, nr_seeds=3, verbose=True)
+    >>> print(f"Created {len(seeds)} seeds from {info['num_components']} components")
+    """
+    if verbose:
+        print(f"Analyzing disconnected bodies in segmentation...")
+        seg_array = sitk.GetArrayFromImage(segmentation)
+        print(f"  Total non-zero voxels: {np.sum(seg_array > 0)}")
+    
+    # Find connected components
+    connected_filter = sitk.ConnectedComponentImageFilter()
+    connected_filter.SetFullyConnected(True)  # Include diagonal connections
+    connected_components = connected_filter.Execute(segmentation)
+    
+    # Get component statistics
+    label_stats = sitk.LabelShapeStatisticsImageFilter()
+    label_stats.Execute(connected_components)
+    
+    num_components = label_stats.GetNumberOfLabels()
+    if verbose:
+        print(f"  Found {num_components} disconnected bodies")
+    
+    # Get component sizes and sort by size (largest first)
+    component_info = []
+    for label in label_stats.GetLabels():
+        size = label_stats.GetNumberOfPixels(label)
+        centroid = label_stats.GetCentroid(label)
+        component_info.append({
+            'label': label,
+            'size': size,
+            'centroid': centroid
+        })
+    
+    # Sort by size (largest first)
+    component_info.sort(key=lambda x: x['size'], reverse=True)
+    
+    if verbose:
+        print(f"  Component sizes: {[comp['size'] for comp in component_info]}")
+    
+    # Determine how many seeds to create
+    if nr_seeds is None:
+        nr_seeds = num_components
+        if verbose:
+            print(f"  No seed count specified, creating one seed per component ({nr_seeds} seeds)")
+    else:
+        original_nr_seeds = nr_seeds
+        nr_seeds = min(nr_seeds, num_components)
+        
+        if verbose:
+            if original_nr_seeds > num_components:
+                print(f"  Requested {original_nr_seeds} seeds, but only {num_components} disconnected bodies found")
+                print(f"  Adjusting to create {nr_seeds} seeds (one per disconnected body)")
+            else:
+                print(f"  Creating {nr_seeds} seeds from largest components")
+        
+        # Also provide a warning even when not verbose
+        elif original_nr_seeds > num_components:
+            print(f"Warning: Requested {original_nr_seeds} seeds, but only found {num_components} disconnected bodies. Creating {nr_seeds} seeds.")
+    
+    # Calculate surface distance map for the entire segmentation
+    distance_map = distance_map_from_seg(segmentation)
+    # Invert so positive values are inside (higher = more central)
+    distance_map = distance_map * -1
+    distance_map_array = sitk.GetArrayFromImage(distance_map).transpose(2, 1, 0)
+    connected_array = sitk.GetArrayFromImage(connected_components).transpose(2, 1, 0)
+    
+    seeds = []
+    selected_components = component_info[:nr_seeds]
+    
+    for i, comp in enumerate(selected_components):
+        label = comp['label']
+        if verbose:
+            print(f"    Processing component {label} (size: {comp['size']})")
+        
+        # Get all indices belonging to this component
+        component_indices = np.argwhere(connected_array == label)
+        
+        if len(component_indices) == 0:
+            if verbose:
+                print(f"      Warning: No voxels found for component {label}")
+            continue
+        
+        # Find the point with maximum distance value within this component
+        max_distance = -np.inf
+        best_index = None
+        
+        for idx in component_indices:
+            distance_val = distance_map_array[idx[0], idx[1], idx[2]]
+            if distance_val > max_distance:
+                max_distance = distance_val
+                best_index = idx
+        
+        if best_index is not None:
+            # Convert index to physical coordinates
+            physical_point = segmentation.TransformIndexToPhysicalPoint(best_index.tolist())
+            seeds.append(np.array(physical_point))
+            
+            if verbose:
+                print(f"      Seed {i+1}: index {best_index} -> physical {physical_point}")
+                print(f"      Distance value: {max_distance:.6f}")
+                print(f"      Component size: {comp['size']} voxels")
+                
+                # Check seed quality
+                if max_distance < 0.5:
+                    print(f"      Warning: Low distance value may indicate problematic seed placement")
+                
+                # Check component shape characteristics
+                if comp['size'] < 100:
+                    print(f"      Warning: Small component size may lead to centerline calculation issues")
+        else:
+            if verbose:
+                print(f"      Warning: Could not find valid seed for component {label}")
+                print(f"      Component had {len(component_indices)} indices but no valid distance values")
+    
+    if verbose:
+        print(f"  Successfully created {len(seeds)} seeds")
+    
+    # Write seeds as polydata for visualization/debugging
+    if len(seeds) > 0:
+        seeds_polydata = points2polydata(seeds)
+        return seeds, {
+            'num_components': num_components,
+            'component_info': component_info,
+            'selected_components': selected_components,
+            'seeds_polydata': seeds_polydata
+        }
+    else:
+        return seeds, {
+            'num_components': num_components,
+            'component_info': component_info,
+            'selected_components': selected_components,
+            'seeds_polydata': None
+        }
+
+
 def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
     """
     Function to get the end points of a cluster map.
@@ -1915,6 +2226,240 @@ def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
     return end_points
 
 
+def calc_multi_component_centerlines(segmentation, nr_seeds=None, 
+                                   min_res=300, out_dir=None, write_files=False,
+                                   move_target_if_fail=False, relax_factor=1,
+                                   verbose=False, return_failed=False):
+    """
+    Calculate centerlines for multi-component segmentations by creating seeds
+    from disconnected bodies and computing centerlines for each component.
+    
+    This function:
+    1. Analyzes the segmentation to find disconnected bodies
+    2. Creates optimal seed points for each disconnected body
+    3. Calculates centerlines using fast marching method for each seed
+    4. Combines all centerlines into a unified polydata structure
+    
+    Parameters
+    ----------
+    segmentation : sitk.Image
+        Binary segmentation image containing one or more disconnected bodies
+    nr_seeds : int, optional
+        Number of seeds to generate. If None, creates one seed per disconnected body.
+        If the requested number exceeds the number of disconnected bodies, it will be
+        automatically reduced to match the number of available bodies with a warning.
+    min_res : int, optional
+        Minimum resolution for centerline calculation. If segmentation resolution
+        is lower, it will be resampled. Defaults to 300.
+    out_dir : str, optional
+        Output directory for intermediate files. Defaults to None.
+    write_files : bool, optional
+        Whether to write intermediate files to disk. Defaults to False.
+    move_target_if_fail : bool, optional
+        Whether to attempt moving target points if centerline calculation fails.
+        Defaults to False.
+    relax_factor : float, optional
+        Factor to relax the tolerance for backtracking convergence. Defaults to 1.
+    verbose : bool, optional
+        If True, prints detailed information about the process. Defaults to False.
+    return_failed : bool, optional
+        Whether to include failed centerline attempts in the output. Defaults to False.
+        
+    Returns
+    -------
+    unified_centerline : vtk.vtkPolyData
+        Combined centerlines from all disconnected bodies as a single polydata
+    success_info : dict
+        Dictionary containing success information:
+        - 'overall_success': bool, whether any centerlines were successfully calculated
+        - 'component_successes': list of bool, success status for each component
+        - 'num_components': int, total number of disconnected bodies found
+        - 'num_successful': int, number of successful centerline calculations
+        - 'seeds_used': list of np.array, seed points that were used
+        
+    Example
+    -------
+    >>> segmentation = sitk.ReadImage("multi_vessel.nii.gz")
+    >>> centerline, info = calc_multi_component_centerlines(segmentation, verbose=True)
+    >>> print(f"Calculated centerlines for {info['num_successful']}/{info['num_components']} components")
+    >>> # Save unified centerline
+    >>> from seqseg.modules.vtk_functions import write_geo
+    >>> write_geo("unified_centerline.vtp", centerline)
+    """
+    if verbose:
+        print("Starting multi-component centerline calculation...")
+        
+    # Step 1: Create seeds from disconnected bodies
+    if verbose:
+        print("Step 1: Analyzing disconnected bodies and creating seeds...")
+    
+    seeds, component_info = create_seeds_from_disconnected_bodies(
+        segmentation, nr_seeds=nr_seeds, verbose=verbose)
+    
+    # Write seeds as polydata file if output directory is specified
+    if out_dir and write_files and component_info.get('seeds_polydata') is not None:
+        seeds_filename = os.path.join(out_dir, 'multi_component_seeds.vtp')
+        write_geo(seeds_filename, component_info['seeds_polydata'])
+        if verbose:
+            print(f"  Seeds written to: {seeds_filename}")
+    
+    if len(seeds) == 0:
+        if verbose:
+            print("No seeds could be created from the segmentation")
+        # Return empty polydata
+        empty_polydata = vtk.vtkPolyData()
+        return empty_polydata, {
+            'overall_success': False,
+            'component_successes': [],
+            'num_components': 0,
+            'num_successful': 0,
+            'seeds_used': []
+        }
+    
+    if verbose:
+        print(f"Step 2: Calculating centerlines for {len(seeds)} seeds...")
+    
+    # Step 2: Calculate centerlines for each seed
+    centerlines = []
+    success_list = []
+    
+    for i, seed in enumerate(seeds):
+        if verbose:
+            print(f"  Processing seed {i+1}/{len(seeds)}: {seed}")
+            
+        # Add seed validation and diagnostics
+        try:
+            # Validate seed is within segmentation bounds
+            seed_index = segmentation.TransformPhysicalPointToIndex(seed.tolist())
+            seg_size = segmentation.GetSize()
+            
+            if (seed_index[0] < 0 or seed_index[1] < 0 or seed_index[2] < 0 or
+                seed_index[0] >= seg_size[0] or seed_index[1] >= seg_size[1] or seed_index[2] >= seg_size[2]):
+                if verbose:
+                    print(f"    Warning: Seed {i+1} is outside segmentation bounds")
+                    print(f"      Seed index: {seed_index}, Segmentation size: {seg_size}")
+                # Try to move seed inside bounds
+                seed_index = [max(0, min(seed_index[0], seg_size[0]-1)),
+                             max(0, min(seed_index[1], seg_size[1]-1)),
+                             max(0, min(seed_index[2], seg_size[2]-1))]
+                seed = np.array(segmentation.TransformIndexToPhysicalPoint(seed_index))
+                if verbose:
+                    print(f"      Adjusted seed to: {seed}, index: {seed_index}")
+            
+            # Check if seed is in segmentation mask
+            seg_value = segmentation.GetPixel(seed_index)
+            if seg_value == 0:
+                if verbose:
+                    print(f"    Warning: Seed {i+1} is outside segmentation mask (value={seg_value})")
+                # Find nearest non-zero voxel
+                seg_array = sitk.GetArrayFromImage(segmentation).transpose(2, 1, 0)
+                nonzero_indices = np.argwhere(seg_array > 0)
+                if len(nonzero_indices) > 0:
+                    distances = np.linalg.norm(nonzero_indices - np.array(seed_index), axis=1)
+                    nearest_idx = nonzero_indices[np.argmin(distances)]
+                    seed = np.array(segmentation.TransformIndexToPhysicalPoint(nearest_idx.tolist()))
+                    if verbose:
+                        print(f"      Moved seed to nearest segmentation voxel: {seed}")
+                else:
+                    if verbose:
+                        print(f"    Error: No non-zero voxels found in segmentation for seed {i+1}")
+                    empty_centerline = vtk.vtkPolyData()
+                    centerlines.append(empty_centerline)
+                    success_list.append(False)
+                    continue
+            
+            if verbose:
+                print(f"    Seed {i+1} validation passed - proceeding with centerline calculation")
+            
+            # Extract disconnected body around seed
+            segmentation_body = extract_disconnected_body_around_seed(
+                segmentation, seed, verbose=verbose)
+            
+            # Calculate centerline using fast marching method
+            centerline, success = calc_centerline_fmm(
+                segmentation_body, 
+                seed=seed,
+                targets=None,  # Let calc_centerline_fmm find targets automatically
+                min_res=min_res,
+                out_dir=out_dir,
+                write_files=write_files,
+                move_target_if_fail=move_target_if_fail,
+                relax_factor=relax_factor,
+                verbose=verbose,
+                return_failed=return_failed
+            )
+            
+            centerlines.append(centerline)
+            success_list.append(success)
+            
+            if verbose:
+                if success:
+                    num_points = centerline.GetNumberOfPoints()
+                    num_cells = centerline.GetNumberOfCells()
+                    print(f"    Success: {num_points} points, {num_cells} cells")
+                    
+                    # Additional diagnostics for successful centerlines
+                    if centerline.GetPointData().GetArray("MaximumInscribedSphereRadius"):
+                        radius_array = centerline.GetPointData().GetArray("MaximumInscribedSphereRadius")
+                        radii = [radius_array.GetValue(i) for i in range(radius_array.GetNumberOfTuples())]
+                        print(f"    Radius range: {min(radii):.3f} - {max(radii):.3f}")
+                else:
+                    print(f"    Failed to calculate centerline for seed {i+1}")
+                    print(f"      This could be due to:")
+                    print(f"        - Insufficient targets found from this seed")
+                    print(f"        - Gradient backtracking failed")
+                    print(f"        - Component too small or isolated")
+                    
+        except Exception as e:
+            if verbose:
+                print(f"    Error calculating centerline for seed {i+1}: {str(e)}")
+                print(f"      Seed location: {seed}")
+                import traceback
+                print(f"      Full traceback: {traceback.format_exc()}")
+            # Create empty polydata for failed case
+            empty_centerline = vtk.vtkPolyData()
+            centerlines.append(empty_centerline)
+            success_list.append(False)
+    
+    # Step 3: Combine all centerlines into unified polydata
+    if verbose:
+        successful_count = sum(success_list)
+        print(f"Step 3: Combining {successful_count} successful centerlines...")
+    
+    # Filter out unsuccessful centerlines
+    successful_centerlines = []
+    successful_centerlines_count = 0
+    
+    for i, (centerline, success) in enumerate(zip(centerlines, success_list)):
+        if success and centerline.GetNumberOfPoints() > 0:
+            successful_centerlines.append(centerline)
+            successful_centerlines_count += 1
+    
+    # Use appendPolyData from vtk_functions to combine all successful centerlines
+    if successful_centerlines:
+        unified_centerline = appendPolyData(successful_centerlines)
+    else:
+        # Create empty polydata if no successful centerlines
+        unified_centerline = vtk.vtkPolyData()
+    
+    # Create success info
+    success_info = {
+        'overall_success': successful_centerlines_count > 0,
+        'component_successes': success_list,
+        'num_components': component_info['num_components'],
+        'num_successful': successful_centerlines_count,
+        'seeds_used': seeds
+    }
+    
+    if verbose:
+        print(f"Multi-component centerline calculation complete:")
+        print(f"  Total components: {success_info['num_components']}")
+        print(f"  Successful centerlines: {success_info['num_successful']}")
+        print(f"  Final unified centerline: {unified_centerline.GetNumberOfPoints()} points, {unified_centerline.GetNumberOfCells()} cells")
+    
+    return unified_centerline, success_info
+
+
 def test_centerline_fmm(directory, out_dir):
     """
     Function that tests the centerline calculation
@@ -1954,18 +2499,38 @@ def test_centerline_fmm(directory, out_dir):
 
 if __name__ == '__main__':
 
-    # Out directory
-    out_dir = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/centerlines_fmm/'
-
+    ###
+    # NOTE: A bug exists where if the Direction of the segmentation
+    # is not identity, the centerline calculation will fail.
+    ###
     # Path to segmentation
     path_segs = '/Users/numisveins/Documents/vascular_data_3d/truths/'
     path_segs = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/truths/'
+    path_segs = '//Users/nsveinsson/Documents/datasets/CAS_coronary_dataset/1-200/'
+    # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/truths/'
+
+    # Output directory
+    out_dir = path_segs + '/centerlines_fmm/'
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Image extension
+    img_ext = '.nii.gz'
+    # img_ext = '.mha'
+
+    # Verbose
+    write_files = False
+    verbose = True
 
     # Start index
     start = 0
+    stop = None
+
+    # If contains string, only process those files
+    contains_str = 'label'
+    # contains_str = ''
 
     # Path to spacing file
-    if_spacing_file = True
+    if_spacing_file = False
     spacing_file = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/meta.csv'
 
     # Path to end points
@@ -1973,7 +2538,9 @@ if __name__ == '__main__':
     end_points_dir = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/end_points/'
 
     # List of segmentations
-    segs = [f for f in os.listdir(path_segs) if f.endswith('.mha')]
+    segs = [f for f in os.listdir(path_segs) if f.endswith(img_ext)]
+    if contains_str:
+        segs = [f for f in segs if contains_str in f]
     segs = sorted(segs)
 
     if if_spacing_file:
@@ -1985,7 +2552,7 @@ if __name__ == '__main__':
         spacing_values = [tuple(map(float, x[1:-1].split(','))) for x in spacing_values]
 
     # Loop through all segmentations
-    for seg in segs[start:]:
+    for seg in segs[start:stop]:
 
         print(f"\n\nCalculating centerline for: {seg}\n\n")
         path_seg = os.path.join(path_segs, seg)
@@ -2003,6 +2570,30 @@ if __name__ == '__main__':
         # Load segmentation
         segmentation = sitk.ReadImage(path_seg)
 
+        # Print img info
+        print(f"Segmentation info:")
+        print(f"  Size: {segmentation.GetSize()}")
+        print(f"  Spacing: {segmentation.GetSpacing()}")
+        print(f"  Origin: {segmentation.GetOrigin()}")
+        print(f"  Direction: {segmentation.GetDirection()}")
+
+        # Set Direction to identity
+        segmentation.SetDirection((1.0, 0.0, 0.0,
+                                  0.0, 1.0, 0.0,
+                                  0.0, 0.0, 1.0))
+
+        # Cast to uint8
+        segmentation = sitk.Cast(segmentation, sitk.sitkUInt8)
+
+        # Make binary
+        max_value = int(sitk.GetArrayFromImage(segmentation).max())
+        print(f"Max value in segmentation: {max_value}")
+        segmentation = sitk.BinaryThreshold(segmentation,
+                                             lowerThreshold=1,
+                                             upperThreshold=max_value,
+                                             insideValue=1,
+                                             outsideValue=0)
+        
         if if_spacing_file:
             # set the spacing
             segmentation.SetSpacing(spacing_values[segs.index(seg)])
@@ -2024,20 +2615,43 @@ if __name__ == '__main__':
         else:
             targets = None
         # Calculate centerline
-        centerline, success_overall = calc_centerline_fmm(
+        # centerline, success_overall, targets = calc_centerline_fmm(
+        #     segmentation,
+        #     out_dir=out_dir,
+        #     write_files=write_files,
+        #     seed=None,
+        #     targets=targets,
+        #     move_target_if_fail=False,
+        #     return_failed=True,
+        #     return_target_all=True,
+        #     return_target=False,
+        #     verbose=verbose,
+        #     # min_res=500,
+        #     )
+        
+        # Calculate multi-component centerlines
+        centerline_multi, success_info = calc_multi_component_centerlines(
             segmentation,
+            nr_seeds=None,
+            min_res=300,
             out_dir=out_dir,
-            write_files=False,
-            seed=None,
-            targets=targets,
+            write_files=write_files,
             move_target_if_fail=False,
-            )
+            relax_factor=1,
+            verbose=verbose,
+            return_failed=True
+        )
 
         print(f"Time in seconds: {time.time() - time_start:0.3f}")
-        pfn = os.path.join(out_dir, name+'.vtp')
-        write_geo(pfn, centerline)
-        print(f"Centerline written to: {pfn}")
-        print(f"Success: {success_overall}")
+        # pfn = os.path.join(out_dir, name+'.vtp')
+        # write_geo(pfn, centerline)
+        # print(f"Centerline written to: {pfn}")
+        # print(f"Success: {success_overall}")
+
+        pfn = os.path.join(out_dir, name+'_multi.vtp')
+        write_geo(pfn, centerline_multi)
+        print(f"Multi-component centerline written to: {pfn}")
+        print(f"Success info: {success_info}")
 
         # write to done.txt
         with open(os.path.join(out_dir, 'done.txt'), 'a') as f:
