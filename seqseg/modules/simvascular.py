@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
 import numpy as np
+import os
+import vtk
 
 
 def compute_tangents(points):
@@ -102,7 +104,131 @@ def create_pth(points, output_path):
     print(f"✅ SimVascular .pth file written to {output_path}")
 
 
+def write_pths_from_vtp(vtp_path, out_dir=None, prefix=None, verbose=True):
+    """Read a centerline `.vtp` and write one SimVascular `.pth` per polyline branch.
+
+    Parameters
+    ----------
+    vtp_path : str
+        Path to the input `.vtp` file containing centerline polydata (lines).
+    out_dir : str, optional
+        Directory to write `.pth` files to. If None, uses the directory of `vtp_path`.
+    prefix : str, optional
+        Filename prefix for output files. If None, uses the base name of `vtp_path`.
+    verbose : bool
+        If True, prints progress messages.
+
+    Returns
+    -------
+    written : list of str
+        List of written `.pth` file paths.
+    """
+    if not os.path.exists(vtp_path):
+        raise FileNotFoundError(f"Input VTP not found: {vtp_path}")
+
+    if out_dir is None:
+        out_dir = os.path.dirname(os.path.abspath(vtp_path))
+    os.makedirs(out_dir, exist_ok=True)
+
+    if prefix is None:
+        prefix = os.path.splitext(os.path.basename(vtp_path))[0]
+
+    # Read VTP
+    reader = vtk.vtkXMLPolyDataReader()
+    reader.SetFileName(vtp_path)
+    reader.Update()
+    polydata = reader.GetOutput()
+
+    num_cells = polydata.GetNumberOfCells()
+    pts = polydata.GetPoints()
+    if verbose:
+        print(f"Read VTP: {vtp_path} -> {num_cells} cells, {pts.GetNumberOfPoints()} points")
+
+    written = []
+
+    # Iterate cells; each cell that is a polyline becomes one .pth
+    for ci in range(num_cells):
+        cell = polydata.GetCell(ci)
+        pid_list = cell.GetPointIds()
+        n = pid_list.GetNumberOfIds()
+        if n < 2:
+            # skip degenerate
+            if verbose:
+                print(f"  Skipping cell {ci} (less than 2 points)")
+            continue
+
+        branch_points = []
+        for pi in range(n):
+            pid = pid_list.GetId(pi)
+            xyz = pts.GetPoint(pid)
+            branch_points.append((float(xyz[0]), float(xyz[1]), float(xyz[2])))
+
+        out_name = f"{prefix}_branch{ci+1}.pth"
+        out_path = os.path.join(out_dir, out_name)
+        create_pth(branch_points, out_path)
+        written.append(out_path)
+        if verbose:
+            print(f"  Wrote branch {ci+1}/{num_cells} -> {out_path}")
+
+    if verbose:
+        print(f"Done: wrote {len(written)} .pth files to {out_dir}")
+
+    return written
+
+
+def write_pths_from_dir(vtp_dir, out_dir=None, verbose=True):
+    """Scan a directory for `.vtp` centerline files and write `.pth` files for each.
+
+    Parameters
+    ----------
+    vtp_dir : str
+        Directory containing `.vtp` files (non-recursive).
+    out_dir : str, optional
+        Directory to place generated `.pth` files. If None, a subdirectory
+        named `<vtp_dir>_pths` will be created next to `vtp_dir`.
+    verbose : bool
+        If True, prints progress messages.
+
+    Returns
+    -------
+    results : dict
+        Mapping from input `.vtp` path to list of written `.pth` file paths.
+    """
+    vtp_dir = os.path.abspath(vtp_dir)
+    if not os.path.isdir(vtp_dir):
+        raise NotADirectoryError(f"Not a directory: {vtp_dir}")
+
+    if out_dir is None:
+        out_dir = vtp_dir.rstrip(os.sep) + '_pths'
+    os.makedirs(out_dir, exist_ok=True)
+
+    vtp_files = sorted([f for f in os.listdir(vtp_dir) if f.lower().endswith('.vtp')])
+    if verbose:
+        print(f"Found {len(vtp_files)} .vtp files in {vtp_dir}")
+
+    results = {}
+    for vtp_fn in vtp_files:
+        vtp_path = os.path.join(vtp_dir, vtp_fn)
+        prefix = os.path.splitext(vtp_fn)[0]
+        if verbose:
+            print(f"Processing: {vtp_path}")
+        written = write_pths_from_vtp(vtp_path, out_dir=out_dir, prefix=prefix, verbose=verbose)
+        results[vtp_path] = written
+
+    if verbose:
+        total = sum(len(v) for v in results.values())
+        print(f"Wrote {total} .pth files for {len(results)} VTPs into {out_dir}")
+
+    return results
+
+
 if __name__ == "__main__":
+
+    dir = '/Users/nsveinsson/Documents/datasets/CAS_coronary_dataset/1-200/centerlines_fmm_only_successful/'
+    out_dir = dir + '_pths'
+
+    write_pths_from_dir(dir, out_dir=out_dir, verbose=True)
+
     # Example usage
     example_points = [
         (-2.6108, 12.7837, 166.0114),
