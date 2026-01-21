@@ -1212,8 +1212,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     distance_map_surf = distance_map_from_seg(segmentation)
     # Switch sign of distance map
     distance_map_surf = distance_map_surf * -1
-    distance_map_surf_np = sitk.GetArrayFromImage(
-        distance_map_surf).transpose(2, 1, 0)
+    distance_map_surf_np = sitk.GetArrayFromImage(distance_map_surf).transpose(2, 1, 0)
     # Get maximum value of distance map
     max_surf = distance_map_surf_np.max()
     if verbose:
@@ -1230,7 +1229,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         seed, targets, output = cluster_map(segmentation,
                                             return_wave_distance_map=True,
                                             out_dir=out_dir,
-                                            write_files=write_files)
+                                            write_files=write_files,
+                                            verbose=verbose)
     elif seed is None:
         print(f"Need to create seed, targets given: {targets}")
         index = np.where(distance_map_surf_np == max_surf)
@@ -1248,7 +1248,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         _, targets, output = cluster_map(segmentation,
                                          return_wave_distance_map=True,
                                          out_dir=out_dir,
-                                         write_files=write_files)
+                                         write_files=write_files,
+                                         verbose=verbose)
         # have same format as seed
         if isinstance(seed, list):
             # then list of indices
@@ -1698,7 +1699,7 @@ def find_end_clusters(cluster_map):
 
 
 def cluster_map(segmentation, return_wave_distance_map=False,
-                out_dir=None, write_files=False):
+                out_dir=None, write_files=False, verbose=False):
     """
     Function to cluster a distance map of a segmentation into integer values.
 
@@ -1792,7 +1793,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     # Get unique values in wave distance map
     unique_values = np.unique(
         sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0))
-    print(f"Unique values: {unique_values}")
+    if verbose:
+        print(f"Unique values: {unique_values}")
     # Remove values above threshold 100 thousand
     unique_values = unique_values[unique_values < 100000]
     # Create new image with same size as wave distance map
@@ -1820,7 +1822,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
         mask = sitk.BinaryThreshold(wave_distance_map,
                                     lowerThreshold=value,
                                     upperThreshold=(value+N-1))
-        print(f"Values: {value} to {value+N-1}")
+        if verbose:
+            print(f"Values: {value} to {value+N-1}")
         # Connected components
         connected = sitk.ConnectedComponentImageFilter()
         # Fully connected to include diagonal connections
@@ -1829,7 +1832,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
         # Get number of connected components
         num_connected = np.max(
             sitk.GetArrayFromImage(connected).transpose(2, 1, 0))
-        print(f"   Num connected: {num_connected}")
+        if verbose:
+            print(f"   Num connected: {num_connected}")
         # Assign unique value to each connected component
         for j in range(1, num_connected+1):
             mask = sitk.BinaryThreshold(connected,
@@ -2527,35 +2531,43 @@ if __name__ == '__main__':
     # is not identity, the centerline calculation will fail.
     ###
     # Path to segmentation
-    path_segs = '/Users/numisveins/Documents/vascular_data_3d/truths/'
-    path_segs = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/truths/'
-    path_segs = '//Users/nsveinsson/Documents/datasets/CAS_coronary_dataset/1-200/'
-    # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/truths/'
+    path_segs = '/Users/nsveinsson/Documents/datasets/CAS_cerebral_dataset/CAS2023_trainingdataset/cm/truths/'
 
     # Output directory
-    out_dir = path_segs + '/centerlines_fmm_only_successful/'
+    # out_dir = path_segs + '/centerlines_fmm_only_successful/'
+    out_dir = path_segs.replace('truths','centerlines_fmm')
     os.makedirs(out_dir, exist_ok=True)
 
     # Image extension
-    img_ext = '.nii.gz'
-    # img_ext = '.mha'
+    img_ext = '.mha'
+
+    # If make binary
+    make_binary = False
+
+    # Else choose label value to segment
+    label_value = 1
+
+    # If keep largest component
+    keep_largest_component = True
+
+    # If fill holes
+    fill_holes = False
 
     # Verbose
-    return_failed = False
-    write_files = False
+    return_failed = True
+    write_files = True
     verbose = True
 
     # Start index
     start = 0
-    stop = None
+    stop = 1
 
     # If contains string, only process those files
-    contains_str = 'label'
-    # contains_str = ''
+    contains_str = ''
 
     # Path to spacing file
     if_spacing_file = False
-    spacing_file = '/global/scratch/users/numi/CAS_dataset/CAS2023_trainingdataset/meta.csv'
+    spacing_file = '/Users/nsveinsson/Documents/datasets/CAS_cerebral_dataset/CAS2023_trainingdataset/mm/meta.csv'
 
     # Path to end points
     if_end_points = False
@@ -2612,13 +2624,46 @@ if __name__ == '__main__':
         segmentation = sitk.Cast(segmentation, sitk.sitkUInt8)
 
         # Make binary
-        max_value = int(sitk.GetArrayFromImage(segmentation).max())
-        print(f"Max value in segmentation: {max_value}")
-        segmentation = sitk.BinaryThreshold(segmentation,
-                                             lowerThreshold=1,
-                                             upperThreshold=max_value,
-                                             insideValue=1,
-                                             outsideValue=0)
+        if make_binary:
+            max_value = int(sitk.GetArrayFromImage(segmentation).max())
+            print(f"Max value in segmentation: {max_value}")
+            segmentation = sitk.BinaryThreshold(segmentation,
+                                                lowerThreshold=1,
+                                                upperThreshold=max_value,
+                                                insideValue=1,
+                                                outsideValue=0)
+        else:
+            # Threshold to label value
+            segmentation = sitk.BinaryThreshold(segmentation,
+                                                lowerThreshold=label_value,
+                                                upperThreshold=label_value,
+                                                insideValue=1,
+                                                outsideValue=0)
+        # Fill holes
+        if fill_holes:
+            holes = sitk.BinaryFillholeImageFilter()
+            segmentation = holes.Execute(segmentation)
+
+        # Keep largest component
+        if keep_largest_component:
+            connected = sitk.ConnectedComponentImageFilter()
+            connected.SetFullyConnected(True)
+            seg_cc = connected.Execute(segmentation)
+            label_shape = sitk.LabelShapeStatisticsImageFilter()
+            label_shape.Execute(seg_cc)
+            largest_label = 0
+            largest_size = 0
+            for label in label_shape.GetLabels():
+                size = label_shape.GetNumberOfPixels(label)
+                if size > largest_size:
+                    largest_size = size
+                    largest_label = label
+            print(f"Largest component label: {largest_label}, size: {largest_size}")
+            segmentation = sitk.BinaryThreshold(seg_cc,
+                                                lowerThreshold=largest_label,
+                                                upperThreshold=largest_label,
+                                                insideValue=1,
+                                                outsideValue=0)
         
         if if_spacing_file:
             # set the spacing

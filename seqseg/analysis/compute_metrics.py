@@ -1228,10 +1228,6 @@ if __name__ == '__main__':
     # pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/vascular_segs/vascular_segs_mha/pred_seqseg_ct/new_format/'
     # output_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/graphs/'
 
-    # # cardiac data
-    # pred_folder = '/Users/numisveins/Documents/data_combo_paper/ct_data/meshes/'
-    # truth_folder = '/Users/numisveins/Documents/data_combo_paper/outct_data/Ground truth cardiac segmentations/'
-
     # get all folders in pred_folder
     pred_folders = os.listdir(pred_folder)
     # only keep folders and ignore hidden files

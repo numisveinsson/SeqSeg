@@ -224,7 +224,7 @@ def write_pths_from_dir(vtp_dir, out_dir=None, verbose=True):
 
 if __name__ == "__main__":
 
-    dir = '/Users/nsveinsson/Documents/datasets/CAS_coronary_dataset/1-200/centerlines_fmm_only_successful/'
+    dir = '/Users/nsveinsson/Documents/datasets/CAS_coronary_dataset/1-200/centerlines_fmm_only_successful_scaled'
     out_dir = dir + '_pths'
 
     write_pths_from_dir(dir, out_dir=out_dir, verbose=True)

@@ -1,0 +1,737 @@
+"""Compute Hausdorff distance and ASSD between matching surface meshes (.vtp).
+
+Usage:
+	python -m seqseg.analysis.compute_metrics_meshes /path/to/gt_dir /path/to/pred_dir \
+			--out-csv results.csv
+
+Example:
+	# basic run, write CSV
+	python -m seqseg.analysis.compute_metrics_meshes /data/gt_vtps /data/pred_vtps --out-csv metrics.csv
+
+	# compute Dice using 1.0mm isotropic voxelization and sample up to 5000 points
+	python -m seqseg.analysis.compute_metrics_meshes /data/gt_vtps /data/pred_vtps \
+			--out-csv metrics.csv --spacing 1.0 --max-points 5000
+
+	# compute centerline overlap metric
+	python -m seqseg.analysis.compute_metrics_meshes /data/gt_vtps /data/pred_vtps \
+			--out-csv metrics.csv --centerline-dir /data/centerlines
+
+	# clip meshes using centerlines before computing metrics
+	python -m seqseg.analysis.compute_metrics_meshes /data/gt_vtps /data/pred_vtps \
+			--out-csv metrics.csv --clip --centerline-dir /data/centerlines
+
+	# clip meshes and save clipped meshes for debugging
+	python -m seqseg.analysis.compute_metrics_meshes /data/gt_vtps /data/pred_vtps \
+			--out-csv metrics.csv --clip --centerline-dir /data/centerlines \
+			--clip-output-dir /data/clipped_meshes
+
+Assumes meshes have the same filenames in both directories (e.g. `case001.vtp`).
+This script computes one-way point-to-surface distances by evaluating
+the implicit distance from points in the GT mesh to the prediction mesh surface using
+`vtkImplicitPolyDataDistance`. From these distances it computes:
+	- Hausdorff distance (max distance from GT points to prediction surface)
+	- HD95 (95th percentile distance from GT points to prediction surface)
+	- ASSD (average surface distance from GT points to prediction surface)
+	- Centerline overlap (ratio of centerline length within prediction surface, if --centerline-dir provided)
+	
+Note: This is a one-way metric (GT -> prediction only), not symmetric.
+
+Notes:
+- This operates on vertex points of the input `.vtp` meshes; for very dense
+	meshes you may want to subsample using `--max-points`.
+- Requires `vtk` Python package: `pip install vtk` (or `conda install -c conda-forge vtk`).
+- Clipping (--clip) uses centerline-based clipping boxes to remove boundary regions
+	before computing metrics, similar to the clipping functionality in compute_metrics.py.
+	This requires centerline files with 'CenterlineId' and 'MaximumInscribedSphereRadius'
+	point data arrays.
+- Centerline overlap metric calculates the ratio of centerline length that is found within
+	the prediction surface mesh, similar to the percent_centerline_length function in compute_metrics.py.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import os
+import sys
+import math
+from typing import List, Tuple, Optional
+
+try:
+	import vtk
+except Exception as e:
+	raise ImportError(
+		"The 'vtk' Python package is required to run this script. "
+		"Install it with `pip install vtk` or `conda install -c conda-forge vtk`."
+	) from e
+
+import numpy as np
+from vtk.util import numpy_support
+
+# Import clipping functions
+try:
+	sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+	from modules import vtk_functions as vf
+	from modules.capping import (
+		bryan_get_clipping_parameters,
+		bryan_generate_oriented_boxes,
+		bryan_clip_surface
+	)
+except ImportError:
+	# Clipping functionality will not be available if imports fail
+	vf = None
+	bryan_get_clipping_parameters = None
+	bryan_generate_oriented_boxes = None
+	bryan_clip_surface = None
+
+
+def load_vtp(path: str) -> vtk.vtkPolyData:
+	reader = vtk.vtkXMLPolyDataReader()
+	reader.SetFileName(path)
+	reader.Update()
+	poly = reader.GetOutput()
+	if poly is None:
+		raise RuntimeError(f"Failed to read VTP: {path}")
+	return poly
+
+
+def write_vtp(path: str, poly: vtk.vtkPolyData) -> None:
+	"""Write a vtkPolyData to a .vtp file."""
+	writer = vtk.vtkXMLPolyDataWriter()
+	writer.SetFileName(path)
+	writer.SetInputData(poly)
+	writer.Write()
+
+
+def clip_surface_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData, case_name: str = None, temp_dir: Optional[str] = None) -> vtk.vtkPolyData:
+	"""Clip a surface mesh using centerline-based clipping boxes.
+	
+	This function applies the same clipping logic as in compute_metrics.py:
+	1. Gets clipping parameters from centerline (endpoints, radii, unit vectors)
+	2. Generates oriented boxes for clipping
+	3. Clips the surface using those boxes
+	4. Keeps only the largest connected component
+	
+	Parameters
+	----------
+	surface : vtk.vtkPolyData
+		Surface mesh to clip
+	centerline : vtk.vtkPolyData
+		Centerline with clipping parameters
+	case_name : str, optional
+		Case name for temporary file naming (if temp_dir provided)
+	temp_dir : str, optional
+		Directory for temporary clipping box files (optional)
+	
+	Returns
+	-------
+	vtk.vtkPolyData
+		Clipped surface mesh (largest connected component only)
+	"""
+	if vf is None or bryan_get_clipping_parameters is None:
+		raise ImportError(
+			"Clipping functionality requires modules.vtk_functions and modules.capping. "
+			"Make sure these modules are available."
+		)
+	
+	# Get clipping parameters from centerline
+	endpts, radii, unit_vecs = bryan_get_clipping_parameters(centerline)
+	
+	# Generate oriented boxes for clipping
+	# Use a temporary directory or current directory if not provided
+	if temp_dir is None:
+		temp_dir = os.path.dirname(os.path.abspath(__file__))
+	os.makedirs(temp_dir, exist_ok=True)
+	
+	box_name = f"{case_name}_boxclips" if case_name else "boxclips"
+	boxpd, _ = bryan_generate_oriented_boxes(endpts, unit_vecs, radii, box_name, temp_dir, 4)
+	
+	# Clip the surface
+	clippedpd = bryan_clip_surface(surface, boxpd)
+	
+	# Keep only the largest connected component
+	largest = vf.get_largest_connected_polydata(clippedpd)
+	
+	return largest
+
+
+def sample_indices(num: int, max_points: Optional[int]) -> np.ndarray:
+	if max_points is None or num <= max_points:
+		return np.arange(num, dtype=np.int64)
+	# random sample without replacement
+	return np.random.choice(num, size=max_points, replace=False)
+
+
+def point_coords_as_numpy(poly: vtk.vtkPolyData, indices: Optional[np.ndarray] = None) -> np.ndarray:
+	pts = poly.GetPoints()
+	n = pts.GetNumberOfPoints()
+	if indices is None:
+		indices = np.arange(n, dtype=np.int64)
+	coords = np.empty((indices.shape[0], 3), dtype=float)
+	for i, idx in enumerate(indices):
+		coords[i, :] = pts.GetPoint(int(idx))
+	return coords
+
+
+def is_point_in_surface(surface: vtk.vtkPolyData, point: Tuple[float, float, float]) -> bool:
+	"""Check if a point is inside a closed surface mesh.
+	
+	Uses signed distance from implicit function, which is more robust than
+	vtkSelectEnclosedPoints for surfaces that may not be perfectly closed.
+	
+	Parameters
+	----------
+	surface : vtk.vtkPolyData
+		Closed surface mesh
+	point : tuple of 3 floats
+		Point coordinates (x, y, z)
+	
+	Returns
+	-------
+	bool
+		True if point is inside the surface, False otherwise
+	"""
+	# Use signed distance from implicit function (more robust than vtkSelectEnclosedPoints)
+	# Negative distance means inside, positive means outside
+	# This method works even if the surface is not perfectly closed
+	try:
+		implicit = vtk.vtkImplicitPolyDataDistance()
+		implicit.SetInput(surface)
+		signed_dist = implicit.EvaluateFunction(point)
+		# Negative signed distance indicates the point is inside
+		# Use a small tolerance to handle numerical precision issues
+		return signed_dist < 1e-6
+	except Exception:
+		# If evaluation fails, return False (conservative approach)
+		# This means we assume the point is outside if we can't determine
+		return False
+
+
+def percent_centerline_length_mesh(surface: vtk.vtkPolyData, centerline: vtk.vtkPolyData) -> float:
+	"""Calculate the ratio of centerline length that is found within the surface mesh.
+	
+	This function iterates through all cells in the centerline, calculates the length
+	of segments between consecutive points, and checks if both endpoints of each segment
+	are within the surface mesh. Returns the ratio of centerline length inside the surface
+	to total centerline length.
+	
+	Parameters
+	----------
+	surface : vtk.vtkPolyData
+		Surface mesh (segmentation)
+	centerline : vtk.vtkPolyData
+		Centerline polydata
+	
+	Returns
+	-------
+	float
+		Ratio of centerline length within surface (0-1), or NaN if centerline is empty
+	"""
+	num_cells = centerline.GetNumberOfCells()
+	if num_cells == 0:
+		return float('nan')
+	
+	# Create implicit distance function once for the entire surface (much faster)
+	# This is the key optimization - we create it once and reuse it for all points
+	try:
+		implicit = vtk.vtkImplicitPolyDataDistance()
+		implicit.SetInput(surface)
+	except Exception:
+		return float('nan')
+	
+	centerline_length = 0.0
+	cent_length_in = 0.0
+	points_checked = set()  # Use set for O(1) lookup instead of list
+	
+	# Iterate through all cells in centerline
+	for i in range(num_cells):
+		cell = centerline.GetCell(i)
+		if cell is None:
+			continue
+		num_points = cell.GetNumberOfPoints()
+		if num_points < 2:
+			continue
+		
+		points = cell.GetPoints()
+		length = 0.0
+		length_in = 0.0
+		
+		# Calculate length of segments between consecutive points
+		for j in range(num_points - 1):
+			p1 = points.GetPoint(j)
+			p2 = points.GetPoint(j + 1)
+			
+			# Convert to tuple for set membership check
+			p2_tuple = tuple(p2)
+			
+			# Skip if we've already checked this point (p2 was already processed as p1 in previous iteration)
+			if p2_tuple in points_checked:
+				continue
+			
+			# Calculate segment length
+			segment_length = np.linalg.norm(np.array(p1) - np.array(p2))
+			length += segment_length
+			
+			# Check if both endpoints are within the surface using the pre-created implicit function
+			try:
+				# Evaluate signed distance: negative = inside, positive = outside
+				signed_dist_p1 = implicit.EvaluateFunction(p1)
+				signed_dist_p2 = implicit.EvaluateFunction(p2)
+				
+				# Use small tolerance for numerical precision
+				p1_inside = signed_dist_p1 < 1e-6
+				p2_inside = signed_dist_p2 < 1e-6
+				
+				if p1_inside and p2_inside:
+					length_in += segment_length
+			except Exception:
+				# If point check fails, exclude this segment from total length
+				length -= segment_length
+			
+			points_checked.add(tuple(p1))
+		
+		centerline_length += length
+		cent_length_in += length_in
+	
+	if centerline_length == 0:
+		return float('nan')
+	
+	return cent_length_in / centerline_length
+
+
+def distances_pointset_to_surface(source: vtk.vtkPolyData, target: vtk.vtkPolyData, max_points: Optional[int] = None) -> np.ndarray:
+	"""Compute unsigned distances from each (sampled) point of `source` to surface `target`.
+
+	Returns a numpy array of distances (float) for the sampled source points.
+	"""
+	pts = source.GetPoints()
+	if pts is None:
+		return np.array([], dtype=float)
+	n = pts.GetNumberOfPoints()
+	if n == 0:
+		return np.array([], dtype=float)
+
+	indices = sample_indices(n, max_points)
+	# implicit distance evaluator
+	implicit = vtk.vtkImplicitPolyDataDistance()
+	implicit.SetInput(target)
+
+	dists = np.empty(indices.shape[0], dtype=float)
+	for i, idx in enumerate(indices):
+		x, y, z = pts.GetPoint(int(idx))
+		val = implicit.EvaluateFunction((x, y, z))
+		# EvaluateFunction may return signed distance; take absolute
+		dists[i] = abs(float(val))
+	return dists
+
+
+def mesh_to_binary_numpy(poly: vtk.vtkPolyData, spacing: Tuple[float, float, float]) -> Tuple[np.ndarray, Tuple[int, int, int]]:
+	"""Rasterize `poly` into a binary numpy array using given `spacing`.
+
+	Returns (mask_flat, dims) where mask_flat is a 1D boolean numpy array of length nx*ny*nz
+	and dims is (nx, ny, nz).
+	"""
+	bounds = poly.GetBounds()
+	if bounds is None:
+		return np.array([], dtype=bool), (0, 0, 0)
+	xmin, xmax, ymin, ymax, zmin, zmax = bounds
+	sx, sy, sz = spacing
+	if sx <= 0 or sy <= 0 or sz <= 0:
+		raise ValueError('spacing values must be positive')
+
+	nx = max(1, int(math.ceil((xmax - xmin) / sx)) + 1)
+	ny = max(1, int(math.ceil((ymax - ymin) / sy)) + 1)
+	nz = max(1, int(math.ceil((zmax - zmin) / sz)) + 1)
+
+	image = vtk.vtkImageData()
+	image.SetSpacing((sx, sy, sz))
+	image.SetOrigin((xmin, ymin, zmin))
+	image.SetDimensions(nx, ny, nz)
+	image.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
+
+	scalars = image.GetPointData().GetScalars()
+	arr = numpy_support.vtk_to_numpy(scalars)
+	arr[:] = 1  # fill with foreground
+
+	pol2st = vtk.vtkPolyDataToImageStencil()
+	pol2st.SetInputData(poly)
+	pol2st.SetOutputOrigin(image.GetOrigin())
+	pol2st.SetOutputSpacing(image.GetSpacing())
+	pol2st.SetOutputWholeExtent(image.GetExtent())
+	pol2st.Update()
+
+	imgstenc = vtk.vtkImageStencil()
+	imgstenc.SetInputData(image)
+	imgstenc.SetStencilConnection(pol2st.GetOutputPort())
+	imgstenc.ReverseStencilOff()
+	imgstenc.SetBackgroundValue(0)
+	imgstenc.Update()
+
+	out = imgstenc.GetOutput()
+	out_scalars = out.GetPointData().GetScalars()
+	out_arr = numpy_support.vtk_to_numpy(out_scalars).astype(bool)
+	return out_arr, (nx, ny, nz)
+
+
+def voxelize_pair(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, spacing: Tuple[float, float, float]):
+	"""Rasterize both meshes into a common grid defined by `spacing`.
+
+	Returns (mask_gt, mask_pred, dims) where masks are 1D boolean arrays of length nx*ny*nz.
+	"""
+	# compute combined bounds
+	b1 = gt_poly.GetBounds()
+	b2 = pred_poly.GetBounds()
+	if b1 is None or b2 is None:
+		return np.array([], dtype=bool), np.array([], dtype=bool), (0, 0, 0)
+	xmin = min(b1[0], b2[0])
+	xmax = max(b1[1], b2[1])
+	ymin = min(b1[2], b2[2])
+	ymax = max(b1[3], b2[3])
+	zmin = min(b1[4], b2[4])
+	zmax = max(b1[5], b2[5])
+
+	sx, sy, sz = spacing
+	nx = max(1, int(math.ceil((xmax - xmin) / sx)) + 1)
+	ny = max(1, int(math.ceil((ymax - ymin) / sy)) + 1)
+	nz = max(1, int(math.ceil((zmax - zmin) / sz)) + 1)
+
+	# base image template
+	base = vtk.vtkImageData()
+	base.SetSpacing((sx, sy, sz))
+	base.SetOrigin((xmin, ymin, zmin))
+	base.SetDimensions(nx, ny, nz)
+	base.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
+
+	def _rasterize(poly: vtk.vtkPolyData):
+		img = vtk.vtkImageData()
+		img.DeepCopy(base)
+		scalars = img.GetPointData().GetScalars()
+		arr = numpy_support.vtk_to_numpy(scalars)
+		arr[:] = 1
+
+		pol2st = vtk.vtkPolyDataToImageStencil()
+		pol2st.SetInputData(poly)
+		pol2st.SetOutputOrigin(img.GetOrigin())
+		pol2st.SetOutputSpacing(img.GetSpacing())
+		pol2st.SetOutputWholeExtent(img.GetExtent())
+		pol2st.Update()
+
+		imgstenc = vtk.vtkImageStencil()
+		imgstenc.SetInputData(img)
+		imgstenc.SetStencilConnection(pol2st.GetOutputPort())
+		imgstenc.ReverseStencilOff()
+		imgstenc.SetBackgroundValue(0)
+		imgstenc.Update()
+
+		out = imgstenc.GetOutput()
+		out_scalars = out.GetPointData().GetScalars()
+		out_arr = numpy_support.vtk_to_numpy(out_scalars).astype(bool)
+		return out_arr
+
+	mask_gt = _rasterize(gt_poly)
+	mask_pred = _rasterize(pred_poly)
+	return mask_gt, mask_pred, (nx, ny, nz)
+
+
+def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_points: Optional[int] = None, voxel_spacing: Optional[Tuple[float, float, float]] = None, centerline: Optional[vtk.vtkPolyData] = None) -> dict:
+	"""Compute Hausdorff and ASSD between gt and pred polydata (one-way: GT to prediction).
+
+	Computes distances from each point in GT to the nearest point on the prediction surface.
+	This is a one-way metric: only GT -> prediction, not prediction -> GT.
+
+	Parameters
+	----------
+	gt_poly : vtk.vtkPolyData
+		Ground truth surface mesh
+	pred_poly : vtk.vtkPolyData
+		Prediction surface mesh
+	max_points : int, optional
+		Maximum number of points to sample for distance computation
+	voxel_spacing : tuple of 3 floats, optional
+		Voxel spacing for Dice computation
+	centerline : vtk.vtkPolyData, optional
+		Centerline for computing centerline overlap metric
+	
+	Returns
+	-------
+	dict
+		Dictionary with keys:
+		  - 'hausdorff_sym' : Hausdorff distance (same as gt_to_pred since one-way)
+		  - 'hausdorff_gt_to_pred' : Hausdorff distance (gt -> pred)
+		  - 'hausdorff_pred_to_gt' : NaN (not computed)
+		  - 'mean_gt_to_pred' : mean distance (gt points to pred surface)
+		  - 'mean_pred_to_gt' : NaN (not computed)
+		  - 'assd' : average surface distance (same as mean_gt_to_pred since one-way)
+		  - 'centerline_overlap' : ratio of centerline length within prediction surface (0-1)
+	"""
+	# Only compute distances from GT points to prediction surface
+	d_gt_to_pred = distances_pointset_to_surface(gt_poly, pred_poly, max_points=max_points)
+
+	# protect against empty arrays
+	def _safe_mean(a: np.ndarray) -> float:
+		return float(np.mean(a)) if a.size else float('nan')
+
+	mean_gt_to_pred = _safe_mean(d_gt_to_pred)
+
+	# classic (max) Hausdorff distance (one-way: GT -> pred)
+	haus_gt_to_pred = float(np.max(d_gt_to_pred)) if d_gt_to_pred.size else float('nan')
+	# Since we only compute one-way, symmetric is the same as directed
+	haus_sym = haus_gt_to_pred
+
+	# 95th percentile (HD95) (one-way: GT -> pred)
+	hd95_gt_to_pred = float(np.percentile(d_gt_to_pred, 95)) if d_gt_to_pred.size else float('nan')
+	# Since we only compute one-way, symmetric is the same as directed
+	hd95_sym = hd95_gt_to_pred
+
+	# ASSD is just the mean distance since we only compute one-way
+	assd = mean_gt_to_pred
+
+	result = {
+		'hausdorff_sym': haus_sym,
+		'hausdorff_gt_to_pred': haus_gt_to_pred,
+		'hausdorff_pred_to_gt': float('nan'),  # Not computed (one-way only)
+		'hd95_sym': hd95_sym,
+		'hd95_gt_to_pred': hd95_gt_to_pred,
+		'hd95_pred_to_gt': float('nan'),  # Not computed (one-way only)
+		'mean_gt_to_pred': mean_gt_to_pred,
+		'mean_pred_to_gt': float('nan'),  # Not computed (one-way only)
+		'assd': assd,
+		'n_sampled_gt': int(d_gt_to_pred.size),
+		'n_sampled_pred': 0,  # Not computed (one-way only)
+		'dice': float('nan'),
+		'n_voxels_gt': 0,
+		'n_voxels_pred': 0,
+		'centerline_overlap': float('nan'),
+	}
+
+	# Compute Dice coefficient by voxelizing both meshes onto a common grid if spacing provided
+	if voxel_spacing is not None:
+		try:
+			mask_gt, mask_pred, dims = voxelize_pair(gt_poly, pred_poly, voxel_spacing)
+			if mask_gt.size and mask_pred.size and mask_gt.size == mask_pred.size:
+				n_gt = int(np.count_nonzero(mask_gt))
+				n_pred = int(np.count_nonzero(mask_pred))
+				inter = int(np.count_nonzero(mask_gt & mask_pred))
+				dice = float((2.0 * inter) / (n_gt + n_pred)) if (n_gt + n_pred) > 0 else float('nan')
+				result['dice'] = dice
+				result['n_voxels_gt'] = n_gt
+				result['n_voxels_pred'] = n_pred
+		except Exception:
+			# if voxelization fails, leave dice as nan
+			pass
+
+	# Compute centerline overlap if centerline provided
+	if centerline is not None:
+		try:
+			centerline_overlap = percent_centerline_length_mesh(pred_poly, centerline)
+			result['centerline_overlap'] = centerline_overlap
+		except Exception as e:
+			# if centerline overlap computation fails, leave as nan
+			pass
+
+	return result
+
+
+def find_matching_vtps(dir1: str, dir2: str, ext: str = '.vtp') -> List[Tuple[str, str, str]]:
+	"""Return list of tuples (case_name, path_gt, path_pred) for files present in both dirs."""
+	files1 = {f for f in os.listdir(dir1) if f.lower().endswith(ext)}
+	files2 = {f for f in os.listdir(dir2) if f.lower().endswith(ext)}
+	common = sorted(files1.intersection(files2))
+	pairs = []
+	for f in common:
+		case = os.path.splitext(f)[0]
+		pairs.append((case, os.path.join(dir1, f), os.path.join(dir2, f)))
+	return pairs
+
+
+def write_results_csv(out_csv: str, rows: List[dict]) -> None:
+	fieldnames = [
+		'case',
+		'hausdorff_sym',
+		'hd95_sym',
+		'hausdorff_gt_to_pred',
+		'hd95_gt_to_pred',
+		'hausdorff_pred_to_gt',
+		'hd95_pred_to_gt',
+		'mean_gt_to_pred',
+		'mean_pred_to_gt',
+		'assd',
+		'n_sampled_gt',
+		'n_sampled_pred',
+		'dice',
+		'n_voxels_gt',
+		'n_voxels_pred',
+		'centerline_overlap',
+	]
+	with open(out_csv, 'w', newline='') as f:
+		w = csv.DictWriter(f, fieldnames=fieldnames)
+		w.writeheader()
+		for r in rows:
+			w.writerow({k: r.get(k, '') for k in fieldnames})
+
+
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+	p = argparse.ArgumentParser(description='Compute Hausdorff and ASSD between matching .vtp meshes in two dirs')
+	p.add_argument('gt_dir', help='Ground-truth directory containing .vtp files')
+	p.add_argument('pred_dir', help='Prediction directory containing .vtp files')
+	p.add_argument('--out-csv', default='mesh_metrics.csv', help='Output CSV path')
+	p.add_argument('--max-points', type=int, default=None, help='If set, randomly sample at most this many points from each mesh')
+	p.add_argument('--ext', default='.vtp', help='File extension to look for (default: .vtp)')
+	p.add_argument('--spacing', default=None, help='Voxel spacing for Dice voxelization. Single float or comma-separated three floats (e.g. "1.0" or "0.5,0.5,1.0"). If omitted, Dice is not computed.')
+	p.add_argument('--centerline-dir', default=None, help='Directory containing centerline .vtp files. Required if --clip is used. If provided, centerline overlap metric will be computed.')
+	p.add_argument('--clip', action='store_true', help='Clip meshes using centerlines before computing metrics. Requires --centerline-dir.')
+	p.add_argument('--clip-temp-dir', default=None, help='Temporary directory for clipping box files (default: same as script directory)')
+	p.add_argument('--clip-output-dir', default=None, help='Directory to write clipped meshes for debugging. If specified, clipped GT and prediction meshes will be saved here.')
+	p.add_argument('--quiet', action='store_true', help='Reduce logging')
+	return p.parse_args(argv)
+
+
+def parse_spacing_arg(s: Optional[str]) -> Optional[Tuple[float, float, float]]:
+	if s is None:
+		return None
+	parts = [p.strip() for p in str(s).split(',') if p.strip()]
+	try:
+		if len(parts) == 1:
+			v = float(parts[0])
+			return (v, v, v)
+		elif len(parts) == 3:
+			return (float(parts[0]), float(parts[1]), float(parts[2]))
+	except ValueError:
+		pass
+	raise argparse.ArgumentTypeError('Invalid spacing format. Use single float or three comma-separated floats.')
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+	args = parse_args(argv)
+	gt_dir = args.gt_dir
+	pred_dir = args.pred_dir
+	out_csv = args.out_csv
+	max_points = args.max_points
+	ext = args.ext if args.ext.startswith('.') else '.' + args.ext
+	clip = args.clip
+	centerline_dir = args.centerline_dir
+	clip_temp_dir = args.clip_temp_dir
+	clip_output_dir = args.clip_output_dir
+
+	# Validate clipping arguments
+	if clip:
+		if centerline_dir is None:
+			print('Error: --centerline-dir is required when --clip is used', file=sys.stderr)
+			return 1
+		if not os.path.isdir(centerline_dir):
+			print(f'Error: Centerline directory does not exist: {centerline_dir}', file=sys.stderr)
+			return 1
+		if vf is None or bryan_get_clipping_parameters is None:
+			print('Error: Clipping functionality is not available. Required modules could not be imported.', file=sys.stderr)
+			return 1
+	
+	# Create output directory for clipped meshes if specified
+	if clip_output_dir is not None:
+		os.makedirs(clip_output_dir, exist_ok=True)
+		if not args.quiet:
+			print(f'Clipped meshes will be saved to: {clip_output_dir}')
+
+	pairs = find_matching_vtps(gt_dir, pred_dir, ext=ext)
+	if not pairs:
+		print(f'No matching {ext} files found in {gt_dir} and {pred_dir}', file=sys.stderr)
+		return 2
+
+	rows = []
+	for case, gt_path, pred_path in pairs:
+		if not args.quiet:
+			print(f'Processing {case}...')
+		try:
+			gt_poly = load_vtp(gt_path)
+			pred_poly = load_vtp(pred_path)
+			
+			# Apply clipping if requested
+			if clip:
+				centerline_path = os.path.join(centerline_dir, case + '.vtp')
+				if not os.path.exists(centerline_path):
+					print(f'Warning: Centerline not found for {case}: {centerline_path}. Skipping clipping.', file=sys.stderr)
+				else:
+					if not args.quiet:
+						print(f'  Clipping meshes using centerline: {centerline_path}')
+					try:
+						centerline = vf.read_geo(centerline_path).GetOutput()
+						gt_poly_clipped = clip_surface_mesh(gt_poly, centerline, case_name=case, temp_dir=clip_temp_dir)
+						pred_poly_clipped = clip_surface_mesh(pred_poly, centerline, case_name=case, temp_dir=clip_temp_dir)
+						
+						# Write clipped meshes for debugging if output directory specified
+						if clip_output_dir is not None:
+							gt_clipped_path = os.path.join(clip_output_dir, f'{case}_gt_clipped.vtp')
+							pred_clipped_path = os.path.join(clip_output_dir, f'{case}_pred_clipped.vtp')
+							write_vtp(gt_clipped_path, gt_poly_clipped)
+							write_vtp(pred_clipped_path, pred_poly_clipped)
+							if not args.quiet:
+								print(f'  Saved clipped meshes: {gt_clipped_path}, {pred_clipped_path}')
+						
+						# Use clipped meshes for metrics computation
+						gt_poly = gt_poly_clipped
+						pred_poly = pred_poly_clipped
+					except Exception as e:
+						print(f'Warning: Clipping failed for {case}: {e}. Using original meshes.', file=sys.stderr)
+			
+			# Load centerline if centerline directory provided
+			centerline = None
+			if centerline_dir is not None:
+				centerline_path = os.path.join(centerline_dir, case + '.vtp')
+				if os.path.exists(centerline_path):
+					try:
+						if vf is not None:
+							centerline = vf.read_geo(centerline_path).GetOutput()
+						else:
+							centerline = load_vtp(centerline_path)
+						if not args.quiet:
+							print(f'  Loaded centerline: {centerline_path}')
+					except Exception as e:
+						if not args.quiet:
+							print(f'  Warning: Failed to load centerline {centerline_path}: {e}', file=sys.stderr)
+				else:
+					if not args.quiet:
+						print(f'  Warning: Centerline not found: {centerline_path}', file=sys.stderr)
+			
+			spacing = parse_spacing_arg(args.spacing) if getattr(args, 'spacing', None) is not None else None
+			metrics = compute_metrics(gt_poly, pred_poly, max_points=max_points, voxel_spacing=spacing, centerline=centerline)
+			row = {'case': case}
+			row.update(metrics)
+			rows.append(row)
+			if not args.quiet:
+				msg = f"  Hausdorff (GT->pred): {metrics['hausdorff_gt_to_pred']:.6g}, HD95 (GT->pred): {metrics['hd95_gt_to_pred']:.6g}, ASSD: {metrics['assd']:.6g}"
+				if not math.isnan(metrics.get('dice', math.nan)):
+					msg += f", Dice: {metrics['dice']:.6g} (voxels gt/pred: {metrics.get('n_voxels_gt',0)}/{metrics.get('n_voxels_pred',0)})"
+				if not math.isnan(metrics.get('centerline_overlap', math.nan)):
+					msg += f", Centerline Overlap: {metrics['centerline_overlap']:.6g}"
+				print(msg)
+		except Exception as e:
+			print(f'Error processing {case}: {e}', file=sys.stderr)
+
+	# write CSV
+	write_results_csv(out_csv, rows)
+
+	# print summary
+	haus_list = [r['hausdorff_sym'] for r in rows if not math.isnan(r.get('hausdorff_sym', math.nan))]
+	assd_list = [r['assd'] for r in rows if not math.isnan(r.get('assd', math.nan))]
+	hd95_list = [r['hd95_sym'] for r in rows if not math.isnan(r.get('hd95_sym', math.nan))]
+	dice_list = [r['dice'] for r in rows if not math.isnan(r.get('dice', math.nan))]
+	centerline_overlap_list = [r['centerline_overlap'] for r in rows if not math.isnan(r.get('centerline_overlap', math.nan))]
+	if haus_list:
+		print(f'Average Hausdorff (GT->pred) over {len(haus_list)} cases: {float(np.mean(haus_list)):.6g}')
+	if assd_list:
+		print(f'Average ASSD (GT->pred) over {len(assd_list)} cases: {float(np.mean(assd_list)):.6g}')
+	if hd95_list:
+		print(f'Average HD95 (GT->pred) over {len(hd95_list)} cases: {float(np.mean(hd95_list)):.6g}')
+	if dice_list:
+		print(f'Average Dice over {len(dice_list)} cases: {float(np.mean(dice_list)):.6g}')
+	if centerline_overlap_list:
+		print(f'Average Centerline Overlap over {len(centerline_overlap_list)} cases: {float(np.mean(centerline_overlap_list)):.6g}')
+	if clip_output_dir is not None:
+		print(f'Clipped meshes saved to: {clip_output_dir}')
+
+	print(f'Wrote per-case results to: {out_csv}')
+	return 0
+
+
+if __name__ == '__main__':
+	raise SystemExit(main())
+
