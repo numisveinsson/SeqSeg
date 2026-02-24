@@ -13,7 +13,7 @@ TIME_ANALYSIS: False # if we want to write out how long each step take
 TREE_ANALYSIS: False
 
 VOLUME_SIZE_RATIO: 4.9 # default 5, 5.5 for coronaries, 4 for segs
-MAGN_RADIUS: 1.05
+MAGN_RADIUS: 1.05 # 1.25 for fmm vs vmtk according to gala
 ADD_RADIUS: 0.2 # mm (keep in mm)
 MAX_PERC_ENLARGE: 0.3 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
 MIN_RADIUS: 0.3 # mm (keep in mm)

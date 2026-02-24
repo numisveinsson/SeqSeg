@@ -33,8 +33,15 @@ the implicit distance from points in the GT mesh to the prediction mesh surface 
 	- HD95 (95th percentile distance from GT points to prediction surface)
 	- ASSD (average surface distance from GT points to prediction surface)
 	- Centerline overlap (ratio of centerline length within prediction surface, if --centerline-dir provided)
+	- Normal angular error (degrees): mean, std and max between GT and prediction normals at corresponding surface locations (one-way)
+	- Volume and volume error: enclosed volume (e.g. mm³) per mesh, signed and relative error (requires closed triangulated meshes)
 	
 Note: This is a one-way metric (GT -> prediction only), not symmetric.
+
+Units: Distance metrics (Hausdorff, HD95, ASSD) are computed in the same units as the
+input mesh coordinates. For medical imaging data, meshes are typically in physical space
+coordinates (millimeters), so distances are reported in millimeters. The units depend on
+the coordinate system used when the meshes were created.
 
 Notes:
 - This operates on vertex points of the input `.vtp` meshes; for very dense
@@ -325,6 +332,201 @@ def distances_pointset_to_surface(source: vtk.vtkPolyData, target: vtk.vtkPolyDa
 	return dists
 
 
+def _polydata_with_normals(poly: vtk.vtkPolyData, point_normals: bool = True, cell_normals: bool = True) -> vtk.vtkPolyData:
+	"""Return a copy of polydata with point and/or cell normals computed if missing."""
+	out = vtk.vtkPolyData()
+	out.DeepCopy(poly)
+	need_point = point_normals and (out.GetPointData().GetNormals() is None)
+	need_cell = cell_normals and (out.GetCellData().GetNormals() is None)
+	if not need_point and not need_cell:
+		return out
+	normals_filter = vtk.vtkPolyDataNormals()
+	normals_filter.SetInputData(out)
+	normals_filter.ComputePointNormalsOn() if point_normals else normals_filter.ComputePointNormalsOff()
+	normals_filter.ComputeCellNormalsOn() if cell_normals else normals_filter.ComputeCellNormalsOff()
+	normals_filter.Update()
+	return normals_filter.GetOutput()
+
+
+def normal_angular_error_gt_to_pred(
+	gt_poly: vtk.vtkPolyData,
+	pred_poly: vtk.vtkPolyData,
+	max_points: Optional[int] = None,
+) -> dict:
+	"""Mean, std and max angular error (degrees) between GT normals and prediction normals at corresponding locations.
+
+	For each sampled GT point, finds the closest point on the prediction surface and compares
+	the GT point normal to the prediction face normal at that location. Uses the same point
+	sampling as distance metrics (sample_indices). One-way: GT -> prediction only.
+
+	Returns
+	-------
+	dict
+		Keys: 'mean', 'std', 'max' (degrees). std is nan if fewer than 2 valid points.
+	"""
+	gt_with_normals = _polydata_with_normals(gt_poly, point_normals=True, cell_normals=False)
+	pred_with_normals = _polydata_with_normals(pred_poly, point_normals=False, cell_normals=True)
+
+	pts = gt_with_normals.GetPoints()
+	if pts is None:
+		return {'mean': float('nan'), 'std': float('nan'), 'max': float('nan')}
+	n = pts.GetNumberOfPoints()
+	if n == 0:
+		return {'mean': float('nan'), 'std': float('nan'), 'max': float('nan')}
+
+	gt_normals_arr = gt_with_normals.GetPointData().GetNormals()
+	if gt_normals_arr is None:
+		return {'mean': float('nan'), 'std': float('nan'), 'max': float('nan')}
+	gt_normals = numpy_support.vtk_to_numpy(gt_normals_arr)
+
+	pred_cell_normals_arr = pred_with_normals.GetCellData().GetNormals()
+	if pred_cell_normals_arr is None:
+		return {'mean': float('nan'), 'std': float('nan'), 'max': float('nan')}
+	pred_cell_normals = numpy_support.vtk_to_numpy(pred_cell_normals_arr)
+
+	locator = vtk.vtkCellLocator()
+	locator.SetDataSet(pred_with_normals)
+	locator.BuildLocator()
+
+	# vtk.reference (VTK 7) vs vtk.mutable (VTK 8+) for FindClosestPoint output args
+	vtk_ref = getattr(vtk, 'mutable', None) or getattr(vtk, 'reference', None)
+	if vtk_ref is None:
+		raise RuntimeError('VTK provides neither vtk.mutable nor vtk.reference; cannot use vtkCellLocator.FindClosestPoint')
+	indices = sample_indices(n, max_points)
+	angles_deg = np.empty(indices.shape[0], dtype=float)
+	closest_point = [0.0, 0.0, 0.0]
+	cell_id_ref = vtk_ref(0)
+	sub_id_ref = vtk_ref(0)
+	dist2_ref = vtk_ref(0.0)
+	for i, idx in enumerate(indices):
+		idx = int(idx)
+		x, y, z = pts.GetPoint(idx)
+		locator.FindClosestPoint([x, y, z], closest_point, cell_id_ref, sub_id_ref, dist2_ref)
+		cell_id = cell_id_ref.get()
+		if cell_id < 0:
+			angles_deg[i] = float('nan')
+			continue
+		n_gt = gt_normals[idx]
+		n_pred = pred_cell_normals[cell_id]
+		dot = np.clip(float(np.dot(n_gt, n_pred)), -1.0, 1.0)
+		angles_deg[i] = math.degrees(math.acos(dot))
+	valid = np.isfinite(angles_deg)
+	if not np.any(valid):
+		return {'mean': float('nan'), 'std': float('nan'), 'max': float('nan')}
+	a = angles_deg[valid]
+	n_valid = a.size
+	std_val = float(np.std(a)) if n_valid >= 2 else float('nan')
+	return {'mean': float(np.mean(a)), 'std': std_val, 'max': float(np.max(a))}
+
+
+def mesh_volume(poly: vtk.vtkPolyData) -> float:
+	"""Volume enclosed by a closed triangulated surface (same units as mesh coordinates, e.g. mm³).
+
+	Uses vtkMassProperties. Returns nan if the mesh is not closed, has no cells, or computation fails.
+	"""
+	if poly is None or poly.GetNumberOfCells() == 0:
+		return float('nan')
+	try:
+		mass = vtk.vtkMassProperties()
+		mass.SetInputData(poly)
+		mass.Update()
+		return float(mass.GetVolume())
+	except Exception:
+		return float('nan')
+
+
+def mesh_surface_area(poly: vtk.vtkPolyData) -> float:
+	"""Surface area of a closed triangulated mesh (same units as mesh coordinates squared, e.g. mm²).
+
+	Uses vtkMassProperties. Returns nan if the mesh has no cells or computation fails.
+	"""
+	if poly is None or poly.GetNumberOfCells() == 0:
+		return float('nan')
+	try:
+		mass = vtk.vtkMassProperties()
+		mass.SetInputData(poly)
+		mass.Update()
+		return float(mass.GetSurfaceArea())
+	except Exception:
+		return float('nan')
+
+
+def volume_error_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData) -> dict:
+	"""Volume of each mesh and signed/relative error between them.
+
+	Returns
+	-------
+	dict
+		Keys: 'volume_gt', 'volume_pred', 'volume_error_abs' (pred - gt), 'volume_error_rel' ((pred - gt) / gt, nan if gt == 0).
+	"""
+	v_gt = mesh_volume(gt_poly)
+	v_pred = mesh_volume(pred_poly)
+	err_abs = float('nan')
+	err_rel = float('nan')
+	if np.isfinite(v_gt) and np.isfinite(v_pred):
+		err_abs = v_pred - v_gt
+		if v_gt != 0:
+			err_rel = err_abs / v_gt
+	return {
+		'volume_gt': v_gt,
+		'volume_pred': v_pred,
+		'volume_error_abs': err_abs,
+		'volume_error_rel': err_rel,
+	}
+
+
+def surface_area_error_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData) -> dict:
+	"""Surface area of each mesh and signed/relative error between them."""
+	a_gt = mesh_surface_area(gt_poly)
+	a_pred = mesh_surface_area(pred_poly)
+	err_abs = float('nan')
+	err_rel = float('nan')
+	if np.isfinite(a_gt) and np.isfinite(a_pred):
+		err_abs = a_pred - a_gt
+		if a_gt != 0:
+			err_rel = err_abs / a_gt
+	return {
+		'surface_area_gt': a_gt,
+		'surface_area_pred': a_pred,
+		'surface_area_error_abs': err_abs,
+		'surface_area_error_rel': err_rel,
+	}
+
+
+def surface_dice(
+	gt_poly: vtk.vtkPolyData,
+	pred_poly: vtk.vtkPolyData,
+	tolerance: float,
+	max_points: Optional[int] = None,
+) -> float:
+	"""Surface Dice between GT and prediction at a given tolerance.
+
+	Uses the standard definition:
+		(|{p in S_gt: d(p,S_pred)<=τ}| + |{q in S_pred: d(q,S_gt)<=τ}|) / (|S_gt| + |S_pred|)
+
+	Here |·| is approximated by uniform point sampling on each surface, using the same
+	sampling strategy as other distance metrics (sample_indices).
+	"""
+	if tolerance < 0:
+		raise ValueError('tolerance must be non-negative')
+
+	d_gt_to_pred = distances_pointset_to_surface(gt_poly, pred_poly, max_points=max_points)
+	d_pred_to_gt = distances_pointset_to_surface(pred_poly, gt_poly, max_points=max_points)
+
+	n_gt = d_gt_to_pred.size
+	n_pred = d_pred_to_gt.size
+	if n_gt == 0 and n_pred == 0:
+		return float('nan')
+
+	c_gt = int(np.count_nonzero(d_gt_to_pred <= tolerance)) if n_gt else 0
+	c_pred = int(np.count_nonzero(d_pred_to_gt <= tolerance)) if n_pred else 0
+
+	den = n_gt + n_pred
+	if den == 0:
+		return float('nan')
+	return float((c_gt + c_pred) / den)
+
+
 def mesh_to_binary_numpy(poly: vtk.vtkPolyData, spacing: Tuple[float, float, float]) -> Tuple[np.ndarray, Tuple[int, int, int]]:
 	"""Rasterize `poly` into a binary numpy array using given `spacing`.
 
@@ -448,7 +650,7 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 	max_points : int, optional
 		Maximum number of points to sample for distance computation
 	voxel_spacing : tuple of 3 floats, optional
-		Voxel spacing for Dice computation
+		Voxel spacing for Dice computation (in same units as mesh coordinates)
 	centerline : vtk.vtkPolyData, optional
 		Centerline for computing centerline overlap metric
 	
@@ -463,6 +665,22 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 		  - 'mean_pred_to_gt' : NaN (not computed)
 		  - 'assd' : average surface distance (same as mean_gt_to_pred since one-way)
 		  - 'centerline_overlap' : ratio of centerline length within prediction surface (0-1)
+		  - 'mean_normal_angular_error_gt_to_pred' : mean angular error (degrees) between GT and pred normals (one-way)
+		  - 'std_normal_angular_error_gt_to_pred' : std of angular errors (degrees)
+		  - 'max_normal_angular_error_gt_to_pred' : max angular error (degrees)
+		  - 'volume_gt', 'volume_pred' : enclosed volume (e.g. mm³)
+		  - 'volume_error_abs' : signed volume error (pred - gt)
+		  - 'volume_error_rel' : relative volume error (pred - gt) / gt
+		  - 'surface_area_gt', 'surface_area_pred' : surface area (e.g. mm²)
+		  - 'surface_area_error_abs' : signed surface area error (pred - gt)
+		  - 'surface_area_error_rel' : relative surface area error (pred - gt) / gt
+		  - 'surface_dice_t1', 'surface_dice_t2' : surface Dice at two fixed tolerances (same units as mesh coordinates)
+	
+	Note
+	----
+	Distance metrics are in the same units as the input mesh coordinates. For medical
+	imaging data, meshes are typically in physical space (millimeters), so distances
+	are reported in millimeters.
 	"""
 	# Only compute distances from GT points to prediction surface
 	d_gt_to_pred = distances_pointset_to_surface(gt_poly, pred_poly, max_points=max_points)
@@ -502,6 +720,19 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 		'n_voxels_gt': 0,
 		'n_voxels_pred': 0,
 		'centerline_overlap': float('nan'),
+		'mean_normal_angular_error_gt_to_pred': float('nan'),
+		'std_normal_angular_error_gt_to_pred': float('nan'),
+		'max_normal_angular_error_gt_to_pred': float('nan'),
+		'volume_gt': float('nan'),
+		'volume_pred': float('nan'),
+		'volume_error_abs': float('nan'),
+		'volume_error_rel': float('nan'),
+		'surface_area_gt': float('nan'),
+		'surface_area_pred': float('nan'),
+		'surface_area_error_abs': float('nan'),
+		'surface_area_error_rel': float('nan'),
+		'surface_dice_t1': float('nan'),
+		'surface_dice_t2': float('nan'),
 	}
 
 	# Compute Dice coefficient by voxelizing both meshes onto a common grid if spacing provided
@@ -528,6 +759,44 @@ def compute_metrics(gt_poly: vtk.vtkPolyData, pred_poly: vtk.vtkPolyData, max_po
 		except Exception as e:
 			# if centerline overlap computation fails, leave as nan
 			pass
+
+	# Normal angular error (GT -> pred): mean, std, max (degrees); same point sampling as distance metrics
+	try:
+		nae = normal_angular_error_gt_to_pred(gt_poly, pred_poly, max_points=max_points)
+		result['mean_normal_angular_error_gt_to_pred'] = nae['mean']
+		result['std_normal_angular_error_gt_to_pred'] = nae['std']
+		result['max_normal_angular_error_gt_to_pred'] = nae['max']
+	except Exception:
+		pass  # leave as nan if computation fails
+
+	# Volume and volume error (requires closed triangulated meshes)
+	try:
+		ve = volume_error_metrics(gt_poly, pred_poly)
+		result['volume_gt'] = ve['volume_gt']
+		result['volume_pred'] = ve['volume_pred']
+		result['volume_error_abs'] = ve['volume_error_abs']
+		result['volume_error_rel'] = ve['volume_error_rel']
+	except Exception:
+		pass
+
+	# Surface area and surface area error (requires closed triangulated meshes)
+	try:
+		sa = surface_area_error_metrics(gt_poly, pred_poly)
+		result['surface_area_gt'] = sa['surface_area_gt']
+		result['surface_area_pred'] = sa['surface_area_pred']
+		result['surface_area_error_abs'] = sa['surface_area_error_abs']
+		result['surface_area_error_rel'] = sa['surface_area_error_rel']
+	except Exception:
+		pass
+
+	# Surface Dice at two fixed tolerances (e.g. 1.0 and 2.0 in mesh units)
+	try:
+		t1 = 1.0
+		t2 = 2.0
+		result['surface_dice_t1'] = surface_dice(gt_poly, pred_poly, tolerance=t1, max_points=max_points)
+		result['surface_dice_t2'] = surface_dice(gt_poly, pred_poly, tolerance=t2, max_points=max_points)
+	except Exception:
+		pass
 
 	return result
 
@@ -562,12 +831,46 @@ def write_results_csv(out_csv: str, rows: List[dict]) -> None:
 		'n_voxels_gt',
 		'n_voxels_pred',
 		'centerline_overlap',
+		'mean_normal_angular_error_gt_to_pred',
+		'std_normal_angular_error_gt_to_pred',
+		'max_normal_angular_error_gt_to_pred',
+		'volume_gt',
+		'volume_pred',
+		'volume_error_abs',
+		'volume_error_rel',
+		'surface_area_gt',
+		'surface_area_pred',
+		'surface_area_error_abs',
+		'surface_area_error_rel',
+		'surface_dice_t1',
+		'surface_dice_t2',
 	]
 	with open(out_csv, 'w', newline='') as f:
 		w = csv.DictWriter(f, fieldnames=fieldnames)
 		w.writeheader()
 		for r in rows:
 			w.writerow({k: r.get(k, '') for k in fieldnames})
+
+		# Summary rows: mean and std over cases for numeric fields
+		if rows:
+			mean_row = {'case': 'MEAN'}
+			std_row = {'case': 'STD'}
+			for k in fieldnames[1:]:  # skip 'case'
+				values = []
+				for r in rows:
+					v = r.get(k, None)
+					if isinstance(v, (int, float)) and not math.isnan(v):
+						values.append(float(v))
+				if values:
+					arr = np.asarray(values, dtype=float)
+					mean_row[k] = float(np.mean(arr))
+					std_row[k] = float(np.std(arr)) if arr.size >= 2 else float('nan')
+				else:
+					mean_row[k] = ''
+					std_row[k] = ''
+
+			w.writerow(mean_row)
+			w.writerow(std_row)
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -702,6 +1005,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 					msg += f", Dice: {metrics['dice']:.6g} (voxels gt/pred: {metrics.get('n_voxels_gt',0)}/{metrics.get('n_voxels_pred',0)})"
 				if not math.isnan(metrics.get('centerline_overlap', math.nan)):
 					msg += f", Centerline Overlap: {metrics['centerline_overlap']:.6g}"
+				if not math.isnan(metrics.get('mean_normal_angular_error_gt_to_pred', math.nan)):
+					msg += f", Normal Angular Error (deg) mean: {metrics['mean_normal_angular_error_gt_to_pred']:.6g}, std: {metrics['std_normal_angular_error_gt_to_pred']:.6g}, max: {metrics['max_normal_angular_error_gt_to_pred']:.6g}"
+				if np.isfinite(metrics.get('volume_gt', float('nan'))):
+					msg += f", Volume error abs: {metrics['volume_error_abs']:.6g}, rel: {metrics['volume_error_rel']:.6g}"
 				print(msg)
 		except Exception as e:
 			print(f'Error processing {case}: {e}', file=sys.stderr)
