@@ -1,0 +1,16 @@
+{
+	"mc": "MC",
+	"taubin_on_mc_04_50": "Taubin on MC, 0.4-50",
+	"taubin_on_mc_02_400": "Taubin on MC, 0.2-400",
+	"taubin_on_mc_025_400": "Taubin on MC, 0.25-400",
+	"taubin_on_mc_01_400": "Taubin on MC, 0.1-400",
+	"taubin_on_mc_02_600": "Taubin on MC, 0.2-600",
+	"taubin_on_mc_03_400": "Taubin on MC, 0.3-400",
+	"taubin_on_mc_05_400": "Taubin on MC, 0.5-400",
+	"global_taubin": "Taubin",
+	"taubin_50_53": "Taubin 50-53",
+	"taubin_50_51": "Taubin Smoothing",
+	"taubin_33_34": "Taubin 33-34",
+	"global_pred": "EGNN",
+	"global_pred_taubin": "EGNN + Taubin"
+}

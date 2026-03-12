@@ -9,9 +9,14 @@ Example:
 Outputs metrics on mesh quality and smoothness:
 	- Laplacian (smoothness): mean, std, max of |mean curvature| across vertices.
 	  Lower values indicate smoother meshes. Uses VTK's vtkCurvatures (Mean curvature).
+	- Curvature variation: mean local std of curvature among neighbors. Lower = smoother.
+	- Aspect ratio: mean, std, max per-triangle aspect ratio (longest/shortest edge).
+	  Closer to 1 = more regular triangles.
+	- Manifold check: n_non_manifold_edges, is_manifold (True if no non-manifold edges).
+	- Self-intersection: n_self_intersecting_triangles (requires trimesh; NaN if unavailable).
 	- Basic mesh stats: n_vertices, n_cells, volume, surface_area
 
-Requires `vtk` Python package: `pip install vtk` (or `conda install -c conda-forge vtk`).
+Requires `vtk` Python package. For self-intersection: `pip install trimesh`.
 """
 
 from __future__ import annotations
@@ -134,6 +139,149 @@ def mesh_surface_area(poly: vtk.vtkPolyData) -> float:
 		return float(mass.GetSurfaceArea())
 	except Exception:
 		return float('nan')
+
+
+def aspect_ratio_metrics(poly: vtk.vtkPolyData) -> dict:
+	"""Compute aspect ratio (longest/shortest edge) per triangle. Closer to 1 = more regular.
+
+	Uses vtkMeshQuality. Returns mean, std, max. Ideal triangles have aspect ratio 1.
+	"""
+	if poly is None or poly.GetNumberOfCells() == 0:
+		return {'aspect_ratio_mean': float('nan'), 'aspect_ratio_std': float('nan'), 'aspect_ratio_max': float('nan')}
+	try:
+		quality = vtk.vtkMeshQuality()
+		quality.SetInputData(poly)
+		quality.SetTriangleQualityMeasureToAspectRatio()
+		quality.SaveCellQualityOn()
+		quality.Update()
+		out = quality.GetOutput()
+		arr = out.GetCellData().GetArray("Quality")
+		if arr is None:
+			arr = out.GetCellData().GetArray(0)
+		if arr is None:
+			return {'aspect_ratio_mean': float('nan'), 'aspect_ratio_std': float('nan'), 'aspect_ratio_max': float('nan')}
+		a = numpy_support.vtk_to_numpy(arr).astype(float)
+		valid = np.isfinite(a) & (a > 0)
+		if not np.any(valid):
+			return {'aspect_ratio_mean': float('nan'), 'aspect_ratio_std': float('nan'), 'aspect_ratio_max': float('nan')}
+		a = a[valid]
+		n_valid = a.size
+		std_val = float(np.std(a)) if n_valid >= 2 else float('nan')
+		return {
+			'aspect_ratio_mean': float(np.mean(a)),
+			'aspect_ratio_std': std_val,
+			'aspect_ratio_max': float(np.max(a)),
+		}
+	except Exception:
+		return {'aspect_ratio_mean': float('nan'), 'aspect_ratio_std': float('nan'), 'aspect_ratio_max': float('nan')}
+
+
+def manifold_check(poly: vtk.vtkPolyData) -> dict:
+	"""Check for non-manifold edges. Uses vtkFeatureEdges.
+
+	Returns n_non_manifold_edges (count) and is_manifold (True if count == 0).
+	"""
+	if poly is None:
+		return {'n_non_manifold_edges': -1, 'is_manifold': False}
+	try:
+		edges = vtk.vtkFeatureEdges()
+		edges.SetInputData(poly)
+		edges.BoundaryEdgesOff()
+		edges.FeatureEdgesOff()
+		edges.ManifoldEdgesOff()
+		edges.NonManifoldEdgesOn()
+		edges.Update()
+		out = edges.GetOutput()
+		n_edges = out.GetNumberOfCells() if out else 0
+		return {
+			'n_non_manifold_edges': n_edges,
+			'is_manifold': n_edges == 0,
+		}
+	except Exception:
+		return {'n_non_manifold_edges': -1, 'is_manifold': False}
+
+
+def self_intersection_count(poly: vtk.vtkPolyData) -> float:
+	"""Count triangles that improperly intersect other parts of the mesh.
+
+	Requires trimesh. Returns nan if trimesh is not available.
+	"""
+	try:
+		import trimesh
+	except ImportError:
+		return float('nan')
+	if poly is None or poly.GetNumberOfCells() == 0:
+		return float('nan')
+	try:
+		pts = poly.GetPoints()
+		n_pts = pts.GetNumberOfPoints()
+		points = np.array([pts.GetPoint(i) for i in range(n_pts)])
+		cells = poly.GetPolys()
+		cells.InitTraversal()
+		faces = []
+		id_list = vtk.vtkIdList()
+		while cells.GetNextCell(id_list):
+			if id_list.GetNumberOfIds() == 3:
+				faces.append([id_list.GetId(j) for j in range(3)])
+		faces = np.array(faces, dtype=np.int64) if faces else np.empty((0, 3))
+		tm = trimesh.Trimesh(vertices=points, faces=faces)
+		inter = trimesh.intersections.mesh_self_intersection(tm)
+		return float(len(inter)) if inter is not None else 0.0
+	except Exception:
+		return float('nan')
+
+
+def curvature_variation_metrics(poly: vtk.vtkPolyData) -> dict:
+	"""Compute curvature variation: mean local std of curvature among vertex neighbors.
+
+	For each vertex, compute std of mean curvature at that vertex and its neighbors.
+	Higher values indicate more variation (less smooth). Requires mean curvature from vtkCurvatures.
+	"""
+	if poly is None or poly.GetNumberOfPoints() == 0 or poly.GetNumberOfCells() == 0:
+		return {'curvature_variation_mean': float('nan'), 'curvature_variation_std': float('nan'), 'curvature_variation_max': float('nan')}
+	try:
+		curvatures = vtk.vtkCurvatures()
+		curvatures.SetInputData(poly)
+		curvatures.SetCurvatureTypeToMean()
+		curvatures.Update()
+		out = curvatures.GetOutput()
+		mean_curv = out.GetPointData().GetArray("Mean_Curvature")
+		if mean_curv is None:
+			return {'curvature_variation_mean': float('nan'), 'curvature_variation_std': float('nan'), 'curvature_variation_max': float('nan')}
+		curv_arr = numpy_support.vtk_to_numpy(mean_curv).astype(float)
+		n_pts = curv_arr.size
+
+		# Build point-to-neighbors via cells
+		neighbors = [[] for _ in range(n_pts)]
+		cells = poly.GetPolys()
+		cells.InitTraversal()
+		id_list = vtk.vtkIdList()
+		while cells.GetNextCell(id_list):
+			if id_list.GetNumberOfIds() == 3:
+				a, b, c = id_list.GetId(0), id_list.GetId(1), id_list.GetId(2)
+				for p, q in [(a, b), (a, c), (b, a), (b, c), (c, a), (c, b)]:
+					if q not in neighbors[p]:
+						neighbors[p].append(q)
+
+		local_variations = []
+		for i in range(n_pts):
+			neigh = [i] + neighbors[i]
+			vals = curv_arr[neigh]
+			vals = vals[np.isfinite(vals)]
+			if vals.size >= 2:
+				local_variations.append(float(np.std(vals)))
+		if not local_variations:
+			return {'curvature_variation_mean': float('nan'), 'curvature_variation_std': float('nan'), 'curvature_variation_max': float('nan')}
+		arr = np.array(local_variations)
+		n_valid = arr.size
+		std_val = float(np.std(arr)) if n_valid >= 2 else float('nan')
+		return {
+			'curvature_variation_mean': float(np.mean(arr)),
+			'curvature_variation_std': std_val,
+			'curvature_variation_max': float(np.max(arr)),
+		}
+	except Exception:
+		return {'curvature_variation_mean': float('nan'), 'curvature_variation_std': float('nan'), 'curvature_variation_max': float('nan')}
 
 
 def compute_metrics(poly: vtk.vtkPolyData) -> dict:

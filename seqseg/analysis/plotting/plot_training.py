@@ -1,5 +1,6 @@
 import pickle
 import matplotlib.pyplot as plt
+plt.rcParams['font.family'] = 'Times New Roman'
 import numpy
 
 # make figure and assign axis objects

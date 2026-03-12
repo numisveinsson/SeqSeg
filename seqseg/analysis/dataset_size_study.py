@@ -4,6 +4,7 @@
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
+    plt.rcParams['font.family'] = 'Times New Roman'
 
     # Data
     percentages = [15, 25, 50, 75, 100]

@@ -646,6 +646,36 @@ def bound_polydata_by_image(image, poly, threshold):
     return clipper.GetOutput()
 
 
+def bound_polydata_by_sphere(poly, center, radius):
+    """
+    Clip polydata to the region inside a sphere.
+
+    Parameters
+    ----------
+    poly : vtk.vtkPolyData
+        Input surface mesh
+    center : tuple or array-like of 3 floats
+        Sphere center (x, y, z)
+    radius : float
+        Sphere radius
+
+    Returns
+    -------
+    vtk.vtkPolyData
+        Clipped mesh (inside sphere only; boundary is open at sphere surface)
+    """
+    sphereSource = vtk.vtkSphere()
+    sphereSource.SetCenter(center[0], center[1], center[2])
+    sphereSource.SetRadius(radius)
+
+    clipper = vtk.vtkClipPolyData()
+    clipper.SetClipFunction(sphereSource)
+    clipper.SetInputData(poly)
+    clipper.InsideOutOn()
+    clipper.Update()
+    return clipper.GetOutput()
+
+
 def write_vtk_polydata(poly, fn):
     """
     This function writes a vtk polydata to disk
@@ -794,6 +824,161 @@ def points2polydata(xyz, attribute_float=None, attributes=None):
     polydata.Modified()
 
     return polydata
+
+
+def _get_mesh_laplacian(pos, face):
+    """Compute mesh Laplacian (cotangent weights) for a triangle mesh.
+
+    Replicates torch_geometric.utils.get_mesh_laplacian using numpy.
+    Returns (edge_index, edge_weight) where edge_index is (2, num_edges)
+    with row=source, col=target, and edge_weight has cotangent weights
+    plus self-loops with negative degree.
+    """
+    assert pos.shape[1] == 3 and face.shape[0] == 3
+    num_nodes = pos.shape[0]
+
+    def get_cots(left, centre, right):
+        left_pos = pos[left]
+        central_pos = pos[centre]
+        right_pos = pos[right]
+        left_vec = left_pos - central_pos
+        right_vec = right_pos - central_pos
+        dot = np.einsum('ij,ij->i', left_vec, right_vec)
+        cross = np.linalg.norm(np.cross(left_vec, right_vec, axis=1), axis=1)
+        cot = np.where(np.abs(cross) > 1e-12, dot / cross, 0.0)
+        return cot / 2.0
+
+    # Cotangent at each vertex of each face
+    cot_021 = get_cots(face[0], face[2], face[1])
+    cot_102 = get_cots(face[1], face[0], face[2])
+    cot_012 = get_cots(face[0], face[1], face[2])
+    cot_weight = np.concatenate([cot_021, cot_102, cot_012])
+
+    # Edges: (0,1), (1,2), (0,2) for each face
+    cot_index = np.concatenate([
+        face[:2],      # (0,1)
+        face[1:],      # (1,2)
+        face[::2],     # (0,2)
+    ], axis=1)
+
+    # Make undirected: for each (i,j) add (j,i) with same weight
+    row_a, col_a = cot_index[0], cot_index[1]
+    row_b, col_b = cot_index[1], cot_index[0]
+    row = np.concatenate([row_a, row_b])
+    col = np.concatenate([col_a, col_b])
+    w = np.concatenate([cot_weight, cot_weight])
+    # Coalesce duplicate (row,col) by summing weights
+    edge_key = row.astype(np.int64) * num_nodes + col
+    uniq_keys, inv = np.unique(edge_key, return_inverse=True)
+    cot_weight_undir = np.zeros(len(uniq_keys))
+    np.add.at(cot_weight_undir, inv, w)
+    row = (uniq_keys // num_nodes).astype(np.int64)
+    col = (uniq_keys % num_nodes).astype(np.int64)
+    cot_weight = cot_weight_undir
+
+    # Diagonal: -sum of cotangent weights per vertex
+    cot_deg = np.zeros(num_nodes)
+    np.add.at(cot_deg, row, cot_weight)
+
+    # Add self-loops
+    self_row = np.arange(num_nodes, dtype=np.int64)
+    self_col = np.arange(num_nodes, dtype=np.int64)
+    edge_index = np.vstack([
+        np.concatenate([row, self_row]),
+        np.concatenate([col, self_col]),
+    ])
+    edge_weight = np.concatenate([cot_weight, -cot_deg])
+    return edge_index, edge_weight
+
+
+def _scatter_mean(src, index, num_nodes):
+    """Scatter reduce='mean': for each index j, mean of src[i] where index[i]==j."""
+    out = np.zeros((num_nodes, src.shape[1]), dtype=src.dtype)
+    counts = np.zeros(num_nodes, dtype=np.float64)
+    np.add.at(out, index, src)
+    np.add.at(counts, index, 1.0)
+    counts = np.maximum(counts, 1e-12)  # avoid div by zero
+    return out / counts[:, np.newaxis]
+
+
+def taubin_smoothing(V, F, it, mu1, mu2):
+    """Taubin λ-μ smoothing: alternates smoothing (mu1) and inflation (-mu2) to reduce shrinkage.
+
+    Uses cotangent Laplacian. Equivalent to the torch_geometric/torch_scatter version
+    but implemented with numpy only (no torch).
+
+    Parameters
+    ----------
+    V : np.ndarray
+        Vertex positions, shape (n_vertices, 3).
+    F : np.ndarray
+        Face indices, shape (3, n_faces) - 3 vertex IDs per face.
+    it : int
+        Number of Taubin iterations.
+    mu1 : float
+        Smoothing factor (positive).
+    mu2 : float
+        Inflation factor (positive, applied as -mu2 to counteract shrinkage).
+
+    Returns
+    -------
+    np.ndarray
+        Smoothed vertex positions, shape (n_vertices, 3).
+    """
+    V = np.asarray(V, dtype=np.float64)
+    F = np.asarray(F, dtype=np.int64)
+    if F.shape[1] == 3 and F.shape[0] != 3:
+        F = F.T  # (n_faces, 3) -> (3, n_faces)
+    edge_index, edge_weight = _get_mesh_laplacian(V, F)
+    row, col = edge_index[0], edge_index[1]
+    num_nodes = V.shape[0]
+
+    Vtemp = V.copy()
+    for _ in range(it):
+        inputs_lap = Vtemp[row] * edge_weight[:, np.newaxis]
+        lap = _scatter_mean(inputs_lap, col, num_nodes)
+        Vtemp = Vtemp + mu1 * lap
+
+        inputs_lap = Vtemp[row] * edge_weight[:, np.newaxis]
+        lap = _scatter_mean(inputs_lap, col, num_nodes)
+        Vtemp = Vtemp - mu2 * lap
+    return Vtemp
+
+
+def taubin_smooth_polydata(poly, it=50, mu1=0.5, mu2=0.51):
+    """Apply Taubin smoothing to VTK polydata using numpy (no torch).
+
+    Parameters
+    ----------
+    poly : vtk.vtkPolyData
+        Input surface mesh (triangle cells).
+    it : int
+        Number of Taubin iterations (default 50).
+    mu1 : float
+        Smoothing factor (default 0.5).
+    mu2 : float
+        Inflation factor (default 0.51, slightly > mu1 to prevent shrinkage).
+
+    Returns
+    -------
+    vtk.vtkPolyData
+        Smoothed mesh (same connectivity, updated points).
+    """
+    pts, cells = get_points_cells(poly)
+    V = np.asarray(pts, dtype=np.float64)
+    faces = [c for c in cells if len(c) == 3]
+    if not faces:
+        return poly
+    F = np.array(faces, dtype=np.int64).T  # (3, n_faces)
+    V_smooth = taubin_smoothing(V, F, it, mu1, mu2)
+    out = vtk.vtkPolyData()
+    out.DeepCopy(poly)
+    vtk_arr = n2v(V_smooth.ravel(order='C'))
+    vtk_arr.SetNumberOfComponents(3)
+    pts = vtk.vtkPoints()
+    pts.SetData(vtk_arr)
+    out.SetPoints(pts)
+    return out
 
 
 def smooth_polydata(poly, iteration=25, boundary=False,

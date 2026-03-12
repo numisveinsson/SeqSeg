@@ -6,6 +6,7 @@ import numpy as np
 import vtk
 from vtk_utils.vtk_utils import *
 import matplotlib.pyplot as plt
+plt.rcParams['font.family'] = 'Times New Roman'
 import argparse
 
 def plot_dice_scores_over_epochs(dir_n):

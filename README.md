@@ -97,8 +97,8 @@ The neural network is trained on **local subvolume patches** extracted from anno
 ### System Requirements
 
 - **OS**: Linux, macOS, Windows
-- **Python**: ≥3.11 (recommended)
-- **GPU**: CUDA-compatible GPU with ≥8GB VRAM (recommended)
+- **Python**: ≥3.9 (3.11 recommended)
+- **GPU**: CUDA-compatible GPU with ≥8GB VRAM (recommended for faster inference; can also run on CPU only)
 
 ### Option 1: pip Installation (Recommended)
 
@@ -127,11 +127,12 @@ pip install seqseg
 
 **Core Dependencies:**
 ```
-nnunetv2==2.5.1          # Deep learning segmentation
-torch>=2.3.1             # PyTorch backend  
-simpleitk==2.2.1         # Medical image I/O
-vtk==9.1.0               # 3D visualization and processing
-pyyaml==6.0.1            # Configuration management
+nnunetv2                 # Deep learning segmentation
+torch                    # PyTorch backend  
+SimpleITK                # Medical image I/O
+vtk                      # 3D visualization and processing
+PyYAML                   # Configuration management
+scipy                    # Scientific computing
 ```
 
 **Optional Dependencies:**
@@ -230,7 +231,7 @@ seqseg -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, data in mm
 | `data_dir` | str | - | Path to data directory containing images and seeds.json |
 | `nnunet_results_path` | str | - | Path to nnUNet model weights directory |
 | `nnunet_type` | str | `3d_fullres` | nnUNet model architecture (`3d_fullres`, `2d`) |
-| `train_dataset` | str | - | Dataset name used for training (e.g., `Dataset005_SEQAORTANDFEMOMR`) |
+| `train_dataset` | str | `Dataset010_SEQCOROASOCACT` | Dataset name used for training (e.g., `Dataset005_SEQAORTANDFEMOMR`) |
 | `fold` | str | `all` | Cross-validation fold (`all`, `0`, `1`, `2`, `3`, `4`) |
 | `img_ext` | str | - | Image file extension (`.nii.gz`, `.mha`, `.nrrd`) |
 | `config_name` | str | `global` | Configuration file name |
@@ -245,16 +246,18 @@ seqseg -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, data in mm
 | `write_steps` | int | `0` | Save intermediate results (0/1) |
 | `extract_global_centerline` | int | `0` | Extract final centerline (0/1) |
 | `cap_surface_cent` | int | `0` | Cap vessel surface ends (0/1) |
+| `pt_centerline` | int | `50` | Centerline point spacing for seed extraction |
+| `num_seeds_centerline` | int | `1` | Number of seeds for centerline initialization |
 
 ### Output Files
 
-SeqSeg generates several output files for each processed case:
+SeqSeg generates several output files for each processed case. Filenames include `{test_name}` (e.g. `3d_fullres`):
 
 | File | Description |
 |------|-------------|
-| `{case}_seg_containing_seeds_{steps}_steps.mha` | Final binary segmentation |
-| `{case}_surface_mesh_smooth_{steps}_steps.vtp` | Smoothed 3D surface mesh |
-| `{case}_centerline_{steps}_steps.vtp` | Extracted vessel centerlines |
+| `{case}_segmentation_{test_name}_{steps}_steps.mha` | Final binary segmentation |
+| `{case}_surface_mesh_{test_name}_{steps}_steps.vtp` | Smoothed 3D surface mesh |
+| `{case}_centerline_{test_name}_{steps}_steps.vtp` | Extracted vessel centerlines (only when `extract_global_centerline=1`) |
 | `{case}_binary_seg_*.mha` | Raw binary segmentation |
 | `{case}_prob_seg_*.mha` | Probabilistic segmentation |
 | `simvascular/` | Directory with SimVascular-compatible files |

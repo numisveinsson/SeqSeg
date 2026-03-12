@@ -1,5 +1,8 @@
 from plot_functions import plot_histograms, plot_bar_grouped
+import matplotlib.pyplot as plt
 import numpy as np
+
+plt.rcParams['font.family'] = 'Times New Roman'
 import pickle
 
 def organize(data, tests, column_names):
