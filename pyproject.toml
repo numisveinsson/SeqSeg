@@ -41,6 +41,7 @@ dependencies = [
     "SimpleITK",
     "PyYAML",
     "nnunetv2",
+    "scipy",
 ]
 
 [project.scripts]
