@@ -16,9 +16,9 @@ SeqSeg is a novel method for automatic vessel segmentation that combines local d
 **Key Features:**
 - **Minimal supervision**: Requires only 1-2 seed points for initialization
 - **Robust bifurcation detection**: Automatically identifies and follows vessel branches  
-- **Multi-modal support**: Works with CT, MR, and other 3D medical imaging modalities
+- **Multi-modal support**: Works with CT and MR 3D medical imaging modalities
 - **Scalable**: Handles vessels from small coronaries to large aortas
-- **Clinical validation**: Tested on diverse vascular anatomies including coronary, aortic, cerebral, and pulmonary vessels
+- **Clinical validation**: Tested on diverse vascular anatomies including coronary, aortic, cerebral, and pulmonary vessels (only aortic weights released)
 
 **Performance Highlights:**
 - Dice similarity coefficient: >0.9 on validation datasets
@@ -151,7 +151,8 @@ Pre-trained weights are required for inference:
 
 **Available Models:**
 - `Dataset005_SEQAORTANDFEMOMR`: Aortic and femoral vessels (MR)
-- Additional models available for coronary, cerebral, and pulmonary vessels
+- `Dataset006_SEQAORTANDFEMOCT`: Aortic and femoral vessels (CT)
+- Additional models available for coronary, cerebral, and pulmonary vessels upon request
 
 ## Usage
 
@@ -209,7 +210,7 @@ seqseg \
 
 ### Advanced Usage Examples
 
-#### High-resolution processing:
+#### Debugging mode (write out intermediate results):
 ```bash
 seqseg -data_dir data/ -max_n_steps 100 -max_n_branches 10 -write_steps 1
 ```
@@ -369,23 +370,6 @@ nnUNetv2_train 999 3d_fullres 0  # Train fold 0
 3. **Use with SeqSeg**:
 ```bash
 seqseg -train_dataset Dataset999_MYCUSTOM -fold 0
-```
-
-### Evaluation and Benchmarking
-
-#### Quantitative Metrics
-```python
-from seqseg.analysis.compute_metrics import evaluate_segmentation
-
-# Compute standard metrics (basic evaluation)
-dice, hausdorff, _ = evaluate_segmentation(
-    prediction_path, ground_truth_path
-)
-
-# Full evaluation including centerline overlap
-dice, hausdorff, centerline_overlap = evaluate_segmentation(
-    prediction_path, ground_truth_path, centerline_path
-)
 ```
 
 ### Integration with Other Tools

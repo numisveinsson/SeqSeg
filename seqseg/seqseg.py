@@ -377,8 +377,8 @@ def main():
                               + '_surface_mesh_nonsmooth_' + test_name + '_'
                               + str(n_steps_taken) + '_steps' + '.vtp')
         
-        # Apply smoothing to create high-quality surface for CFD/analysis
-        surface_smooth = vf.smooth_polydata(assembly_surface, iteration=75, smoothingFactor=0.1)
+        # Taubin λ–μ smoothing (cotangent Laplacian; limits shrink vs plain Laplacian)
+        surface_smooth = vf.taubin_smooth_polydata(assembly_surface, it=75, mu1=0.5, mu2=0.51)
         vf.write_vtk_polydata(surface_smooth, dir_output0 + '/' + case
                               + '_surface_mesh_' + test_name + '_'
                               + str(n_steps_taken) + '_steps' + '.vtp')
