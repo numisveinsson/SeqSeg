@@ -73,7 +73,7 @@ def keep_component_seeds(image, seeds):
         SITK image, seed point pointing to point in vessel of interest
         seed(s): location of seeds; list of np arrays (one or multiple points)
     """
-    # create list of list of index values for each seed
+    # create list of index values for each seed
     index_seeds = []
     for i in range(len(seeds)):
         index_seeds.append(image
@@ -97,38 +97,49 @@ def remove_other_vessels(image, seed):
         binary image file (either 0 or 1)
     """
 
-    # labels, means = connected_comp_info(image, False)
     ccimage = sitk.ConnectedComponent(image)
+    size = ccimage.GetSize()
 
-    # print(f"Seeds to remove around: {seed}")
+    # Normalize input to a list of 3D tuple indices.
+    if isinstance(seed, (tuple, list, np.ndarray)) and len(seed) == 3 and \
+       all(isinstance(v, (int, np.integer)) for v in seed):
+        seed_list = [tuple(int(v) for v in seed)]
+    elif isinstance(seed, (tuple, list, np.ndarray)):
+        seed_list = [tuple(int(v) for v in s) for s in seed]
+    else:
+        raise TypeError("seed must be a 3D index or a list of 3D indices")
 
-    if isinstance(seed[0], tuple):
-        labels_seeds = []
-        for i in range(len(seed)):
-            labels_seeds.append(ccimage[seed[i]])
+    labels_seeds = []
+    for s in seed_list:
+        # Skip out-of-bounds seeds instead of crashing or mis-indexing.
+        if any(s[d] < 0 or s[d] >= size[d] for d in range(3)):
+            continue
+        label = int(ccimage[s])
+        # Ignore background labels for multi-seed union logic.
+        if label > 0:
+            labels_seeds.append(label)
 
-        # if only one seed and it is background, set it to 1
-        if len(labels_seeds) == 1 and labels_seeds[0] == 0:
-            labels_seeds[0] = 1
+    labels_seeds = sorted(set(labels_seeds))
+    print(f"Labels at seed indices: {labels_seeds}")
 
-        # create a new image with only the labels of interest
+    if not labels_seeds:
+        # Fallback: keep largest connected component when no seed lands
+        # in vessel foreground.
+        relabeled = sitk.RelabelComponent(ccimage, sortByObjectSize=True)
+        labelImage = sitk.BinaryThreshold(relabeled,
+                                          lowerThreshold=1,
+                                          upperThreshold=1)
+    else:
+        # Create a new image with union of all seed-connected labels.
         labelImage = sitk.BinaryThreshold(ccimage,
                                           lowerThreshold=labels_seeds[0],
                                           upperThreshold=labels_seeds[0])
-        for i in range(1, len(labels_seeds)):
-            labelImage = labelImage
-            + sitk.BinaryThreshold(ccimage,
-                                   lowerThreshold=labels_seeds[i],
-                                   upperThreshold=labels_seeds[i])
-    else:
-        label = ccimage[seed]
-        # print("The label we use is: " + str(label))
-
-        if label == 0:
-            label = 1
-        labelImage = sitk.BinaryThreshold(ccimage,
-                                          lowerThreshold=label,
-                                          upperThreshold=label)
+        for label in labels_seeds[1:]:
+            labelImage = labelImage + sitk.BinaryThreshold(
+                ccimage,
+                lowerThreshold=label,
+                upperThreshold=label
+            )
 
     return labelImage
 
