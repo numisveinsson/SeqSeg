@@ -1,6 +1,10 @@
 ![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/python-app.yml/badge.svg)
 ![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/test.yml/badge.svg)
 
+<p align="center">
+  <img src="seqseg/assets/seqseg_logo.png" alt="SeqSeg — Sequential Vessel Segmentation" width="480"/>
+</p>
+
 # SeqSeg: Sequential Vessel Segmentation and Tracking
 
 > **Automatic tracking and segmentation of blood vessels in CT and MR images using deep learning and geometric tracking**
