@@ -275,6 +275,12 @@ SeqSeg generates several output files for each processed case. Filenames include
 
 ## Performance & Benchmarks
 
+### Aortic segmentation example
+
+![Aortic segmentation: SeqSeg vs. 2D nnU-Net on the ATV dataset](seqseg/assets/ATV_dataset_results.png)
+
+*Qualitative comparison on 18 cases: ground truth, SeqSeg, 2D nnU-Net (with post-processing), and 2D nnU-Net raw predictions. SeqSeg tends to preserve a continuous aortic tree and peripheral branches where the 2D nnU-Net baselines are more fragmented or incomplete.*
+
 ### Performance Metrics
 
 **Processing Times** (Local CPU, typical cases):
