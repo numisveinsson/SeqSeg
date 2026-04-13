@@ -18,7 +18,7 @@ SeqSeg is a novel method for automatic vessel segmentation that combines local d
 - **Robust bifurcation detection**: Automatically identifies and follows vessel branches  
 - **Multi-modal support**: Works with CT and MR 3D medical imaging modalities
 - **Scalable**: Handles vessels from small coronaries to large aortas
-- **Clinical validation**: Tested on diverse vascular anatomies including coronary, aortic, cerebral, and pulmonary vessels (only aortic weights released)
+- **Clinical validation**: Tested on diverse vascular anatomies including coronary, aortic, cerebral, and pulmonary vessels (pre-trained weights released for aorta CT/MR and coronary CT)
 
 **Performance Highlights:**
 - Dice similarity coefficient: >0.9 on validation datasets
@@ -145,14 +145,17 @@ vmtk                    # Advanced vascular modeling tools
 
 Pre-trained weights are required for inference:
 
-1. **Download**: [Pre-trained Models](https://zenodo.org/records/15020477) (nnUNet_results folder)
+1. **Download**:
+   - Aortic and femoral (MR/CT): [Pre-trained models](https://zenodo.org/records/15020477) (nnUNet_results folder)
+   - Coronary CT (CCTA): [SeqSeg nnU-Net weights — CT coronary segmentation](https://zenodo.org/records/19547894) (`nnUNet_results_coronary.zip`, `Dataset010_SEQCOROASOCACT`)
 2. **Extract**: Unzip to desired location
 3. **Reference**: Use `-nnunet_results_path` to specify path
 
 **Available Models:**
 - `Dataset005_SEQAORTANDFEMOMR`: Aortic and femoral vessels (MR)
 - `Dataset006_SEQAORTANDFEMOCT`: Aortic and femoral vessels (CT)
-- Additional models available for coronary, cerebral, and pulmonary vessels upon request
+- `Dataset010_SEQCOROASOCACT`: Coronary lumen (CT angiography) — [nnU-Net weights on Zenodo](https://zenodo.org/records/19547894)
+- Additional models for cerebral and pulmonary vessels available upon request
 
 ## Usage
 
