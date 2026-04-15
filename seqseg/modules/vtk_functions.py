@@ -543,7 +543,7 @@ def get_location_cells(surface):
     return surface_locations
 
 
-def exportSitk2VTK(sitkIm, spacing=None):
+def exportSitk2VTK(sitkIm, spacing=None, interpolation="linear"):
     """
     This function creates a vtk image from a simple itk image
     Args:
@@ -574,7 +574,20 @@ import SimpleITK as sitk
     reslice = vtk.vtkImageReslice()
     reslice.SetInputData(imageData)
     reslice.SetResliceAxes(vtkmatrix)
-    reslice.SetInterpolationModeToNearestNeighbor()
+    interp = str(interpolation).strip().lower()
+    if interp in ("nearest", "nn", "nearestneighbor", "nearest_neighbor"):
+        reslice.SetInterpolationModeToNearestNeighbor()
+    elif interp in ("linear", "lin"):
+        reslice.SetInterpolationModeToLinear()
+    elif interp in ("cubic", "bspline", "b-spline", "b_spline"):
+        # VTK ImageReslice exposes cubic interpolation; use it as the smoothest
+        # available option here for "b-spline-like" behavior.
+        reslice.SetInterpolationModeToCubic()
+    else:
+        raise ValueError(
+            f"Unknown interpolation mode {interpolation!r}. "
+            "Use 'nearest', 'linear', or 'cubic'."
+        )
     reslice.Update()
     imageData = reslice.GetOutput()
     # imageData.SetDirectionMatrix(sitkIm.GetDirection())

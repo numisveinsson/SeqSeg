@@ -364,6 +364,29 @@ def _polyline_world_from_region(
     return arr
 
 
+def _smooth_closed_polyline(
+    xyz: np.ndarray, iterations: int = 12, relaxation: float = 0.2
+) -> np.ndarray:
+    """
+    Cyclic Laplacian smoothing for closed contours.
+
+    Keeps point count unchanged and smooths high-frequency jaggedness.
+    """
+    arr = np.asarray(xyz, dtype=float)
+    if arr.ndim != 2 or arr.shape[1] != 3 or arr.shape[0] < 4:
+        return arr
+    alpha = float(relaxation)
+    if alpha <= 0.0 or iterations <= 0:
+        return arr
+    alpha = min(alpha, 0.5)
+    out = arr.copy()
+    for _ in range(int(iterations)):
+        prev = np.roll(out, 1, axis=0)
+        nxt = np.roll(out, -1, axis=0)
+        out = (1.0 - alpha) * out + 0.5 * alpha * (prev + nxt)
+    return out
+
+
 def extract_plane_contour_world(
     sitk_volume: sitk.Image,
     pos: Sequence[float],
@@ -399,14 +422,14 @@ def extract_plane_contour_world(
     -------
     ndarray of shape (N, 3) or None if no contour is found.
     """
-    if plane_spacing_mm is None:
-        sp_arr = np.array(sitk_volume.GetSpacing(), dtype=float)
-        plane_spacing_mm = float(max(0.3, min(sp_arr) * 0.75))
+    # Use a consistently finer in-plane sampling: half of native minimum spacing.
+    sp_arr = np.array(sitk_volume.GetSpacing(), dtype=float)
+    plane_spacing_mm = float(max(1e-6, 0.5 * float(np.min(sp_arr))))
 
     if vtk_cache is not None:
         vtk_vol = vtk_cache[0]
     else:
-        vtk_vol, _ = exportSitk2VTK(sitk_volume)
+        vtk_vol, _ = exportSitk2VTK(sitk_volume, interpolation="linear")
 
     sl, local_to_world = _reslice_plane_scalar(
         vtk_vol,
@@ -436,11 +459,14 @@ def extract_plane_contour_world(
     tpf.Update()
 
     pos_arr = np.asarray(pos, dtype=float).reshape(3)
-    return _polyline_world_from_region(
+    loop = _polyline_world_from_region(
         tpf.GetOutput(),
         seed_xyz=pos_arr,
         component_selection=component_selection,
     )
+    if loop is None or loop.shape[0] < 4:
+        return loop
+    return _smooth_closed_polyline(loop)
 
 
 def _decimate_indices(n: int, max_control: int) -> np.ndarray:
@@ -623,7 +649,7 @@ def build_contours_for_path_points(
 
     sitk_volume = _as_float_probability_volume(sitk_volume)
 
-    vtk_cache = exportSitk2VTK(sitk_volume)
+    vtk_cache = exportSitk2VTK(sitk_volume, interpolation="linear")
     kept_pp: List[Dict[str, Any]] = []
     contours: List[Optional[np.ndarray]] = []
 
