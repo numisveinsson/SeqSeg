@@ -20,6 +20,7 @@ from .assembly import (Segmentation, VesselTree, print_error,
                        create_step_dict, get_old_ref_point)
 
 from .simvascular import create_pth
+from .simvascular_contour import write_ctgr_for_pth
 
 from .local_assembly import construct_subvolume
 
@@ -884,6 +885,52 @@ def trace_centerline(
                                 path_id=simvascular_path_counter,
                                 spline_resample=True,
                             )
+                            # One SimVascular contour group (.ctgr) per completed branch,
+                            # referencing the same path basename and path_id as the .pth.
+                            if global_config.get("SIMVASCULAR_CONTOURS", True):
+                                try:
+                                    ctgr_output_path = (
+                                        output_folder
+                                        + "/simvascular/Segmentations/branch_"
+                                        + case
+                                        + "_"
+                                        + str(branch)
+                                        + "_"
+                                        + str(i)
+                                        + ".ctgr"
+                                    )
+                                    write_ctgr_for_pth(
+                                        assembly_segs.assembly,
+                                        pth_output_path,
+                                        ctgr_output_path,
+                                        iso_value=float(
+                                            global_config.get(
+                                                "SIMVASCULAR_CONTOUR_ISO", 0.5
+                                            )
+                                        ),
+                                        stride=int(
+                                            global_config.get(
+                                                "SIMVASCULAR_CONTOUR_STRIDE", 1
+                                            )
+                                        ),
+                                        half_extent_mm=float(
+                                            global_config.get(
+                                                "SIMVASCULAR_CONTOUR_HALF_EXTENT_MM",
+                                                50.0,
+                                            )
+                                        ),
+                                        component_selection=str(
+                                            global_config.get(
+                                                "SIMVASCULAR_CONTOUR_COMPONENT",
+                                                "closest_to_path",
+                                            )
+                                        ),
+                                    )
+                                except Exception as e_ct:
+                                    print(
+                                        "Warning: Could not create .ctgr file for "
+                                        f"branch {branch}: {e_ct}"
+                                    )
                     except Exception as e:
                         print(f"Warning: Could not create .pth file for "
                               f"branch {branch}: {e}")

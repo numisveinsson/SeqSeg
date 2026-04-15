@@ -87,6 +87,7 @@ def create_directories(output_folder, write_samples):
         output_folder + 'simvascular',    # SimVascular-compatible outputs
         output_folder + 'simvascular/Images',  # Medical images
         output_folder + 'simvascular/Paths',   # Centerline paths (.pth files)
+        output_folder + 'simvascular/Segmentations',  # Contour groups (.ctgr) per branch
         output_folder + 'simvascular/Models'   # 3D models
     ]
     
