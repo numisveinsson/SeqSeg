@@ -224,8 +224,16 @@ def _reslice_plane_scalar(
     *,
     half_extent_mm: float,
     plane_spacing_mm: float,
-) -> Optional[vtk.vtkImageData]:
-    """Scalar image resliced onto a plane perpendicular to ``tangent``."""
+) -> Tuple[Optional[vtk.vtkImageData], vtk.vtkMatrix4x4]:
+    """
+    Scalar image resliced onto a plane perpendicular to ``tangent``.
+
+    Returns
+    -------
+    slice_image, local_to_world
+        ``slice_image`` is the 2D reslice output. ``local_to_world`` maps
+        reslice physical coordinates (u/v plane frame) to world coordinates.
+    """
     u, v, w = _plane_basis(tangent, rotation)
     pos = np.asarray(pos, dtype=float).reshape(3)
 
@@ -262,9 +270,26 @@ def _reslice_plane_scalar(
         reslice.SetBackgroundValue(0.0)
     reslice.Update()
     out = reslice.GetOutput()
+
+    local_to_world = vtk.vtkMatrix4x4()
+    local_to_world.Identity()
+    # world = c + x*u + y*v + z*w
+    local_to_world.SetElement(0, 0, float(u[0]))
+    local_to_world.SetElement(1, 0, float(u[1]))
+    local_to_world.SetElement(2, 0, float(u[2]))
+    local_to_world.SetElement(0, 1, float(v[0]))
+    local_to_world.SetElement(1, 1, float(v[1]))
+    local_to_world.SetElement(2, 1, float(v[2]))
+    local_to_world.SetElement(0, 2, float(w[0]))
+    local_to_world.SetElement(1, 2, float(w[1]))
+    local_to_world.SetElement(2, 2, float(w[2]))
+    local_to_world.SetElement(0, 3, float(cx))
+    local_to_world.SetElement(1, 3, float(cy))
+    local_to_world.SetElement(2, 3, float(cz))
+
     if out is None or out.GetNumberOfPoints() == 0:
-        return None
-    return out
+        return None, local_to_world
+    return out, local_to_world
 
 
 def _polyline_world_from_region(
@@ -383,7 +408,7 @@ def extract_plane_contour_world(
     else:
         vtk_vol, _ = exportSitk2VTK(sitk_volume)
 
-    sl = _reslice_plane_scalar(
+    sl, local_to_world = _reslice_plane_scalar(
         vtk_vol,
         np.asarray(pos, dtype=float),
         np.asarray(tangent, dtype=float),
@@ -401,9 +426,18 @@ def extract_plane_contour_world(
     cf.ComputeNormalsOff()
     cf.Update()
 
+    # vtkContourFilter output is in the 2D reslice frame; map it back to world
+    # before component selection and XML serialization.
+    tfm = vtk.vtkTransform()
+    tfm.SetMatrix(local_to_world)
+    tpf = vtk.vtkTransformPolyDataFilter()
+    tpf.SetTransform(tfm)
+    tpf.SetInputData(cf.GetOutput())
+    tpf.Update()
+
     pos_arr = np.asarray(pos, dtype=float).reshape(3)
     return _polyline_world_from_region(
-        cf.GetOutput(),
+        tpf.GetOutput(),
         seed_xyz=pos_arr,
         component_selection=component_selection,
     )
