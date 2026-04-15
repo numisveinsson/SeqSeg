@@ -195,6 +195,7 @@ def trace_centerline(
 
     # Initialize tracking variables for the main tracing loop
     branch = 0                                                  # Current active branch index
+    simvascular_path_counter = 0                                # Unique <path id> per written .pth
 
     # Collections for storing VTK polydata results from completed branches
     list_centerlines, list_surfaces = [], []                   # Geometric results (centerlines, surfaces)
@@ -876,7 +877,12 @@ def trace_centerline(
                                 + '/simvascular/Paths/branch_'+case+'_'
                                 + str(branch)+'_'+str(i)
                                 + '.pth')
-                            create_pth(pth_points, pth_output_path)
+                            simvascular_path_counter += 1
+                            create_pth(
+                                pth_points,
+                                pth_output_path,
+                                path_id=simvascular_path_counter,
+                            )
                     except Exception as e:
                         print(f"Warning: Could not create .pth file for "
                               f"branch {branch}: {e}")

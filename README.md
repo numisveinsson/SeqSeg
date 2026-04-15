@@ -2,7 +2,8 @@
 ![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/test.yml/badge.svg)
 
 <p align="center">
-  <img src="seqseg/assets/seqseg_logo.png" alt="SeqSeg — Sequential Vessel Segmentation" width="480"/>
+  <img src="seqseg/assets/seqseg_logo.png" alt="SeqSeg — Sequential Vessel Segmentation" width="480"/><br/>
+  <img src="seqseg/assets/coronary.png" alt="Example coronary segmentation (SeqSeg)" width="260"/>
 </p>
 
 # SeqSeg: Sequential Vessel Segmentation and Tracking
@@ -284,6 +285,12 @@ SeqSeg generates several output files for each processed case. Filenames include
 ![Aortic segmentation: SeqSeg vs. 2D nnU-Net on the ATV dataset](seqseg/assets/ATV_dataset_results.png)
 
 *Qualitative comparison on 18 cases: ground truth, SeqSeg, 2D nnU-Net (with post-processing), and 2D nnU-Net raw predictions. SeqSeg tends to preserve a continuous aortic tree and peripheral branches where the 2D nnU-Net baselines are more fragmented or incomplete.*
+
+### Coronary segmentation example
+
+![Coronary artery segmentation with SeqSeg](seqseg/assets/coronary.png)
+
+*3D visualization: coronary tree segmented with SeqSeg (red) overlaid on the heart (transparent blue). Seed markers show the minimal initialization points used to grow the left and right coronary systems.*
 
 ### Performance Metrics
 

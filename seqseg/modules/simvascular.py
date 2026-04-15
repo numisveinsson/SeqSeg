@@ -36,12 +36,12 @@ def indent(elem, level=0):
             elem.tail = i
 
 
-def create_pth(points, output_path):
+def create_pth(points, output_path, path_id=1):
     """Create a SimVascular-style .pth XML file given a list of (x,y,z) points."""
     path_elem = ET.Element(
         "path",
         attrib={
-            "id": "1",
+            "id": str(int(path_id)),
             "method": "0",
             "calculation_number": "100",
             "spacing": "0",
@@ -165,7 +165,7 @@ def write_pths_from_vtp(vtp_path, out_dir=None, prefix=None, verbose=True):
 
         out_name = f"{prefix}_branch{ci+1}.pth"
         out_path = os.path.join(out_dir, out_name)
-        create_pth(branch_points, out_path)
+        create_pth(branch_points, out_path, path_id=ci + 1)
         written.append(out_path)
         if verbose:
             print(f"  Wrote branch {ci+1}/{num_cells} -> {out_path}")
