@@ -253,7 +253,7 @@ def _reslice_plane_scalar(
     reslice.SetOutputSpacing(sp, sp, sp)
     reslice.SetOutputExtent(0, nx - 1, 0, nx - 1, 0, 0)
     reslice.SetOutputScalarType(vtk.VTK_FLOAT)
-    reslice.SetBackgroundValue(0.0)
+    reslice.SetBackgroundLevel(0.0)
     reslice.Update()
     out = reslice.GetOutput()
     if out is None or out.GetNumberOfPoints() == 0:
