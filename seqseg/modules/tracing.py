@@ -882,6 +882,7 @@ def trace_centerline(
                                 pth_points,
                                 pth_output_path,
                                 path_id=simvascular_path_counter,
+                                spline_resample=True,
                             )
                     except Exception as e:
                         print(f"Warning: Could not create .pth file for "
