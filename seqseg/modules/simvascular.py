@@ -29,15 +29,23 @@ def _perpendicular_normal_unit(tangent, eps=1e-12):
     if nrm < eps:
         return np.array([0.0, 1.0, 0.0], dtype=float)
     t = t / nrm
-    a = np.array([1.0, 0.0, 0.0], dtype=float)
-    if abs(np.dot(t, a)) > 0.9:
-        a = np.array([0.0, 1.0, 0.0], dtype=float)
+    # Pick the cardinal axis least aligned with tangent to avoid bias
+    # (e.g. always using x-axis can force one rotation component to 0).
+    i = int(np.argmin(np.abs(t)))
+    a = np.zeros(3, dtype=float)
+    a[i] = 1.0
     r = np.cross(t, a)
     rn = np.linalg.norm(r)
     if rn < eps:
-        a = np.array([0.0, 0.0, 1.0], dtype=float)
-        r = np.cross(t, a)
-        rn = np.linalg.norm(r)
+        for j in (0, 1, 2):
+            if j == i:
+                continue
+            a = np.zeros(3, dtype=float)
+            a[j] = 1.0
+            r = np.cross(t, a)
+            rn = np.linalg.norm(r)
+            if rn >= eps:
+                break
     return r / rn
 
 
@@ -309,7 +317,7 @@ def create_pth(
             (
                 np.asarray([x, y, z], dtype=float),
                 np.asarray(t, dtype=float),
-                np.array([0.0, 1.0, 0.0], dtype=float),
+                _perpendicular_normal_unit(t),
             )
             for (x, y, z), t in zip(points, tangents)
         ]
