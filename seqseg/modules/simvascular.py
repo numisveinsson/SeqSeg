@@ -100,22 +100,28 @@ def _perpendicular_normal_unit(tangent, eps=1e-12):
 
 
 def _vtk_parametric_spline_eval(spline, t):
-    """Evaluate SimVascular-style vtkParametricSpline at parameter t (knot index space)."""
+    """Evaluate vtkParametricSpline at normalized parameter t in [0, 1]."""
     pts = spline.GetPoints()
     n = pts.GetNumberOfPoints()
     if n == 0:
         return np.zeros(3, dtype=float)
-    if spline.GetClosed():
-        tmax = float(n)
-    else:
-        tmax = float(n - 1)
-    t = max(0.0, min(float(t), tmax))
+    t = max(0.0, min(float(t), 1.0))
     u = [t, 0.0, 0.0]
     p = [0.0, 0.0, 0.0]
     # VTK Python requires a derivative buffer (unused here).
     du = [0.0] * 9
     spline.Evaluate(u, p, du)
     return np.array(p, dtype=float)
+
+
+def _normalized_param(i, frac, input_point_number, closed):
+    """
+    Convert segment-index parameterization to normalized spline u in [0, 1].
+
+    For open splines, denominator is (N-1) segments. For closed splines, N.
+    """
+    denom = float(input_point_number if closed else max(1, input_point_number - 1))
+    return (float(i) + float(frac)) / denom
 
 
 def _make_vtk_parametric_spline(control_points, closed=False):
@@ -195,8 +201,10 @@ def resample_path_like_simvascular(
                 subdiv = 10
                 interval = 1.0 / subdiv
                 for k in range(subdiv):
-                    t1 = i + k * interval
-                    t2 = i + (k + 1) * interval
+                    t1 = _normalized_param(i, k * interval, input_point_number, closed)
+                    t2 = _normalized_param(
+                        i, (k + 1) * interval, input_point_number, closed
+                    )
                     p1 = _vtk_parametric_spline_eval(spline, t1)
                     p2 = _vtk_parametric_spline_eval(spline, t2)
                     seg_len += float(np.linalg.norm(p2 - p1))
@@ -205,7 +213,9 @@ def resample_path_like_simvascular(
         spline_point = {"id": spline_point_id}
 
         if i == input_point_number - 1 and not closed:
-            tx = i - 1.0 / inter_number / fsd
+            tx = _normalized_param(
+                i, -1.0 / inter_number / fsd, input_point_number, closed
+            )
             ptx = _vtk_parametric_spline_eval(spline, tx)
             tan = pt1 - ptx
             tan = _safe_unit(tan, fallback=ctrl_fallback_tan[i])
@@ -216,7 +226,7 @@ def resample_path_like_simvascular(
             spline_point_id += 1
             break
 
-        txx = i + 1.0 / inter_number / fsd
+        txx = _normalized_param(i, 1.0 / inter_number / fsd, input_point_number, closed)
         ptx = _vtk_parametric_spline_eval(spline, txx)
         tan = ptx - pt1
         tan = _safe_unit(tan, fallback=ctrl_fallback_tan[i])
@@ -228,8 +238,11 @@ def resample_path_like_simvascular(
         spline_point_id += 1
 
         for j in range(1, inter_number):
-            tnew = i + j * (1.0 / inter_number)
-            tx = tnew + 1.0 / inter_number / fsd
+            frac = j * (1.0 / inter_number)
+            tnew = _normalized_param(i, frac, input_point_number, closed)
+            tx = _normalized_param(
+                i, frac + 1.0 / inter_number / fsd, input_point_number, closed
+            )
             pt_mid = _vtk_parametric_spline_eval(spline, tnew)
             ptx2 = _vtk_parametric_spline_eval(spline, tx)
             tan2 = ptx2 - pt_mid
