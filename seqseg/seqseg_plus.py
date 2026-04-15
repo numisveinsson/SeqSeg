@@ -249,6 +249,10 @@ def main():
 
         # Create directories for results
         create_directories(dir_output, write_samples)
+        vf.write_image_as_vti(
+            dir_image,
+            os.path.join(dir_output, 'simvascular', 'Images', f'{case}.vti')
+        )
 
         (potential_branches,
          initial_seeds) = init.initialize_from_seg(pred_sweep, dir_output)

@@ -164,6 +164,21 @@ def write_img(fname, input):
     writer.Write()
 
 
+def write_image_as_vti(input_image_path, output_vti_path):
+    """
+    Read an image with SimpleITK and write it as VTI.
+
+    Args:
+        input_image_path: Input image file path (SimpleITK-readable)
+        output_vti_path: Output .vti file path
+    """
+    import SimpleITK as sitk
+
+    image_sitk = sitk.ReadImage(input_image_path)
+    image_vtk, _ = exportSitk2VTK(image_sitk)
+    write_img(output_vti_path, image_vtk)
+
+
 def change_vti_vtk(fname):
     """
     Change image file from vti to vtk
