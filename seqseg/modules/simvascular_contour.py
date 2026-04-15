@@ -9,7 +9,9 @@ elsewhere in SeqSeg.
 
 Contours are intersections of an isosurface threshold with oblique planes
 defined by each path point's ``pos``, ``tangent``, and ``rotation`` (same
-basis SimVascular uses for reslicing along a path).
+basis SimVascular uses for reslicing along a path). Output uses
+``type="Contour"`` with two ``control_points`` and dense ``contour_points`` in
+**world** coordinates (SimVascular threshold-style groups).
 
 When a slice intersects **multiple** vessel components, the default is **not**
 to take the largest 2D loop (another branch can dominate the cross-section).
@@ -252,8 +254,12 @@ def _reslice_plane_scalar(
     reslice.SetResliceAxesOrigin(cx, cy, cz)
     reslice.SetOutputSpacing(sp, sp, sp)
     reslice.SetOutputExtent(0, nx - 1, 0, nx - 1, 0, 0)
-    reslice.SetOutputScalarType(vtk.VTK_FLOAT)
-    reslice.SetBackgroundLevel(0.0)
+    if hasattr(reslice, "SetOutputScalarType"):
+        reslice.SetOutputScalarType(vtk.VTK_FLOAT)
+    if hasattr(reslice, "SetBackgroundLevel"):
+        reslice.SetBackgroundLevel(0.0)
+    elif hasattr(reslice, "SetBackgroundValue"):
+        reslice.SetBackgroundValue(0.0)
     reslice.Update()
     out = reslice.GetOutput()
     if out is None or out.GetNumberOfPoints() == 0:
@@ -409,6 +415,33 @@ def _decimate_indices(n: int, max_control: int) -> np.ndarray:
     return np.unique(np.linspace(0, n - 1, max_control, dtype=int))
 
 
+def _two_control_points_for_contour(
+    xyz: np.ndarray, path_pos: np.ndarray
+) -> np.ndarray:
+    """
+    Two world-space control points for ``type="Contour"`` (threshold line).
+
+    Uses the contour vertex closest to the path ``pos`` and the vertex farthest
+    from ``pos``. If those coincide (e.g. symmetric loop), falls back to
+    vertices separated along the polyline order.
+    """
+    xyz = np.asarray(xyz, dtype=float)
+    if xyz.shape[0] < 2:
+        raise ValueError("Contour needs at least two points for control_points")
+    p = np.asarray(path_pos, dtype=float).reshape(3)
+    d = np.linalg.norm(xyz - p, axis=1)
+    i0 = int(np.argmin(d))
+    i1 = int(np.argmax(d))
+    n = xyz.shape[0]
+    if i1 == i0:
+        i1 = (i0 + max(1, n // 2)) % n
+    p0, p1 = xyz[i0].copy(), xyz[i1].copy()
+    if float(np.linalg.norm(p1 - p0)) < 1e-9:
+        i1 = (i0 + 1) % n
+        p1 = xyz[i1]
+    return np.stack([p0, p1], axis=0)
+
+
 def _fmt_coord(x: float) -> str:
     return f"{float(x):.15g}"
 
@@ -460,14 +493,16 @@ def write_ctgr(
     reslice_size: str = "5",
     lofting_attribs: Optional[Dict[str, str]] = None,
     contour_method: str = "Threshold",
-    subdivision_spacing: str = "0.078125",
-    max_control_points: int = 12,
 ) -> str:
     """
     Write a SimVascular ``.ctgr`` contour group XML.
 
     ``path_points[i]`` must correspond to ``contours_xyz[i]`` (same length).
     ``contours_xyz[i]`` may be ``None`` to skip that slice.
+
+    Each written slice uses ``type="Contour"`` with two ``control_points`` and
+    full-resolution ``contour_points`` in world coordinates (native SimVascular
+    threshold contour layout).
     """
     if len(path_points) != len(contours_xyz):
         raise ValueError("path_points and contours_xyz must have the same length")
@@ -499,19 +534,20 @@ def write_ctgr(
             "contour",
             {
                 "id": str(contour_id),
-                "type": "SplinePolygon",
+                "type": "Contour",
                 "method": str(contour_method),
                 "closed": "true",
-                "min_control_number": "4",
-                "max_control_number": "200",
-                "subdivision_type": "2",
+                "min_control_number": "2",
+                "max_control_number": "2",
+                "subdivision_type": "0",
                 "subdivision_number": "0",
-                "subdivision_spacing": str(subdivision_spacing),
+                "subdivision_spacing": "0",
             },
         )
         contour_id += 1
         _append_path_point_xml(co, pp)
-        _append_points_block(co, "control_points", xyz, max_points=max_control_points)
+        ctrl2 = _two_control_points_for_contour(xyz, pp["pos"])
+        _append_points_block(co, "control_points", ctrl2, max_points=None)
         _append_points_block(co, "contour_points", xyz, max_points=None)
 
     if contour_id == 0:
@@ -551,6 +587,8 @@ def build_contours_for_path_points(
     if stride < 1:
         stride = 1
 
+    sitk_volume = _as_float_probability_volume(sitk_volume)
+
     vtk_cache = exportSitk2VTK(sitk_volume)
     kept_pp: List[Dict[str, Any]] = []
     contours: List[Optional[np.ndarray]] = []
@@ -573,6 +611,14 @@ def build_contours_for_path_points(
         contours.append(loop)
 
     return kept_pp, contours
+
+
+def _as_float_probability_volume(vol: sitk.Image) -> sitk.Image:
+    """Integer label maps cannot use a 0.5 isocontour; cast to float32."""
+    pid = vol.GetPixelID()
+    if pid in (sitk.sitkFloat32, sitk.sitkFloat64):
+        return vol
+    return sitk.Cast(vol, sitk.sitkFloat32)
 
 
 def write_ctgr_for_pth(
@@ -634,7 +680,9 @@ if __name__ == "__main__":
     arr = np.clip(1.0 - r / 12.0, 0.0, 1.0).astype(np.float32)
     vol = sitk.GetImageFromArray(arr.transpose(2, 1, 0))
     vol.SetSpacing((1.0, 1.0, 1.0))
-    vol.SetOrigin((0.0, 0.0, 0.0))
+    # Align physical space with the grid used to build ``arr`` (sphere at world origin).
+    half = (dim - 1) * 0.5
+    vol.SetOrigin((-half, -half, -half))
 
     zvals = np.linspace(-20, 20, 9, dtype=float)
     ctrl = [(0.0, 0.0, float(z)) for z in zvals]
@@ -642,7 +690,7 @@ if __name__ == "__main__":
         ctrl, spline_resample=True, calculation_number=80
     )
     kept, contours = build_contours_for_path_points(
-        vol, ppath, iso_value=0.5, half_extent_mm=35.0, stride=3
+        vol, ppath, iso_value=0.5, half_extent_mm=35.0, stride=1
     )
     ok = sum(1 for c in contours if c is not None)
     fd, out = tempfile.mkstemp(suffix=".ctgr")
