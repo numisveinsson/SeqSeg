@@ -5,10 +5,61 @@ import os
 import vtk
 
 
+def _safe_unit(v, fallback=None, eps=1e-12):
+    """Normalize vector with deterministic fallback."""
+    a = np.asarray(v, dtype=float).reshape(3)
+    n = float(np.linalg.norm(a))
+    if n > eps:
+        return a / n
+    if fallback is None:
+        return np.array([0.0, 0.0, 1.0], dtype=float)
+    b = np.asarray(fallback, dtype=float).reshape(3)
+    bn = float(np.linalg.norm(b))
+    if bn > eps:
+        return b / bn
+    return np.array([0.0, 0.0, 1.0], dtype=float)
+
+
+def _nearest_nonzero_direction(points, i, eps=1e-12):
+    """
+    Direction at index ``i`` from nearest distinct neighbors.
+
+    Uses the closest previous and next points that differ from ``points[i]``.
+    Falls back to one-sided direction, then +Z if all points coincide.
+    """
+    pts = [np.asarray(p, dtype=float).reshape(3) for p in points]
+    p0 = pts[i]
+    prev = None
+    nxt = None
+
+    for j in range(i - 1, -1, -1):
+        d = p0 - pts[j]
+        if float(np.linalg.norm(d)) > eps:
+            prev = d
+            break
+    for j in range(i + 1, len(pts)):
+        d = pts[j] - p0
+        if float(np.linalg.norm(d)) > eps:
+            nxt = d
+            break
+
+    if prev is not None and nxt is not None:
+        return _safe_unit(prev + nxt, fallback=nxt, eps=eps)
+    if nxt is not None:
+        return _safe_unit(nxt, eps=eps)
+    if prev is not None:
+        return _safe_unit(prev, eps=eps)
+    return np.array([0.0, 0.0, 1.0], dtype=float)
+
+
 def compute_tangents(points):
     """Compute approximate tangent vectors using central differences."""
     tangents = []
     n = len(points)
+    if n == 0:
+        return tangents
+    if n == 1:
+        return [np.array([0.0, 0.0, 1.0], dtype=float)]
     for i in range(n):
         if i == 0:
             t = np.array(points[1]) - np.array(points[0])
@@ -16,8 +67,7 @@ def compute_tangents(points):
             t = np.array(points[-1]) - np.array(points[-2])
         else:
             t = np.array(points[i + 1]) - np.array(points[i - 1])
-        t_norm = np.linalg.norm(t)
-        t = t / t_norm if t_norm > 0 else np.zeros(3)
+        t = _safe_unit(t, fallback=_nearest_nonzero_direction(points, i))
         tangents.append(t)
     return tangents
 
@@ -129,6 +179,9 @@ def resample_path_like_simvascular(
                 ),
             )
 
+    # Fallback direction from control polyline in case local spline derivative is tiny.
+    ctrl_fallback_tan = compute_tangents(ctrl)
+
     spline_points = []
     spline_point_id = 0
     fsd = max(1, int(further_subdivision_number))
@@ -155,11 +208,7 @@ def resample_path_like_simvascular(
             tx = i - 1.0 / inter_number / fsd
             ptx = _vtk_parametric_spline_eval(spline, tx)
             tan = pt1 - ptx
-            ln = np.linalg.norm(tan)
-            if ln > 1e-12:
-                tan = tan / ln
-            else:
-                tan = np.array([0.0, 0.0, 1.0], dtype=float)
+            tan = _safe_unit(tan, fallback=ctrl_fallback_tan[i])
             spline_point["pos"] = pt1.copy()
             spline_point["tangent"] = tan
             spline_point["rotation"] = _perpendicular_normal_unit(tan)
@@ -170,11 +219,7 @@ def resample_path_like_simvascular(
         txx = i + 1.0 / inter_number / fsd
         ptx = _vtk_parametric_spline_eval(spline, txx)
         tan = ptx - pt1
-        ln = np.linalg.norm(tan)
-        if ln > 1e-12:
-            tan = tan / ln
-        else:
-            tan = np.array([0.0, 0.0, 1.0], dtype=float)
+        tan = _safe_unit(tan, fallback=ctrl_fallback_tan[i])
 
         spline_point["pos"] = pt1.copy()
         spline_point["tangent"] = tan
@@ -188,11 +233,7 @@ def resample_path_like_simvascular(
             pt_mid = _vtk_parametric_spline_eval(spline, tnew)
             ptx2 = _vtk_parametric_spline_eval(spline, tx)
             tan2 = ptx2 - pt_mid
-            ln2 = np.linalg.norm(tan2)
-            if ln2 > 1e-12:
-                tan2 = tan2 / ln2
-            else:
-                tan2 = np.array([0.0, 0.0, 1.0], dtype=float)
+            tan2 = _safe_unit(tan2, fallback=ctrl_fallback_tan[i])
             spline_points.append(
                 {
                     "id": spline_point_id,
