@@ -1030,15 +1030,36 @@ def compute_polydata_normals(polydata):
     vtk.vtkPolyData
         New mesh with point normals in point data; cell normals disabled.
     """
+    # Force recomputation from current geometry by removing any stale/active normals.
+    cleaned = vtk.vtkPolyData()
+    cleaned.DeepCopy(polydata)
+    point_data = cleaned.GetPointData()
+    if point_data is not None:
+        point_data.SetNormals(None)
+        remove_names = []
+        for idx in range(point_data.GetNumberOfArrays()):
+            arr = point_data.GetArray(idx)
+            if arr is None:
+                continue
+            arr_name = arr.GetName() or ""
+            if "normal" in arr_name.lower():
+                remove_names.append(arr_name)
+        for arr_name in remove_names:
+            point_data.RemoveArray(arr_name)
+
     normals = vtk.vtkPolyDataNormals()
-    normals.SetInputData(polydata)
+    normals.SetInputData(cleaned)
     normals.ComputePointNormalsOn()
     normals.ComputeCellNormalsOff()
     normals.AutoOrientNormalsOn()
     normals.ConsistencyOn()
     normals.SplittingOff()
     normals.Update()
-    return normals.GetOutput()
+
+    out = vtk.vtkPolyData()
+    out.DeepCopy(normals.GetOutput())
+    out.GetPointData().SetActiveNormals("Normals")
+    return out
 
 
 def smooth_polydata(poly, iteration=25, boundary=False,

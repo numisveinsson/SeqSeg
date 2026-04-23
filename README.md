@@ -186,6 +186,10 @@ your_project/
 
 Seeds can be provided via:
 
+Typical seed point radius estimates:
+- Coronary vessels: `0.2 cm` (`2 mm`)
+- Aortic root: `1.1 cm` (`11 mm`)
+
 1. **JSON file** (recommended):
 ```json
 [
