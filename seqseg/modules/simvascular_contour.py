@@ -724,7 +724,7 @@ def write_ctgr_for_pth(
         kept,
         contours,
         output_ctgr_path,
-        reslice_size=str(meta.get("reslice_size", "5")),
+        reslice_size="5",
         contour_method=contour_method,
     )
 
