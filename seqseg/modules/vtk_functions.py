@@ -1009,6 +1009,33 @@ def taubin_smooth_polydata(poly, it=50, mu1=0.5, mu2=0.51):
     return out
 
 
+def compute_polydata_normals(polydata):
+    """Recompute point normals from triangle geometry (e.g. after vertex smoothing).
+
+    Stale normals from marching cubes or prior filters are replaced using
+    ``vtkPolyDataNormals`` with a consistent outward orientation when possible.
+
+    Parameters
+    ----------
+    polydata : vtk.vtkPolyData
+        Triangle surface mesh.
+
+    Returns
+    -------
+    vtk.vtkPolyData
+        New mesh with point normals in point data; cell normals disabled.
+    """
+    normals = vtk.vtkPolyDataNormals()
+    normals.SetInputData(polydata)
+    normals.ComputePointNormalsOn()
+    normals.ComputeCellNormalsOff()
+    normals.AutoOrientNormalsOn()
+    normals.ConsistencyOn()
+    normals.SplittingOff()
+    normals.Update()
+    return normals.GetOutput()
+
+
 def smooth_polydata(poly, iteration=25, boundary=False,
                     feature=False, smoothingFactor=0.):  # .1
     """

@@ -403,6 +403,7 @@ def main():
         
         # Taubin λ–μ smoothing (cotangent Laplacian; limits shrink vs plain Laplacian)
         surface_smooth = vf.taubin_smooth_polydata(assembly_surface, it=75, mu1=0.5, mu2=0.51)
+        surface_smooth = vf.compute_polydata_normals(surface_smooth)
         vf.write_vtk_polydata(surface_smooth, dir_output0 + '/' + case
                               + '_surface_mesh_' + test_name + '_'
                               + str(n_steps_taken) + '_steps' + '.vtp')
