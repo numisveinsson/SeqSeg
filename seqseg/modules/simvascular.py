@@ -1,4 +1,5 @@
 import math
+import time
 import xml.etree.ElementTree as ET
 import numpy as np
 import os
@@ -285,6 +286,100 @@ def write_simvascular_proj(simvascular_dir):
     with open(path, "w", encoding="utf-8") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         f.write('<simvascular_project version="1.0"/>\n\n')
+
+
+def _sitk_index_to_physical_jacobian(sitk_image):
+    """Linear 3x3 part of ITK TransformIndexToPhysicalPoint (physical = origin + M @ index)."""
+    direction = np.asarray(sitk_image.GetDirection(), dtype=np.float64).reshape(3, 3)
+    spacing = np.asarray(sitk_image.GetSpacing(), dtype=np.float64)
+    return direction @ np.diag(spacing)
+
+
+def _vtk_index_to_physical_jacobian(vtk_image):
+    """Match VTK 9+ vtkImageData: linear map from index to displacement (origin handled in VTI)."""
+    spacing = np.asarray(vtk_image.GetSpacing(), dtype=np.float64)
+    try:
+        dm = vtk_image.GetDirectionMatrix()
+    except AttributeError:
+        dm = None
+    if dm is not None:
+        R = np.array(
+            [[dm.GetElement(r, c) for c in range(3)] for r in range(3)],
+            dtype=np.float64,
+        )
+        return R @ np.diag(spacing)
+    return np.diag(spacing)
+
+
+def write_simvascular_image_sidecars(
+    sitk_image,
+    output_vti_path,
+    simvascular_version="2025.12",
+    vtk_image=None,
+):
+    """Write ``<name>.vti.hdr`` and ``image_information.xml`` next to ``<name>.vti``.
+
+    SimVascular expects these to register the volume (avoids "No project image location
+    file found") and to record the LPS index-to-world linear map in ``transform_lps``.
+    """
+    output_vti_path = os.fspath(output_vti_path)
+    images_dir = os.path.dirname(os.path.abspath(output_vti_path))
+    vti_basename = os.path.basename(output_vti_path)
+    if not vti_basename.lower().endswith(".vti"):
+        raise ValueError(f"Expected .vti path, got {output_vti_path!r}")
+    base = vti_basename[:-4]
+
+    ts = str(int(time.time()))
+    if vtk_image is not None:
+        M = _vtk_index_to_physical_jacobian(vtk_image)
+    else:
+        M = _sitk_index_to_physical_jacobian(sitk_image)
+    t_attrs = " ".join(f't{i}{j}="{M[i, j]:.17g}"' for i in range(3) for j in range(3))
+
+    hdr_path = os.path.join(images_dir, f"{base}.vti.hdr")
+    with open(hdr_path, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        f.write(
+            f'<ImageHeaderInformation creation_time="{ts}" '
+            f'modification_time="{ts}" version="1.0">\n'
+        )
+        f.write(
+            f"    <created_with_simvascular_version>"
+            f"{simvascular_version}</created_with_simvascular_version>\n"
+        )
+        f.write("    <modality>unknown</modality>\n")
+        f.write("    <age>0</age>\n")
+        f.write("    <gender>unknown</gender>\n")
+        f.write("    <ethnicity>unknown</ethnicity>\n")
+        f.write("    <image_is_scaled>true</image_is_scaled>\n")
+        f.write("    <scale_factor>0.000000</scale_factor>\n")
+        f.write("    <original_units>mm</original_units>\n")
+        f.write("    <current_units>mm</current_units>\n")
+        f.write(f"    <transform_lps {t_attrs}/>\n")
+        f.write("</ImageHeaderInformation>\n\n")
+
+    info_path = os.path.join(images_dir, "image_information.xml")
+    vti_name = f"{base}.vti"
+    hdr_name = f"{base}.vti.hdr"
+    with open(info_path, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        f.write(
+            f'<ImageObjectInformation creation_time="{ts}" '
+            f'modification_time="{ts}" version="1.0">\n'
+        )
+        f.write('    <timestep id="0">\n')
+        f.write(
+            f"        <created_with_simvascular_version>"
+            f"{simvascular_version}</created_with_simvascular_version>\n"
+        )
+        f.write("        <path></path>\n")
+        f.write(f"        <image_file_name>{vti_name}</image_file_name>\n")
+        f.write(f"        <image_header_file_name>{hdr_name}</image_header_file_name>\n")
+        f.write(f"        <image_name>{base}</image_name>\n")
+        f.write("        <data_is_local_copy>true</data_is_local_copy>\n")
+        f.write("        <scale_factor>0</scale_factor>\n")
+        f.write("    </timestep>\n")
+        f.write("</ImageObjectInformation>\n\n")
 
 
 def create_pth(

@@ -177,6 +177,11 @@ def write_image_as_vti(input_image_path, output_vti_path):
     image_sitk = sitk.ReadImage(input_image_path)
     image_vtk, _ = exportSitk2VTK(image_sitk)
     write_img(output_vti_path, image_vtk)
+    from .simvascular import write_simvascular_image_sidecars
+
+    write_simvascular_image_sidecars(
+        image_sitk, output_vti_path, vtk_image=image_vtk
+    )
 
 
 def change_vti_vtk(fname):
