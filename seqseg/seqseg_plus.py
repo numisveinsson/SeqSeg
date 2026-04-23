@@ -15,6 +15,7 @@ from modules.datasets import get_testing_samples
 from modules.params import load_yaml
 from modules.capping import cap_surface
 from modules.sweep import run_global_segmentation
+from modules.simvascular import write_simvascular_proj
 
 sys.stdout.flush()
 start_time = time.time()
@@ -253,6 +254,7 @@ def main():
             dir_image,
             os.path.join(dir_output, 'simvascular', 'Images', f'{case}.vti')
         )
+        write_simvascular_proj(os.path.join(dir_output, 'simvascular'))
 
         (potential_branches,
          initial_seeds) = init.initialize_from_seg(pred_sweep, dir_output)

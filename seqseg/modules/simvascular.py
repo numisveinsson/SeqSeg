@@ -275,6 +275,18 @@ def indent(elem, level=0):
             elem.tail = i
 
 
+def write_simvascular_proj(simvascular_dir):
+    """Write ``simvascular.proj`` so SimVascular can open the output tree as a project.
+
+    Uses the same minimal root element as ``seqseg/tutorial/data/simvascular.proj``.
+    """
+    os.makedirs(simvascular_dir, exist_ok=True)
+    path = os.path.join(simvascular_dir, "simvascular.proj")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        f.write('<simvascular_project version="1.0"/>\n\n')
+
+
 def create_pth(
     points,
     output_path,

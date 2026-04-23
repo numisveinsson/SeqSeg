@@ -24,6 +24,7 @@ from seqseg.modules import vtk_functions as vf
 from seqseg.modules import initialization as init
 from seqseg.modules.assembly import calc_centerline_global
 from seqseg.modules.tracing import trace_centerline
+from seqseg.modules.simvascular import write_simvascular_proj
 from seqseg.modules.datasets import get_testing_samples
 from seqseg.modules.params import load_yaml
 from seqseg.modules.capping import cap_surface
@@ -286,6 +287,7 @@ def main():
             dir_image,
             os.path.join(dir_output, 'simvascular', 'Images', f'{case}.vti')
         )
+        write_simvascular_proj(os.path.join(dir_output, 'simvascular'))
 
         (potential_branches,
          initial_seeds) = init.initialization(json_file_present,
