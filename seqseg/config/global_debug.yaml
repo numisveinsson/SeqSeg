@@ -32,7 +32,7 @@ USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)
 BUFFER_N: 20 # add to assembly steps buff_N steps ago
 WEIGHTED_ASSEMBLY: True # if assembly should be weighted
 WEIGHT_TYPE: gaussian # type of weighting for assembly
-ASSEMBLY_SPACING_FACTOR: 0.5 # factor to scale final output spacing (0.5 = half spacing)
+ASSEMBLY_SPACING_FACTOR: 0.3 # factor to scale final output spacing
 
 FORCEFUL_SIDEBRANCH: False
 FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1.1

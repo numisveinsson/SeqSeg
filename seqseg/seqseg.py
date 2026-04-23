@@ -236,7 +236,7 @@ def main():
     calc_global_centerline = args.extract_global_centerline  # Post-process centerline
     cap_surface_cent = args.cap_surface_cent           # Cap surface ends
     assembly_threshold = args.assembly_threshold       # Global assembly binarization threshold
-    assembly_spacing_factor = global_config.get('ASSEMBLY_SPACING_FACTOR', 0.5)  # Final output spacing scale factor
+    assembly_spacing_factor = global_config.get('ASSEMBLY_SPACING_FACTOR', 0.3)  # Final output spacing scale factor
 
     if assembly_spacing_factor <= 0:
         raise ValueError("assembly_spacing_factor must be > 0")
