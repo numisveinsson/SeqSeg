@@ -50,7 +50,7 @@ RESTART_BRANCH: True
 # contours along that branch's .pth) using the live global probability assembly.
 SIMVASCULAR_CONTOURS: True
 SIMVASCULAR_CONTOUR_ISO: 0.5
-SIMVASCULAR_CONTOUR_STRIDE: 1
+SIMVASCULAR_CONTOUR_STRIDE: 2
 SIMVASCULAR_CONTOUR_HALF_EXTENT_MM: 50.0
 # closest_to_path | largest — see simvascular_contour.py
 SIMVASCULAR_CONTOUR_COMPONENT: closest_to_path

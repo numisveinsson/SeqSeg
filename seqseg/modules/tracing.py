@@ -834,6 +834,24 @@ def trace_centerline(
                     list_surfaces.extend(list_surf_branch)
                     list_points.extend(list_pts_branch)
 
+                    # If buffering is enabled, flush this completed branch's
+                    # still-local segmentations into the global assembly so
+                    # SimVascular contour extraction includes terminal steps.
+                    if use_buffer:
+                        for step_id in vessel_tree.branches[branch][1:]:
+                            branch_step = vessel_tree.steps[step_id]
+                            if branch_step['prob_predicted_vessel']:
+                                assembly_segs.add_segmentation(
+                                    branch_step['prob_predicted_vessel'],
+                                    branch_step['img_index'],
+                                    branch_step['img_size'],
+                                    (1 / branch_step['radius']) ** 2
+                                )
+                                branch_step['prob_predicted_vessel'] = None
+                                vessel_tree.caps = (
+                                    vessel_tree.caps + branch_step['caps']
+                                )
+
                     # Create VTK polydata for visualization of remaining potential branch points
                     # Each point includes radius and index number for debugging/analysis
                     list_pot = []
@@ -916,7 +934,7 @@ def trace_centerline(
                                         ),
                                         stride=int(
                                             global_config.get(
-                                                "SIMVASCULAR_CONTOUR_STRIDE", 1
+                                                "SIMVASCULAR_CONTOUR_STRIDE", 2
                                             )
                                         ),
                                         half_extent_mm=float(
