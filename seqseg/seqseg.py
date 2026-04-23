@@ -205,6 +205,10 @@ def main():
                         default=0,
                         type=int,
                         help='Whether to cap surface centerline')
+    parser.add_argument('-assembly_threshold', '--assembly_threshold',
+                        default=0.5,
+                        type=float,
+                        help='Threshold for converting global probability assembly to binary segmentation')
     args = parser.parse_args()
 
     # Load algorithm configuration from YAML file
@@ -231,6 +235,7 @@ def main():
     take_time = global_config['TIME_ANALYSIS']         # Performance timing
     calc_global_centerline = args.extract_global_centerline  # Post-process centerline
     cap_surface_cent = args.cap_surface_cent           # Cap surface ends
+    assembly_threshold = args.assembly_threshold       # Global assembly binarization threshold
 
     # nnU-Net model configuration
     dataset = args.train_dataset                       # Training dataset name
@@ -350,7 +355,7 @@ def main():
         n_udpates = assembly_obj.get_n_updates_image()
 
         # Create binary segmentation by thresholding probability map
-        assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5,
+        assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=assembly_threshold,
                                                upperThreshold=1)
         
         # Save intermediate segmentation results

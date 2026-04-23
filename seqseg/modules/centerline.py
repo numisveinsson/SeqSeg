@@ -1162,6 +1162,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         return_target_all=False,
                         verbose=False, return_failed=False,
                         return_success_list=False,
+                        post_process_kwargs=None,
                         ):
     """
     Function to calculate the centerline of a segmentation
@@ -1182,6 +1183,10 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         Seed point.
     targets : list of np.array/indices
         List of target points.
+    post_process_kwargs : dict, optional
+        Extra keyword arguments for :func:`post_process_centerline`, e.g.
+        ``{'merge_method': 'tree', 'tree_merge_radius_factor': 1.2}``.
+        Default remains vtkClean-based merge (``merge_method='clean'``).
 
     Returns
     -------
@@ -1354,7 +1359,9 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                             success_list,
                                             distance_map_surf,
                                             return_failed=return_failed)
-    centerline = post_process_centerline(centerline)
+    _pp = {'verbose': verbose}
+    _pp.update(post_process_kwargs or {})
+    centerline = post_process_centerline(centerline, **_pp)
 
     print(f"    Centerline calculated, success ratio: {success_list.count(True)} / {len(success_list)}")
 
@@ -1497,31 +1504,375 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf,
     return centerline
 
 
-def post_process_centerline(centerline, verbose=False):
+def _polyline_arc_length(coords):
+    """Sum of Euclidean segment lengths for Nx3 coordinates."""
+    if len(coords) < 2:
+        return 0.0
+    return float(np.sum(np.linalg.norm(np.diff(coords, axis=0), axis=1)))
+
+
+def _dist_point_segment(p, a, b):
+    """
+    Closest point on segment a--b to p.
+    Returns distance, closest point q, parameter t in [0,1] along a->b.
+    """
+    ab = b - a
+    denom = float(np.dot(ab, ab))
+    if denom < 1e-30:
+        q = a.copy()
+        return float(np.linalg.norm(p - q)), q, 0.0
+    t = float(np.dot(p - a, ab) / denom)
+    t_cl = min(1.0, max(0.0, t))
+    q = a + t_cl * ab
+    return float(np.linalg.norm(p - q)), q, t_cl
+
+
+def _extract_polylines_from_polydata(centerline):
+    """
+    Return list of dicts: coords (N,3), radii (N,) or None, centerline_id (int).
+    One entry per line/polyline cell with at least two points.
+    """
+    n_cells = centerline.GetNumberOfCells()
+    radii_arr = centerline.GetPointData().GetArray(
+        "MaximumInscribedSphereRadius")
+    cid_arr = centerline.GetPointData().GetArray("CenterlineId")
+    polylines = []
+    for ci in range(n_cells):
+        cell = centerline.GetCell(ci)
+        ctype = cell.GetCellType()
+        if ctype not in (vtk.VTK_LINE, vtk.VTK_POLY_LINE):
+            continue
+        np_cell = cell.GetNumberOfPoints()
+        if np_cell < 2:
+            continue
+        ids = [cell.GetPointId(j) for j in range(np_cell)]
+        coords = np.array([centerline.GetPoint(pid) for pid in ids])
+        if radii_arr is not None:
+            radii = np.array(
+                [radii_arr.GetValue(pid) for pid in ids], dtype=float)
+        else:
+            radii = None
+        if cid_arr is not None:
+            cl_id = int(cid_arr.GetValue(ids[0]))
+        else:
+            cl_id = ci
+        polylines.append({
+            'coords': coords,
+            'radii': radii,
+            'centerline_id': cl_id,
+        })
+    return polylines
+
+
+def _tree_merge_state_to_polydata(state_pts, state_radii, state_cid,
+                                  state_gid, out_cells):
+    """Build vtkPolyData from merged tree representation."""
+    out = vtk.vtkPolyData()
+    pts = vtk.vtkPoints()
+    for p in state_pts:
+        pts.InsertNextPoint(float(p[0]), float(p[1]), float(p[2]))
+    lines = vtk.vtkCellArray()
+    for cell_ids in out_cells:
+        if len(cell_ids) < 2:
+            continue
+        pl = vtk.vtkPolyLine()
+        pl.GetPointIds().SetNumberOfIds(len(cell_ids))
+        for j, vid in enumerate(cell_ids):
+            pl.GetPointIds().SetId(j, int(vid))
+        lines.InsertNextCell(pl)
+    out.SetPoints(pts)
+    out.SetLines(lines)
+    rad_vtk = vtk.vtkDoubleArray()
+    rad_vtk.SetName("MaximumInscribedSphereRadius")
+    for r in state_radii:
+        rad_vtk.InsertNextValue(float(r))
+    out.GetPointData().AddArray(rad_vtk)
+    cid_vtk = vtk.vtkIntArray()
+    cid_vtk.SetName("CenterlineId")
+    for c in state_cid:
+        cid_vtk.InsertNextValue(int(c))
+    out.GetPointData().AddArray(cid_vtk)
+    gid_vtk = vtk.vtkIntArray()
+    gid_vtk.SetName("GlobalNodeID")
+    for g in state_gid:
+        gid_vtk.InsertNextValue(int(g))
+    out.GetPointData().AddArray(gid_vtk)
+    return out
+
+
+def merge_centerline_branches_tree(
+        centerline,
+        radius_factor=1.0,
+        min_tolerance=1e-6,
+        max_widen_attempts=8,
+        widen_factor=1.5,
+        vertex_eps=1e-5,
+        verbose=False):
+    """
+    Merge overlapping branch polylines into a tree: start from the longest
+    polyline, then attach each other branch by walking from its distal end
+    inward until within a radius-based tolerance of the merged geometry,
+    add a connector segment, and drop the overlapping proximal segment.
+
+    If no junction is found after repeated tolerance widening, the full
+    branch is appended unchanged.
+
+    Parameters
+    ----------
+    centerline : vtkPolyData
+        Input with one vtkPolyLine (or vtkLine) per branch; optional
+        MaximumInscribedSphereRadius and CenterlineId point arrays.
+    radius_factor : float
+        Multiplier on local inscribed radius for acceptance tolerance.
+    min_tolerance : float
+        Floor on tolerance (physical units).
+    max_widen_attempts : int
+        Number of times to multiply tolerance by widen_factor and retry.
+    widen_factor : float
+        Factor applied when widening tolerance after a failed pass.
+    vertex_eps : float
+        If the closest point on merged geometry is within this distance of
+        an endpoint of the segment, snap to that vertex instead of inserting.
+    verbose : bool
+
+    Returns
+    -------
+    vtkPolyData
+        Merged centerline (no vtkCleanPolyData applied here).
+    """
+    polylines = _extract_polylines_from_polydata(centerline)
+    if not polylines:
+        return vtk.vtkPolyData()
+    if len(polylines) == 1:
+        return centerline
+
+    polylines.sort(key=lambda pl: _polyline_arc_length(pl['coords']),
+                   reverse=True)
+
+    # Longest branch seeds the merged structure
+    first = polylines[0]
+    coords0 = first['coords']
+    rad0 = first['radii']
+    cid0 = first['centerline_id']
+
+    state_pts = [coords0[i].copy() for i in range(len(coords0))]
+    if rad0 is not None:
+        state_radii = [float(rad0[i]) for i in range(len(coords0))]
+    else:
+        med = _polyline_arc_length(coords0) / max(len(coords0) - 1, 1)
+        state_radii = [float(med)] * len(coords0)
+    state_cid = [int(cid0)] * len(coords0)
+    state_gid = [int(i) for i in range(len(coords0))]
+    segs = [(i, i + 1) for i in range(len(coords0) - 1)]
+    out_cells = [list(range(len(coords0)))]
+
+    def closest_to_segments(p):
+        best_d = np.inf
+        best_q = None
+        best_si = -1
+        best_t = 0.0
+        best_a = best_b = -1
+        for si, (ia, ib) in enumerate(segs):
+            d, q, t = _dist_point_segment(
+                p, state_pts[ia], state_pts[ib])
+            if d < best_d:
+                best_d = d
+                best_q = q
+                best_si = si
+                best_t = t
+                best_a, best_b = ia, ib
+        return best_d, best_q, best_si, best_t, best_a, best_b
+
+    def split_segment_and_update_cells(seg_idx, q, t_cl, ra, rb, new_cid):
+        """Insert q on segs[seg_idx] (a,b); return new vertex index."""
+        a, b = segs[seg_idx]
+        new_id = len(state_pts)
+        state_pts.append(q.copy())
+        state_radii.append(float((1.0 - t_cl) * ra + t_cl * rb))
+        state_cid.append(int(new_cid))
+        state_gid.append(int(new_id))
+        segs[seg_idx:seg_idx + 1] = [(a, new_id), (new_id, b)]
+        for cell in out_cells:
+            for k in range(len(cell) - 1):
+                u, v = cell[k], cell[k + 1]
+                if {u, v} == {a, b}:
+                    cell.insert(k + 1, new_id)
+                    break
+        return new_id
+
+    def resolve_junction(q, seg_idx, t_cl, a, b, branch_cid):
+        pa = state_pts[a]
+        pb = state_pts[b]
+        ra = state_radii[a]
+        rb = state_radii[b]
+        if np.linalg.norm(q - pa) <= vertex_eps:
+            return a
+        if np.linalg.norm(q - pb) <= vertex_eps:
+            return b
+        return split_segment_and_update_cells(
+            seg_idx, q, t_cl, ra, rb, branch_cid)
+
+    def add_point_if_new(p, r, branch_cid, merge_pt_eps):
+        p = np.asarray(p, dtype=float).ravel()
+        for j, sj in enumerate(state_pts):
+            if np.linalg.norm(sj - p) <= merge_pt_eps:
+                return j
+        jid = len(state_pts)
+        state_pts.append(p.copy())
+        state_radii.append(float(r))
+        state_cid.append(int(branch_cid))
+        state_gid.append(int(jid))
+        return jid
+
+    def append_edges_for_cell(cell_ids):
+        for u, v in zip(cell_ids[:-1], cell_ids[1:]):
+            if u == v:
+                continue
+            if any({ua, ub} == {u, v} for ua, ub in segs):
+                continue
+            segs.append((u, v))
+
+    merge_pt_eps = max(min_tolerance * 0.01, 1e-9)
+
+    for pl in polylines[1:]:
+        bcoords = pl['coords']
+        brad = pl['radii']
+        n = len(bcoords)
+        if n < 2:
+            continue
+        if brad is None:
+            brlen = _polyline_arc_length(bcoords)
+            default_r = brlen / max(n - 1, 1)
+        else:
+            default_r = None
+
+        junction_i = None
+        attach_id = None
+        scale = 1.0
+        for _attempt in range(max_widen_attempts):
+            for i in range(n - 1, -1, -1):
+                p = bcoords[i]
+                if brad is not None:
+                    loc_r = float(brad[i])
+                else:
+                    loc_r = float(default_r)
+                tol = max(min_tolerance,
+                          scale * radius_factor * max(loc_r, 1e-12))
+                d, q, si, t_cl, a, b = closest_to_segments(p)
+                if d <= tol:
+                    junction_i = i
+                    attach_id = resolve_junction(
+                        q, si, t_cl, a, b, pl['centerline_id'])
+                    break
+            if junction_i is not None:
+                break
+            scale *= widen_factor
+
+        if junction_i is None:
+            if verbose:
+                print("    tree merge: could not join branch "
+                      f"centerline_id={pl['centerline_id']}; appending full "
+                      f"polyline after {max_widen_attempts} widen attempts")
+            new_ids = []
+            for i in range(n):
+                r_i = float(brad[i]) if brad is not None else float(
+                    default_r)
+                pid = add_point_if_new(
+                    bcoords[i], r_i, pl['centerline_id'], merge_pt_eps)
+                new_ids.append(pid)
+            # Deduplicate consecutive equal ids
+            trimmed = [new_ids[0]]
+            for pid in new_ids[1:]:
+                if pid != trimmed[-1]:
+                    trimmed.append(pid)
+            if len(trimmed) >= 2:
+                out_cells.append(trimmed)
+                append_edges_for_cell(trimmed)
+            continue
+
+        tail_ids = []
+        for k in range(junction_i, n):
+            r_k = (float(brad[k]) if brad is not None
+ else float(default_r))
+            tid = add_point_if_new(
+                bcoords[k], r_k, pl['centerline_id'], merge_pt_eps)
+            tail_ids.append(tid)
+
+        new_cell = [attach_id]
+        for tid in tail_ids:
+            if tid == attach_id:
+                continue
+            if new_cell and tid == new_cell[-1]:
+                continue
+            new_cell.append(tid)
+        if len(new_cell) >= 2:
+            out_cells.append(new_cell)
+            append_edges_for_cell(new_cell)
+        elif verbose:
+            print("    tree merge: degenerate cell after merge for "
+                  f"centerline_id={pl['centerline_id']}, skipped")
+
+    return _tree_merge_state_to_polydata(
+        state_pts, state_radii, state_cid, state_gid, out_cells)
+
+
+def post_process_centerline(centerline, verbose=False,
+                            merge_method='clean',
+                            tree_merge_radius_factor=1.0,
+                            tree_merge_min_tolerance=1e-6,
+                            tree_merge_max_widen_attempts=8,
+                            tree_merge_widen_factor=1.5,
+                            tree_merge_vertex_eps=1e-5):
     """
     Function to post process the centerline using vtk functionalities.
 
-    1. Remove duplicate points.
-    2. Smooth centerline.
+    merge_method ``'clean'`` (default):
+        1. Remove duplicate points (vtkCleanPolyData).
+        2. Smooth centerline.
+
+    merge_method ``'tree'``:
+        1. Merge branches with merge_centerline_branches_tree (radius-based tolerance, longest branch first, connector segments; no vtk clean).
+        2. Smooth centerline.
 
     Parameters
     ----------
     centerline : vtkPolyData
         Centerline of the vessel.
+    merge_method : {'clean', 'tree'}
+        Post-merge strategy before smoothing.
+    tree_merge_radius_factor : float
+        Passed to merge_centerline_branches_tree when merge_method='tree'.
+    tree_merge_min_tolerance : float
+    tree_merge_max_widen_attempts : int
+    tree_merge_widen_factor : float
+    tree_merge_vertex_eps : float
 
     Returns
     -------
     centerline : vtkPolyData
     """
+    if merge_method not in ('clean', 'tree'):
+        raise ValueError("merge_method must be 'clean' or 'tree'")
+
     if verbose:
         print(f"""Number of points before post processing:
               {centerline.GetNumberOfPoints()}""")
-    # Remove duplicate points
-    cleaner = vtk.vtkCleanPolyData()
-    cleaner.SetInputData(centerline)
-    cleaner.SetTolerance(0.001)
-    cleaner.Update()
-    centerline = cleaner.GetOutput()
+    if merge_method == 'clean':
+        cleaner = vtk.vtkCleanPolyData()
+        cleaner.SetInputData(centerline)
+        cleaner.SetTolerance(0.001)
+        cleaner.Update()
+        centerline = cleaner.GetOutput()
+    else:
+        centerline = merge_centerline_branches_tree(
+            centerline,
+            radius_factor=tree_merge_radius_factor,
+            min_tolerance=tree_merge_min_tolerance,
+            max_widen_attempts=tree_merge_max_widen_attempts,
+            widen_factor=tree_merge_widen_factor,
+            vertex_eps=tree_merge_vertex_eps,
+            verbose=verbose,
+        )
 
     # Smooth centerline
     smoother = vtk.vtkWindowedSincPolyDataFilter()

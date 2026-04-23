@@ -19,6 +19,7 @@ MAX_PERC_ENLARGE: 0.5 # if percent of blood in a given volume goes above this, w
 MIN_RADIUS: 0.3 # mm (keep in mm)
 MIN_RES: 6
 CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
+CENTERLINE_MERGE_METHOD: clean # clean (vtkCleanPolyData) or tree
 TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 2
