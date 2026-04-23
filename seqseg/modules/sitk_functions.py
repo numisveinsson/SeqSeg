@@ -53,6 +53,38 @@ def copy_settings(img, ref_img):
     return img
 
 
+def resample_to_spacing(image, new_spacing, is_label=False):
+    """
+    Resample a SITK image to a target spacing while preserving physical extent.
+
+    Args:
+        image (sitk.Image): Input image.
+        new_spacing (iterable): Target spacing [sx, sy, sz].
+        is_label (bool): Use nearest-neighbor interpolation for labels.
+    """
+    orig_size = np.array(image.GetSize(), dtype=np.int64)
+    orig_spacing = np.array(image.GetSpacing(), dtype=np.float64)
+    target_spacing = np.array(new_spacing, dtype=np.float64)
+
+    new_size = np.maximum(
+        1,
+        np.rint(orig_size * (orig_spacing / target_spacing)).astype(np.int64)
+    ).tolist()
+
+    resample = sitk.ResampleImageFilter()
+    resample.SetOutputSpacing(target_spacing.tolist())
+    resample.SetSize([int(s) for s in new_size])
+    resample.SetOutputOrigin(image.GetOrigin())
+    resample.SetOutputDirection(image.GetDirection())
+    resample.SetTransform(sitk.Transform())
+    resample.SetDefaultPixelValue(0)
+    if is_label:
+        resample.SetInterpolator(sitk.sitkNearestNeighbor)
+    else:
+        resample.SetInterpolator(sitk.sitkLinear)
+    return resample.Execute(image)
+
+
 def write_image(image, outputImageFileName):
     """
     Write image to file

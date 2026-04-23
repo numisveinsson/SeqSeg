@@ -236,6 +236,10 @@ def main():
     calc_global_centerline = args.extract_global_centerline  # Post-process centerline
     cap_surface_cent = args.cap_surface_cent           # Cap surface ends
     assembly_threshold = args.assembly_threshold       # Global assembly binarization threshold
+    assembly_spacing_factor = global_config.get('ASSEMBLY_SPACING_FACTOR', 0.5)  # Final output spacing scale factor
+
+    if assembly_spacing_factor <= 0:
+        raise ValueError("assembly_spacing_factor must be > 0")
 
     # nnU-Net model configuration
     dataset = args.train_dataset                       # Training dataset name
@@ -353,6 +357,16 @@ def main():
         # Global assembly contains accumulated segmentations from all tracing steps
         assembly = assembly_obj.assembly
         n_udpates = assembly_obj.get_n_updates_image()
+
+        # Optionally resample final assembly outputs to a finer/coarser grid.
+        if assembly_spacing_factor != 1.0:
+            target_spacing = [spacing * assembly_spacing_factor
+                              for spacing in assembly.GetSpacing()]
+            print(f"Resampling final assembly to spacing: {target_spacing}")
+            assembly = sf.resample_to_spacing(assembly, target_spacing,
+                                              is_label=False)
+            n_udpates = sf.resample_to_spacing(n_udpates, target_spacing,
+                                               is_label=False)
 
         # Create binary segmentation by thresholding probability map
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=assembly_threshold,
