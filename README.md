@@ -10,6 +10,8 @@
 
 > **Automatic tracking and segmentation of blood vessels in CT and MR images using deep learning and geometric tracking**
 
+> **News:** SeqSeg now outputs a full SimVascular project in the `simvascular/` subdirectory. You can open it directly in SimVascular, with automatic pathlines and contours generated for every branch segmented by SeqSeg.
+
 [![Paper](https://img.shields.io/badge/Paper-Annals%20of%20BME-blue)](https://rdcu.be/dU0wy)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
