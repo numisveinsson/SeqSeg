@@ -2,6 +2,7 @@
 import sys
 import os
 import time
+import math
 import vtk
 import SimpleITK as sitk
 import numpy as np
@@ -1456,6 +1457,7 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf,
     global_node_id.SetName("GlobalNodeID")
     cent_id = vtk.vtkIntArray()
     cent_id.SetName("CenterlineId")
+    min_radius = float(max(distance_map_surf.GetSpacing()))
 
     # Iterate over all points
     for ind, points_path in enumerate(points_list):
@@ -1476,6 +1478,7 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf,
                      max(0, min(index[2], distance_map_surf.GetSize()[2]-1))]
             # Get distance value at point
             radius = distance_map_surf.GetPixel(index)
+            radius = max(float(radius), min_radius)
             # Add point to points
             id = points.InsertNextPoint(point)
             line.GetPointIds().SetId(i, id)
@@ -1565,7 +1568,8 @@ def _extract_polylines_from_polydata(centerline):
 
 
 def _tree_merge_state_to_polydata(state_pts, state_radii, state_cid,
-                                  state_gid, out_cells):
+                                  state_gid, out_cells,
+                                  state_bif_label=None):
     """Build vtkPolyData from merged tree representation."""
     out = vtk.vtkPolyData()
     pts = vtk.vtkPoints()
@@ -1597,15 +1601,23 @@ def _tree_merge_state_to_polydata(state_pts, state_radii, state_cid,
     for g in state_gid:
         gid_vtk.InsertNextValue(int(g))
     out.GetPointData().AddArray(gid_vtk)
+    if state_bif_label is not None:
+        bif_vtk = vtk.vtkIntArray()
+        bif_vtk.SetName("BifurcationLabel")
+        for b in state_bif_label:
+            bif_vtk.InsertNextValue(int(b))
+        out.GetPointData().AddArray(bif_vtk)
     return out
 
 
 def merge_centerline_branches_tree(
         centerline,
-        radius_factor=1.0,
-        min_tolerance=1e-6,
-        max_widen_attempts=8,
+        radius_factor=0.2,
+        min_tolerance=1e-5,
+        max_widen_attempts=3,
         widen_factor=1.5,
+        point_stride=5,
+        bifurcation_label_radius=0.0,
         vertex_eps=1e-5,
         verbose=False):
     """
@@ -1630,6 +1642,13 @@ def merge_centerline_branches_tree(
         Number of times to multiply tolerance by widen_factor and retry.
     widen_factor : float
         Factor applied when widening tolerance after a failed pass.
+    point_stride : int
+        Step used when scanning branch points from distal to proximal during
+        junction search. Use 1 for every point, 2 for every other point, 3 for
+        every third point, etc.
+    bifurcation_label_radius : float
+        Radius used to label points near successful merge junctions.
+        If <= 0, no bifurcation labeling is added.
     vertex_eps : float
         If the closest point on merged geometry is within this distance of
         an endpoint of the segment, snap to that vertex instead of inserting.
@@ -1640,11 +1659,26 @@ def merge_centerline_branches_tree(
     vtkPolyData
         Merged centerline (no vtkCleanPolyData applied here).
     """
+    merge_t0 = time.perf_counter()
+
+    def _print_merge_time():
+        if verbose:
+            dt = time.perf_counter() - merge_t0
+            print(f"Total tree merge time: {dt:.3f} s")
+
     polylines = _extract_polylines_from_polydata(centerline)
     if not polylines:
+        _print_merge_time()
         return vtk.vtkPolyData()
     if len(polylines) == 1:
+        _print_merge_time()
         return centerline
+    point_stride = int(point_stride)
+    if point_stride < 1:
+        raise ValueError("point_stride must be >= 1")
+    bifurcation_label_radius = float(bifurcation_label_radius)
+    if bifurcation_label_radius < 0:
+        raise ValueError("bifurcation_label_radius must be >= 0")
 
     polylines.sort(key=lambda pl: _polyline_arc_length(pl['coords']),
                    reverse=True)
@@ -1663,35 +1697,82 @@ def merge_centerline_branches_tree(
         state_radii = [float(med)] * len(coords0)
     state_cid = [int(cid0)] * len(coords0)
     state_gid = [int(i) for i in range(len(coords0))]
+    state_bif_label = [0] * len(coords0)
+    merge_point_ids = []
     segs = [(i, i + 1) for i in range(len(coords0) - 1)]
     out_cells = [list(range(len(coords0)))]
+    locator = None
+    locator_seg_ids = []
+    locator_dirty = True
+
+    def rebuild_segment_locator():
+        nonlocal locator, locator_seg_ids, locator_dirty
+        seg_poly = vtk.vtkPolyData()
+        pts = vtk.vtkPoints()
+        for p in state_pts:
+            pts.InsertNextPoint(float(p[0]), float(p[1]), float(p[2]))
+        lines = vtk.vtkCellArray()
+        locator_seg_ids = []
+        for seg_idx, (ia, ib) in enumerate(segs):
+            if ia == ib:
+                continue
+            ln = vtk.vtkLine()
+            ln.GetPointIds().SetId(0, int(ia))
+            ln.GetPointIds().SetId(1, int(ib))
+            lines.InsertNextCell(ln)
+            locator_seg_ids.append(seg_idx)
+        seg_poly.SetPoints(pts)
+        seg_poly.SetLines(lines)
+        loc = vtk.vtkStaticCellLocator()
+        loc.SetDataSet(seg_poly)
+        loc.BuildLocator()
+        locator = loc
+        locator_dirty = False
 
     def closest_to_segments(p):
-        best_d = np.inf
-        best_q = None
-        best_si = -1
-        best_t = 0.0
-        best_a = best_b = -1
-        for si, (ia, ib) in enumerate(segs):
-            d, q, t = _dist_point_segment(
-                p, state_pts[ia], state_pts[ib])
-            if d < best_d:
-                best_d = d
-                best_q = q
-                best_si = si
-                best_t = t
-                best_a, best_b = ia, ib
-        return best_d, best_q, best_si, best_t, best_a, best_b
+        nonlocal locator_dirty
+        if not segs:
+            return np.inf, None, -1, 0.0, -1, -1
+        if locator_dirty or locator is None:
+            rebuild_segment_locator()
+        cp = [0.0, 0.0, 0.0]
+        cell_id = vtk.mutable(0)
+        sub_id = vtk.mutable(0)
+        dist2 = vtk.mutable(0.0)
+        locator.FindClosestPoint(
+            (float(p[0]), float(p[1]), float(p[2])),
+            cp,
+            cell_id,
+            sub_id,
+            dist2)
+        loc_cell_id = int(cell_id)
+        if loc_cell_id < 0 or loc_cell_id >= len(locator_seg_ids):
+            return np.inf, None, -1, 0.0, -1, -1
+        best_si = locator_seg_ids[loc_cell_id]
+        best_a, best_b = segs[best_si]
+        q = np.asarray(cp, dtype=float)
+        ab = state_pts[best_b] - state_pts[best_a]
+        denom = float(np.dot(ab, ab))
+        if denom < 1e-30:
+            best_t = 0.0
+        else:
+            best_t = float(np.dot(q - state_pts[best_a], ab) / denom)
+            best_t = min(1.0, max(0.0, best_t))
+        best_d = float(np.sqrt(float(dist2)))
+        return best_d, q, best_si, best_t, best_a, best_b
 
     def split_segment_and_update_cells(seg_idx, q, t_cl, ra, rb, new_cid):
         """Insert q on segs[seg_idx] (a,b); return new vertex index."""
+        nonlocal locator_dirty
         a, b = segs[seg_idx]
         new_id = len(state_pts)
         state_pts.append(q.copy())
         state_radii.append(float((1.0 - t_cl) * ra + t_cl * rb))
         state_cid.append(int(new_cid))
         state_gid.append(int(new_id))
+        state_bif_label.append(0)
         segs[seg_idx:seg_idx + 1] = [(a, new_id), (new_id, b)]
+        locator_dirty = True
         for cell in out_cells:
             for k in range(len(cell) - 1):
                 u, v = cell[k], cell[k + 1]
@@ -1712,29 +1793,67 @@ def merge_centerline_branches_tree(
         return split_segment_and_update_cells(
             seg_idx, q, t_cl, ra, rb, branch_cid)
 
-    def add_point_if_new(p, r, branch_cid, merge_pt_eps):
+    merge_pt_eps = max(min_tolerance * 0.01, 1e-9)
+    inv_merge_pt_eps = 1.0 / merge_pt_eps
+    point_bins = {}
+
+    def point_bin_key(p):
+        return (int(math.floor(float(p[0]) * inv_merge_pt_eps)),
+                int(math.floor(float(p[1]) * inv_merge_pt_eps)),
+                int(math.floor(float(p[2]) * inv_merge_pt_eps)))
+
+    def add_point_to_bins(pid):
+        key = point_bin_key(state_pts[pid])
+        if key not in point_bins:
+            point_bins[key] = [pid]
+        else:
+            point_bins[key].append(pid)
+
+    for pid in range(len(state_pts)):
+        add_point_to_bins(pid)
+
+    def add_point_if_new(p, r, branch_cid, merge_pt_eps_unused):
         p = np.asarray(p, dtype=float).ravel()
-        for j, sj in enumerate(state_pts):
-            if np.linalg.norm(sj - p) <= merge_pt_eps:
-                return j
+        bx, by, bz = point_bin_key(p)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    key = (bx + dx, by + dy, bz + dz)
+                    if key not in point_bins:
+                        continue
+                    for j in point_bins[key]:
+                        sj = state_pts[j]
+                        if np.linalg.norm(sj - p) <= merge_pt_eps:
+                            return j
         jid = len(state_pts)
         state_pts.append(p.copy())
         state_radii.append(float(r))
         state_cid.append(int(branch_cid))
         state_gid.append(int(jid))
+        state_bif_label.append(0)
+        add_point_to_bins(jid)
         return jid
 
     def append_edges_for_cell(cell_ids):
+        nonlocal locator_dirty
         for u, v in zip(cell_ids[:-1], cell_ids[1:]):
             if u == v:
                 continue
             if any({ua, ub} == {u, v} for ua, ub in segs):
                 continue
             segs.append((u, v))
-
-    merge_pt_eps = max(min_tolerance * 0.01, 1e-9)
+            locator_dirty = True
 
     for pl in polylines[1:]:
+        if verbose:
+            print(f"Processing branch: {pl['centerline_id']}")
+            print(f"Number of points: {len(pl['coords'])}")
+            print(f"Number of radii: {len(pl['radii'])}")
+            print(f"Number of segments: {len(segs)}")
+            print(f"Number of out_cells: {len(out_cells)}")
+            print(f"Number of state_pts: {len(state_pts)}")
+            print(f"Number of state_radii: {len(state_radii)}")
+            print(f"Number of state_cid: {len(state_cid)}")
         bcoords = pl['coords']
         brad = pl['radii']
         n = len(bcoords)
@@ -1745,12 +1864,15 @@ def merge_centerline_branches_tree(
             default_r = brlen / max(n - 1, 1)
         else:
             default_r = None
+        scan_indices = list(range(n - 1, -1, -point_stride))
+        if scan_indices and scan_indices[-1] != 0:
+            scan_indices.append(0)
 
         junction_i = None
         attach_id = None
         scale = 1.0
         for _attempt in range(max_widen_attempts):
-            for i in range(n - 1, -1, -1):
+            for i in scan_indices:
                 p = bcoords[i]
                 if brad is not None:
                     loc_r = float(brad[i])
@@ -1763,6 +1885,7 @@ def merge_centerline_branches_tree(
                     junction_i = i
                     attach_id = resolve_junction(
                         q, si, t_cl, a, b, pl['centerline_id'])
+                    merge_point_ids.append(attach_id)
                     break
             if junction_i is not None:
                 break
@@ -1812,16 +1935,32 @@ def merge_centerline_branches_tree(
             print("    tree merge: degenerate cell after merge for "
                   f"centerline_id={pl['centerline_id']}, skipped")
 
-    return _tree_merge_state_to_polydata(
-        state_pts, state_radii, state_cid, state_gid, out_cells)
+    if bifurcation_label_radius > 0 and merge_point_ids:
+        radius_sq = bifurcation_label_radius * bifurcation_label_radius
+        merge_unique = sorted(set(merge_point_ids))
+        merge_pts = [state_pts[mid] for mid in merge_unique]
+        for j, sj in enumerate(state_pts):
+            for mp in merge_pts:
+                d = sj - mp
+                if float(np.dot(d, d)) <= radius_sq:
+                    state_bif_label[j] = 1
+                    break
+
+    out = _tree_merge_state_to_polydata(
+        state_pts, state_radii, state_cid, state_gid, out_cells,
+        state_bif_label=state_bif_label)
+    _print_merge_time()
+    return out
 
 
 def post_process_centerline(centerline, verbose=False,
                             merge_method='clean',
                             tree_merge_radius_factor=1.0,
                             tree_merge_min_tolerance=1e-6,
-                            tree_merge_max_widen_attempts=8,
+                            tree_merge_max_widen_attempts=3,
                             tree_merge_widen_factor=1.5,
+                            tree_merge_point_stride=5,
+                            tree_merge_bifurcation_label_radius=1.0,
                             tree_merge_vertex_eps=1e-5):
     """
     Function to post process the centerline using vtk functionalities.
@@ -1845,6 +1984,8 @@ def post_process_centerline(centerline, verbose=False,
     tree_merge_min_tolerance : float
     tree_merge_max_widen_attempts : int
     tree_merge_widen_factor : float
+    tree_merge_point_stride : int
+    tree_merge_bifurcation_label_radius : float
     tree_merge_vertex_eps : float
 
     Returns
@@ -1855,6 +1996,7 @@ def post_process_centerline(centerline, verbose=False,
         raise ValueError("merge_method must be 'clean' or 'tree'")
 
     if verbose:
+        print(f"Merge method: {merge_method}")
         print(f"""Number of points before post processing:
               {centerline.GetNumberOfPoints()}""")
     if merge_method == 'clean':
@@ -1870,6 +2012,8 @@ def post_process_centerline(centerline, verbose=False,
             min_tolerance=tree_merge_min_tolerance,
             max_widen_attempts=tree_merge_max_widen_attempts,
             widen_factor=tree_merge_widen_factor,
+            point_stride=tree_merge_point_stride,
+            bifurcation_label_radius=tree_merge_bifurcation_label_radius,
             vertex_eps=tree_merge_vertex_eps,
             verbose=verbose,
         )
@@ -2887,11 +3031,11 @@ if __name__ == '__main__':
     # is not identity, the centerline calculation will fail.
     ###
     # Path to segmentation
-    path_segs = '/Users/nsveinsson/Documents/datasets/CAS_cerebral_dataset/CAS2023_trainingdataset/cm/truths/'
+    path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
 
     # Output directory
     # out_dir = path_segs + '/centerlines_fmm_only_successful/'
-    out_dir = path_segs.replace('truths','centerlines_fmm')
+    out_dir = path_segs.replace('truths','centerlines_fmm_test')
     os.makedirs(out_dir, exist_ok=True)
 
     # Image extension
@@ -2910,13 +3054,13 @@ if __name__ == '__main__':
     fill_holes = False
 
     # Verbose
-    return_failed = True
-    write_files = True
+    return_failed = False
+    write_files = False
     verbose = True
 
     # Start index
-    start = 1
-    stop = 2
+    start = 0
+    stop = 1
 
     # If contains string, only process those files
     contains_str = ''
@@ -3060,13 +3204,14 @@ if __name__ == '__main__':
         centerline_multi, success_info = calc_multi_component_centerlines(
             segmentation,
             nr_seeds=None,
-            min_res=300,
+            min_res=100,
             out_dir=out_dir,
             write_files=write_files,
             move_target_if_fail=False,
             relax_factor=1,
             verbose=verbose,
-            return_failed=return_failed
+            return_failed=return_failed,
+            post_process_kwargs={'merge_method': 'tree'}
         )
 
         print(f"Time in seconds: {time.time() - time_start:0.3f}")
