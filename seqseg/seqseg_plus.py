@@ -361,7 +361,9 @@ def main():
             global_centerline, targets, success = calc_centerline_global(
                 assembly_binary,
                 initial_seeds,
-                nr_seeds=num_seeds)
+                nr_seeds=num_seeds,
+                merge_method=global_config.get('CENTERLINE_MERGE_METHOD',
+                                               'clean'))
             # if centerline is not None
             if success:
                 vf.write_vtk_polydata(

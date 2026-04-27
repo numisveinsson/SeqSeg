@@ -2585,10 +2585,11 @@ def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
     return end_points
 
 
-def calc_multi_component_centerlines(segmentation, nr_seeds=None, 
+def calc_multi_component_centerlines(segmentation, nr_seeds=None,
                                    min_res=300, out_dir=None, write_files=False,
                                    move_target_if_fail=False, relax_factor=1,
-                                   verbose=False, return_failed=False):
+                                   verbose=False, return_failed=False,
+                                   post_process_kwargs=None):
     """
     Calculate centerlines for multi-component segmentations by creating seeds
     from disconnected bodies and computing centerlines for each component.
@@ -2623,6 +2624,9 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
         If True, prints detailed information about the process. Defaults to False.
     return_failed : bool, optional
         Whether to include failed centerline attempts in the output. Defaults to False.
+    post_process_kwargs : dict, optional
+        Extra kwargs forwarded to :func:`calc_centerline_fmm` for centerline
+        post-processing (e.g. ``{'merge_method': 'tree'}``).
         
     Returns
     -------
@@ -2748,7 +2752,8 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
                 relax_factor=relax_factor,
                 verbose=verbose,
                 return_failed=return_failed,
-                return_success_list=True
+                return_success_list=True,
+                post_process_kwargs=post_process_kwargs,
             )
             
             centerlines.append(centerline)
@@ -2910,8 +2915,8 @@ if __name__ == '__main__':
     verbose = True
 
     # Start index
-    start = 0
-    stop = 1
+    start = 1
+    stop = 2
 
     # If contains string, only process those files
     contains_str = ''

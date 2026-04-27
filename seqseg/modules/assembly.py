@@ -880,7 +880,8 @@ def get_old_ref_point(vessel_tree,
 
 
 def calc_centerline_global(predicted_vessels, initial_seeds,
-                           nr_seeds=None, verbose=False):
+                           nr_seeds=None, merge_method='clean',
+                           verbose=False):
     """
     Function to construct global centerline(s) from the full assembled
     segmentation, including disconnected bodies/components.
@@ -894,6 +895,9 @@ def calc_centerline_global(predicted_vessels, initial_seeds,
         nr_seeds: int, optional
             Number of seeds/components to process in multi-component
             centerline extraction. If None, processes all components.
+        merge_method: str, optional
+            Centerline merge method for post-processing. Supported values are
+            ``'clean'`` (default) and ``'tree'``.
     """
     print(f"""Calculating global centerline
           with {len(initial_seeds)} initial seeds""")
@@ -902,13 +906,14 @@ def calc_centerline_global(predicted_vessels, initial_seeds,
     centerline_poly, success_info = calc_multi_component_centerlines(
         predicted_vessels,
         nr_seeds=nr_seeds,
-        min_res=700,
+        min_res=300,
         out_dir=None,
         write_files=False,
         move_target_if_fail=False,
         relax_factor=3,
         verbose=verbose,
         return_failed=True,
+        post_process_kwargs={'merge_method': merge_method},
     )
 
     # For backward compatibility, keep the same return tuple shape.
