@@ -13,6 +13,10 @@ defaults:
 jobs:
   test_scripts:
     runs-on: macos-latest
+    env:
+      # Headless plotting; avoids GUI backend work during CI.
+      MPLBACKEND: Agg
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +25,27 @@ jobs:
         with:
           python-version: "3.10"
 
+      # First matplotlib import builds a font cache; on macOS runners this can
+      # exceed default step budgets. Cache + warm-up keeps the CLI step fast.
+      - name: Cache matplotlib font cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.matplotlib
+            ~/.cache/matplotlib
+          key: mpl-font-${{ runner.os }}-${{ runner.arch }}-py3.10-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            mpl-font-${{ runner.os }}-${{ runner.arch }}-py3.10-
+
       # Install dependencies via pip
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install .  # Installs the local package (seqseg)
+
+      - name: Warm matplotlib font cache
+        run: |
+          python -c "import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt; import matplotlib.font_manager as fm; fm.fontManager"
 
       # Test python script
       - name: Test SeqSeg CLI

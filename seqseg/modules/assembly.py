@@ -474,6 +474,8 @@ class VesselTree:
         Branches are connected by 'connection' attribute
         The size of the node is proportional to the radius
         """
+        import matplotlib
+        matplotlib.use('Agg')
         import networkx as nx
         import matplotlib.pyplot as plt
 
@@ -513,6 +515,8 @@ class VesselTree:
         Args:
             dir_output: directory to save the graph
         """
+        import matplotlib
+        matplotlib.use('Agg')
         import networkx as nx
         import matplotlib.pyplot as plt
 
@@ -713,6 +717,8 @@ class VesselTree:
         """
         Function to plot the radius distribution of the tree
         """
+        import matplotlib
+        matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         radii = [step['radius'] for step in self.steps]
         n_step = len(radii)
