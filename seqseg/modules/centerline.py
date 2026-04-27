@@ -6,6 +6,7 @@ import math
 import vtk
 import SimpleITK as sitk
 import numpy as np
+from scipy.spatial import cKDTree
 # from numba import jit
 sys.path.insert(0, './')
 from seqseg.modules.sitk_functions import create_new, distance_map_from_seg
@@ -1616,7 +1617,8 @@ def merge_centerline_branches_tree(
         min_tolerance=1e-5,
         max_widen_attempts=3,
         widen_factor=1.5,
-        point_stride=5,
+        branch_scan_stride_divisor=1000,
+        connector_interp_points=3,
         bifurcation_label_radius=0.0,
         vertex_eps=1e-5,
         verbose=False):
@@ -1642,10 +1644,14 @@ def merge_centerline_branches_tree(
         Number of times to multiply tolerance by widen_factor and retry.
     widen_factor : float
         Factor applied when widening tolerance after a failed pass.
-    point_stride : int
-        Step used when scanning branch points from distal to proximal during
-        junction search. Use 1 for every point, 2 for every other point, 3 for
-        every third point, etc.
+    branch_scan_stride_divisor : int
+        Distal-to-proximal scan stride is ``max(1, n // branch_scan_stride_divisor)``
+        where ``n`` is the number of points on that branch (e.g. divisor 1000
+        gives stride 5 when ``n`` is 5000).
+    connector_interp_points : int
+        Number of interior points to linearly interpolate between the attach
+        point on the merged tree and the first kept branch point, creating a
+        denser connector segment at merge junctions.
     bifurcation_label_radius : float
         Radius used to label points near successful merge junctions.
         If <= 0, no bifurcation labeling is added.
@@ -1673,9 +1679,12 @@ def merge_centerline_branches_tree(
     if len(polylines) == 1:
         _print_merge_time()
         return centerline
-    point_stride = int(point_stride)
-    if point_stride < 1:
-        raise ValueError("point_stride must be >= 1")
+    branch_scan_stride_divisor = int(branch_scan_stride_divisor)
+    if branch_scan_stride_divisor < 1:
+        raise ValueError("branch_scan_stride_divisor must be >= 1")
+    connector_interp_points = int(connector_interp_points)
+    if connector_interp_points < 0:
+        raise ValueError("connector_interp_points must be >= 0")
     bifurcation_label_radius = float(bifurcation_label_radius)
     if bifurcation_label_radius < 0:
         raise ValueError("bifurcation_label_radius must be >= 0")
@@ -1700,6 +1709,8 @@ def merge_centerline_branches_tree(
     state_bif_label = [0] * len(coords0)
     merge_point_ids = []
     segs = [(i, i + 1) for i in range(len(coords0) - 1)]
+    # O(1) duplicate-edge checks; append_edges_for_cell used to scan all segs.
+    seg_exist = {(min(u, v), max(u, v)) for u, v in segs}
     out_cells = [list(range(len(coords0)))]
     locator = None
     locator_seg_ids = []
@@ -1765,6 +1776,7 @@ def merge_centerline_branches_tree(
         """Insert q on segs[seg_idx] (a,b); return new vertex index."""
         nonlocal locator_dirty
         a, b = segs[seg_idx]
+        seg_exist.discard((min(a, b), max(a, b)))
         new_id = len(state_pts)
         state_pts.append(q.copy())
         state_radii.append(float((1.0 - t_cl) * ra + t_cl * rb))
@@ -1772,6 +1784,8 @@ def merge_centerline_branches_tree(
         state_gid.append(int(new_id))
         state_bif_label.append(0)
         segs[seg_idx:seg_idx + 1] = [(a, new_id), (new_id, b)]
+        seg_exist.add((min(a, new_id), max(a, new_id)))
+        seg_exist.add((min(new_id, b), max(new_id, b)))
         locator_dirty = True
         for cell in out_cells:
             for k in range(len(cell) - 1):
@@ -1834,14 +1848,31 @@ def merge_centerline_branches_tree(
         add_point_to_bins(jid)
         return jid
 
+    def add_point_force_new(p, r, branch_cid):
+        """Insert a new point even if it overlaps existing points."""
+        p = np.asarray(p, dtype=float).ravel()
+        jid = len(state_pts)
+        state_pts.append(p.copy())
+        state_radii.append(float(r))
+        state_cid.append(int(branch_cid))
+        state_gid.append(int(jid))
+        state_bif_label.append(0)
+        add_point_to_bins(jid)
+        return jid
+
     def append_edges_for_cell(cell_ids):
         nonlocal locator_dirty
+        added = False
         for u, v in zip(cell_ids[:-1], cell_ids[1:]):
             if u == v:
                 continue
-            if any({ua, ub} == {u, v} for ua, ub in segs):
+            ek = (min(u, v), max(u, v))
+            if ek in seg_exist:
                 continue
+            seg_exist.add(ek)
             segs.append((u, v))
+            added = True
+        if added:
             locator_dirty = True
 
     for pl in polylines[1:]:
@@ -1864,7 +1895,8 @@ def merge_centerline_branches_tree(
             default_r = brlen / max(n - 1, 1)
         else:
             default_r = None
-        scan_indices = list(range(n - 1, -1, -point_stride))
+        branch_stride = max(1, n // branch_scan_stride_divisor)
+        scan_indices = list(range(n - 1, -1, -branch_stride))
         if scan_indices and scan_indices[-1] != 0:
             scan_indices.append(0)
 
@@ -1889,6 +1921,9 @@ def merge_centerline_branches_tree(
                     break
             if junction_i is not None:
                 break
+            else:
+                if verbose:
+                    print(f"Could not join branch centerline_id={pl['centerline_id']}; appending full polyline after {max_widen_attempts} widen attempts")
             scale *= widen_factor
 
         if junction_i is None:
@@ -1921,7 +1956,32 @@ def merge_centerline_branches_tree(
                 bcoords[k], r_k, pl['centerline_id'], merge_pt_eps)
             tail_ids.append(tid)
 
+        # If the first kept branch point snaps onto the attach vertex,
+        # keep an explicit connector point at the merged junction.
+        if tail_ids and tail_ids[0] == attach_id:
+            j_r = (float(brad[junction_i]) if brad is not None
+                   else float(default_r))
+            if np.linalg.norm(bcoords[junction_i] - state_pts[attach_id]) > (
+                    1e-12):
+                tail_ids[0] = add_point_force_new(
+                    bcoords[junction_i], j_r, pl['centerline_id'])
+
         new_cell = [attach_id]
+        if tail_ids:
+            start_p = state_pts[attach_id]
+            end_p = state_pts[tail_ids[0]]
+            connector_vec = end_p - start_p
+            if float(np.dot(connector_vec, connector_vec)) > 1e-24:
+                start_r = float(state_radii[attach_id])
+                end_r = float(state_radii[tail_ids[0]])
+                for j in range(1, connector_interp_points + 1):
+                    alpha = j / float(connector_interp_points + 1)
+                    p_interp = (1.0 - alpha) * start_p + alpha * end_p
+                    r_interp = (1.0 - alpha) * start_r + alpha * end_r
+                    interp_id = add_point_force_new(
+                        p_interp, r_interp, pl['centerline_id'])
+                    if new_cell[-1] != interp_id:
+                        new_cell.append(interp_id)
         for tid in tail_ids:
             if tid == attach_id:
                 continue
@@ -1936,15 +1996,15 @@ def merge_centerline_branches_tree(
                   f"centerline_id={pl['centerline_id']}, skipped")
 
     if bifurcation_label_radius > 0 and merge_point_ids:
-        radius_sq = bifurcation_label_radius * bifurcation_label_radius
         merge_unique = sorted(set(merge_point_ids))
-        merge_pts = [state_pts[mid] for mid in merge_unique]
-        for j, sj in enumerate(state_pts):
-            for mp in merge_pts:
-                d = sj - mp
-                if float(np.dot(d, d)) <= radius_sq:
-                    state_bif_label[j] = 1
-                    break
+        merge_pts = np.asarray(
+            [state_pts[mid] for mid in merge_unique], dtype=float)
+        tree = cKDTree(merge_pts)
+        pts_arr = np.asarray(state_pts, dtype=float)
+        near = tree.query_ball_point(pts_arr, r=bifurcation_label_radius)
+        for j, hits in enumerate(near):
+            if hits:
+                state_bif_label[j] = 1
 
     out = _tree_merge_state_to_polydata(
         state_pts, state_radii, state_cid, state_gid, out_cells,
@@ -1959,7 +2019,8 @@ def post_process_centerline(centerline, verbose=False,
                             tree_merge_min_tolerance=1e-6,
                             tree_merge_max_widen_attempts=3,
                             tree_merge_widen_factor=1.5,
-                            tree_merge_point_stride=5,
+                            tree_merge_branch_scan_stride_divisor=1000,
+                            tree_merge_connector_interp_points=30,
                             tree_merge_bifurcation_label_radius=1.0,
                             tree_merge_vertex_eps=1e-5):
     """
@@ -1984,7 +2045,9 @@ def post_process_centerline(centerline, verbose=False,
     tree_merge_min_tolerance : float
     tree_merge_max_widen_attempts : int
     tree_merge_widen_factor : float
-    tree_merge_point_stride : int
+    tree_merge_branch_scan_stride_divisor : int
+        Passed to merge_centerline_branches_tree as ``branch_scan_stride_divisor``.
+    tree_merge_connector_interp_points : int
     tree_merge_bifurcation_label_radius : float
     tree_merge_vertex_eps : float
 
@@ -2012,20 +2075,27 @@ def post_process_centerline(centerline, verbose=False,
             min_tolerance=tree_merge_min_tolerance,
             max_widen_attempts=tree_merge_max_widen_attempts,
             widen_factor=tree_merge_widen_factor,
-            point_stride=tree_merge_point_stride,
+            branch_scan_stride_divisor=tree_merge_branch_scan_stride_divisor,
+            connector_interp_points=tree_merge_connector_interp_points,
             bifurcation_label_radius=tree_merge_bifurcation_label_radius,
             vertex_eps=tree_merge_vertex_eps,
             verbose=verbose,
         )
+        # Now clean
+        cleaner = vtk.vtkCleanPolyData()
+        cleaner.SetInputData(centerline)
+        cleaner.SetTolerance(0.001)
+        cleaner.Update()
+        centerline = cleaner.GetOutput()
 
     # Smooth centerline
     smoother = vtk.vtkWindowedSincPolyDataFilter()
     smoother.SetInputData(centerline)
-    smoother.SetNumberOfIterations(15)
+    smoother.SetNumberOfIterations(1500)
     smoother.BoundarySmoothingOff()
     smoother.FeatureEdgeSmoothingOff()
-    smoother.SetFeatureAngle(120.0)
-    smoother.SetPassBand(0.001)
+    # smoother.SetFeatureAngle(120.0)
+    smoother.SetPassBand(0.1)
     smoother.NonManifoldSmoothingOn()
     smoother.NormalizeCoordinatesOn()
     smoother.Update()
@@ -2251,12 +2321,11 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     max_value = np.max(dist_map_np)
     # Find index of maximum value
     index = np.where(dist_map_np == max_value)
-    # If multiple max values, take first
-    if len(index[0]) > 1:
-        index = [index[0][0], index[1][0], index[2][0]]
+    # If multiple max values, take first; use .item() so we pass scalars not 0-d/1-d arrays
+    z0, y0, x0 = index[0][0], index[1][0], index[2][0]
     # Create fast marching filter
     fast_marching = sitk.FastMarchingImageFilter()
-    fast_marching.AddTrialPoint((int(index[0]), int(index[1]), int(index[2])))
+    fast_marching.AddTrialPoint((z0.item(), y0.item(), x0.item()))
     fast_marching.SetStoppingValue(max_time_steps)
     # Create speed image by masking distance map with segmentation
     speed_image = sitk.Mask(distance_map, segmentation)
@@ -3031,11 +3100,12 @@ if __name__ == '__main__':
     # is not identity, the centerline calculation will fail.
     ###
     # Path to segmentation
-    path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
+    # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
+    path_segs = '/Users/nsveinsson/Documents/datasets/airRC_dataset/truths/'
 
     # Output directory
     # out_dir = path_segs + '/centerlines_fmm_only_successful/'
-    out_dir = path_segs.replace('truths','centerlines_fmm_test')
+    out_dir = path_segs.replace('truths','centerlines_fmm_test_airways')
     os.makedirs(out_dir, exist_ok=True)
 
     # Image extension
@@ -3204,7 +3274,7 @@ if __name__ == '__main__':
         centerline_multi, success_info = calc_multi_component_centerlines(
             segmentation,
             nr_seeds=None,
-            min_res=100,
+            min_res=500,
             out_dir=out_dir,
             write_files=write_files,
             move_target_if_fail=False,
