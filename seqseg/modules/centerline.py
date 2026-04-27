@@ -2443,9 +2443,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
         write_geo(os.path.join(out_dir, 'end_points.vtp'), polydata_point)
 
     seed_np = np.array(
-        segmentation.TransformIndexToPhysicalPoint((int(index[0]),
-                                                    int(index[1]),
-                                                    int(index[2]))))
+        segmentation.TransformIndexToPhysicalPoint(
+            (int(z0), int(y0), int(x0))))
     end_points_phys_np = [np.array(point) for point in end_points_phys]
 
     # write seed and end points as npy
