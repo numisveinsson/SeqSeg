@@ -435,7 +435,8 @@ def main():
         if calc_global_centerline:
             global_centerline, targets, success = calc_centerline_global(
                 assembly_binary,
-                initial_seeds)
+                initial_seeds,
+                nr_seeds=num_seeds)
             
             if success or len(targets) > 0:
                 # Save main centerline for CFD inlet/outlet definition

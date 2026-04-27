@@ -360,7 +360,8 @@ def main():
             # Calculate global centerline
             global_centerline, targets, success = calc_centerline_global(
                 assembly_binary,
-                initial_seeds)
+                initial_seeds,
+                nr_seeds=num_seeds)
             # if centerline is not None
             if success:
                 vf.write_vtk_polydata(

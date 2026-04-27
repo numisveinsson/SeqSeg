@@ -1,7 +1,7 @@
 from .sitk_functions import (read_image, create_new, sitk_to_numpy,
                              numpy_to_sitk, keep_component_seeds,
                              is_point_in_image)
-from .centerline import calc_centerline_fmm
+from .centerline import calc_centerline_fmm, calc_multi_component_centerlines
 from .vtk_functions import (write_vtk_polydata,
                             points2polydata, appendPolyData)
 import numpy as np
@@ -879,11 +879,11 @@ def get_old_ref_point(vessel_tree,
     return old_point_ref
 
 
-def calc_centerline_global(predicted_vessels, initial_seeds, verbose=False):
+def calc_centerline_global(predicted_vessels, initial_seeds,
+                           nr_seeds=None, verbose=False):
     """
-    Function to loop over inital seeds and construct global centerline(s)
-
-    Targets are not defined here, but in the calc_centerline_fmm function
+    Function to construct global centerline(s) from the full assembled
+    segmentation, including disconnected bodies/components.
 
     Parameters:
     -----------
@@ -891,36 +891,28 @@ def calc_centerline_global(predicted_vessels, initial_seeds, verbose=False):
             the predicted vessel segmentation
         initial_seeds: list of np arrays
             the initial seeds for the global centerline
+        nr_seeds: int, optional
+            Number of seeds/components to process in multi-component
+            centerline extraction. If None, processes all components.
     """
     print(f"""Calculating global centerline
           with {len(initial_seeds)} initial seeds""")
-    # create a list for centerline polydata
-    centerline_poly = []
-    # create a list for targets
+    # Use multi-component centerline extraction so disconnected bodies are
+    # handled in one unified workflow.
+    centerline_poly, success_info = calc_multi_component_centerlines(
+        predicted_vessels,
+        nr_seeds=nr_seeds,
+        min_res=700,
+        out_dir=None,
+        write_files=False,
+        move_target_if_fail=False,
+        relax_factor=3,
+        verbose=verbose,
+        return_failed=True,
+    )
+
+    # For backward compatibility, keep the same return tuple shape.
+    # multi-component extraction currently does not return global targets.
     targets_list = []
-    # create a success flag
-    success_list = []
-    # loop over the initial seeds
-    for seed in initial_seeds:
-        # keep the component with the seed
-        predicted_vessel = keep_component_seeds(predicted_vessels, [seed])
-        # calculate the centerline
-        cent, success, targets = calc_centerline_fmm(predicted_vessel,
-                                                     seed=seed,
-                                                     min_res=700,
-                                                     relax_factor=3,
-                                                     return_target_all=True,
-                                                     verbose=verbose,
-                                                     return_failed=True)
-        centerline_poly.append(cent)
-        targets_list.append(targets)
-        success_list.append(success)
-
-    # append the centerline polydata list to a single polydata
-    centerline_poly = appendPolyData(centerline_poly)
-    # make single list
-    targets_list = [item for sublist in targets_list for item in sublist]
-    # success if any of the centerlines were successful
-    success_list = any(success_list)
-
-    return centerline_poly, targets_list, success_list
+    success = bool(success_info.get('overall_success', False))
+    return centerline_poly, targets_list, success
