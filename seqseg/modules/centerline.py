@@ -1081,7 +1081,7 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     success : bool
         Boolean indicating if the backtracking was successful.
     """
-    print(f"   Backtracking from {target} to {seed}")
+    # print(f"   Backtracking from {target} to {seed}")
     max_number_points = 100000
     use_gradient_grid = True
     step_size = 0.01
@@ -1877,14 +1877,13 @@ def merge_centerline_branches_tree(
 
     for pl in polylines[1:]:
         if verbose:
-            print(f"Processing branch: {pl['centerline_id']}")
-            print(f"Number of points: {len(pl['coords'])}")
-            print(f"Number of radii: {len(pl['radii'])}")
-            print(f"Number of segments: {len(segs)}")
-            print(f"Number of out_cells: {len(out_cells)}")
-            print(f"Number of state_pts: {len(state_pts)}")
-            print(f"Number of state_radii: {len(state_radii)}")
-            print(f"Number of state_cid: {len(state_cid)}")
+            print(f"Processing branch: {pl['centerline_id']}; Number of points: {len(pl['coords'])}")
+            # print(f"Number of radii: {len(pl['radii'])}")
+            # print(f"Number of segments: {len(segs)}")
+            # print(f"Number of out_cells: {len(out_cells)}")
+            # print(f"Number of state_pts: {len(state_pts)}")
+            # print(f"Number of state_radii: {len(state_radii)}")
+            # print(f"Number of state_cid: {len(state_cid)}")
         bcoords = pl['coords']
         brad = pl['radii']
         n = len(bcoords)
@@ -2213,54 +2212,58 @@ def find_end_clusters(cluster_map):
     Function to find the end clusters of a cluster map.
     The end clusters are the clusters that only connect to one other cluster.
 
-    Clusters are connected if they share a face.
+    Clusters are connected if they share a face (6-connectivity), matching
+    ``get_neighbors``.
 
-    We find the end clusters by iterating over all clusters and checking
-    neighboring voxels and which cluster they belong to.
-    If neighboring voxels only belong to one other cluster
-    then the current cluster is an end cluster.
+    Implemented as one pass over inter-voxel faces between different non-zero
+    labels instead of ``np.argwhere`` per label (which is O(n_clusters * volume)).
 
     Parameters
     ----------
-    cluster_map_img : image np array
+    cluster_map : np.ndarray
         Cluster map. Each cluster has a unique integer value.
 
     Returns
     -------
     end_clusters : list of int
     """
-    # Get unique values
-    unique_values = np.unique(cluster_map)
-    # Initialize end clusters
-    end_clusters = []
-    # Iterate over all clusters
-    for value in unique_values:
-        if value == 0:
+    chunks = []
+    for axis in range(3):
+        sl1 = [slice(None)] * 3
+        sl2 = [slice(None)] * 3
+        sl1[axis] = slice(1, None)
+        sl2[axis] = slice(0, -1)
+        c1 = cluster_map[tuple(sl1)]
+        c2 = cluster_map[tuple(sl2)]
+        m = (c1 != 0) & (c2 != 0) & (c1 != c2)
+        if not np.any(m):
             continue
-        # Get indices of current cluster
-        indices = np.argwhere(cluster_map == value)
-        # Initialize number of connections
-        connections = 0
-        values_connected = []
-        # Iterate over all indices
-        for index in indices:
-            # Get neighboring indices
-            neighbors = get_neighbors(index, cluster_map.shape)
-            # Iterate over all neighbors
-            connections, values_connected = check_connections(value,
-                                                              connections,
-                                                              values_connected,
-                                                              neighbors,
-                                                              cluster_map)
-            # If more than one connection, break
-            if connections > 1:
-                break
-        # If only one connection, add to end clusters
-        if connections == 1:
-            # print(f"Cluster {value} is an end cluster")
-            end_clusters.append(value)
+        a = c1[m]
+        b = c2[m]
+        lo = np.minimum(a, b)
+        hi = np.maximum(a, b)
+        chunks.append(np.column_stack((lo, hi)))
 
-    return end_clusters
+    if not chunks:
+        return []
+
+    edges = np.unique(np.vstack(chunks), axis=0)
+    lo = edges[:, 0]
+    hi = edges[:, 1]
+    u = np.concatenate([lo, hi])
+    v = np.concatenate([hi, lo])
+    order = np.argsort(u, kind="mergesort")
+    u_s = u[order]
+    v_s = v[order]
+    starts = np.flatnonzero(np.r_[True, u_s[1:] != u_s[:-1]])
+    ends = np.r_[starts[1:], u_s.size]
+    labels_at_starts = u_s[starts]
+
+    neighbor_sets = {}
+    for s, e, lab in zip(starts, ends, labels_at_starts):
+        neighbor_sets[int(lab)] = set(v_s[s:e])
+
+    return [lab for lab, neigh in neighbor_sets.items() if len(neigh) == 1]
 
 
 def cluster_map(segmentation, return_wave_distance_map=False,
