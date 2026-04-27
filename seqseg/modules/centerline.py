@@ -3132,7 +3132,7 @@ if __name__ == '__main__':
 
     # Start index
     start = 0
-    stop = 1
+    stop = -1
 
     # If contains string, only process those files
     contains_str = ''
@@ -3150,6 +3150,9 @@ if __name__ == '__main__':
     if contains_str:
         segs = [f for f in segs if contains_str in f]
     segs = sorted(segs)
+
+    if stop == -1:
+        stop = len(segs)
 
     if if_spacing_file:
         import pandas as pd
@@ -3276,7 +3279,7 @@ if __name__ == '__main__':
         centerline_multi, success_info = calc_multi_component_centerlines(
             segmentation,
             nr_seeds=None,
-            min_res=500,
+            min_res=700,
             out_dir=out_dir,
             write_files=write_files,
             move_target_if_fail=False,
