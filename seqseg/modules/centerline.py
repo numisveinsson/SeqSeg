@@ -3153,10 +3153,10 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
 
     # Crop to the non-zero mask bounding box to reduce unnecessary
     # computation for sparse/full-volume segmentations.
-    seg_nonzero = sitk.BinaryThreshold(
-        segmentation, lowerThreshold=1, upperThreshold=sys.maxsize,
-        insideValue=1, outsideValue=0
-    )
+    # Build a foreground mask in a pixel-type-agnostic way.
+    # Using BinaryThreshold with sys.maxsize can overflow for certain input
+    # pixel types and produce an invalid [lower, upper] range in ITK.
+    seg_nonzero = sitk.Cast(sitk.NotEqual(segmentation, 0), sitk.sitkUInt8)
     label_stats = sitk.LabelShapeStatisticsImageFilter()
     label_stats.Execute(seg_nonzero)
     if not label_stats.HasLabel(1):
@@ -3452,7 +3452,7 @@ if __name__ == '__main__':
     # Verbose
     return_failed = False
     # Keep main output minimal: only write the final centerline file.
-    write_files = False
+    write_files = True
     verbose = True
 
     # Start index
