@@ -1200,6 +1200,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         Centerline of the vessel.
     """
     output = None
+    original_segmentation = segmentation
+    was_resampled = False
     if verbose:
         print(f"Resolution of segmentation: {segmentation.GetSize()}")
 
@@ -1218,7 +1220,30 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                       .GetSpacing()],
                                      segmentation.GetDirection(), 0,
                                      segmentation.GetPixelID())
+        was_resampled = True
         print(f"    New size: {segmentation.GetSize()}")
+
+    # Keep user-provided index coordinates anatomically consistent with
+    # the resampled grid by mapping old-index -> physical -> new-index.
+    if was_resampled:
+        if seed is not None and not isinstance(seed, np.ndarray):
+            seed_original = [int(i) for i in seed]
+            seed_phys = original_segmentation.TransformIndexToPhysicalPoint(
+                seed_original)
+            seed = list(segmentation.TransformPhysicalPointToIndex(seed_phys))
+
+        if (targets is not None
+           and len(targets) > 0
+           and not isinstance(targets[0], np.ndarray)):
+            targets_resampled = []
+            for target in targets:
+                target_original = [int(i) for i in target]
+                target_phys = original_segmentation.TransformIndexToPhysicalPoint(
+                    target_original)
+                target_resampled = list(
+                    segmentation.TransformPhysicalPointToIndex(target_phys))
+                targets_resampled.append(target_resampled)
+            targets = targets_resampled
     # Create distance map
     distance_map_surf = distance_map_from_seg(segmentation)
     # Switch sign of distance map
@@ -1273,10 +1298,10 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
 
     # if seed/targets is np.array, convert to index
     if isinstance(seed, np.ndarray):
-        seed_np = seed
         seed = list(segmentation.TransformPhysicalPointToIndex(seed.tolist()))
         # if any are outside or on boundary, move inside
         seed = check_border(seed, segmentation.GetSize())
+        seed_np = np.array(segmentation.TransformIndexToPhysicalPoint(seed))
         targets_np = [target for target in targets]
         targets = [list(
             segmentation.TransformPhysicalPointToIndex(target.tolist()))
@@ -3124,6 +3149,47 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     """
     if verbose:
         print("Starting multi-component centerline calculation...")
+        print(f"Original segmentation size: {segmentation.GetSize()}")
+
+    # Crop to the non-zero mask bounding box to reduce unnecessary
+    # computation for sparse/full-volume segmentations.
+    seg_nonzero = sitk.BinaryThreshold(
+        segmentation, lowerThreshold=1, upperThreshold=sys.maxsize,
+        insideValue=1, outsideValue=0
+    )
+    label_stats = sitk.LabelShapeStatisticsImageFilter()
+    label_stats.Execute(seg_nonzero)
+    if not label_stats.HasLabel(1):
+        if verbose:
+            print("No foreground voxels found in segmentation")
+        empty_polydata = vtk.vtkPolyData()
+        return empty_polydata, {
+            'overall_success': False,
+            'component_successes': [],
+            'num_components': 0,
+            'num_successful': 0,
+            'seeds_used': []
+        }
+
+    bbox = label_stats.GetBoundingBox(1)  # (x, y, z, size_x, size_y, size_z)
+    roi_buffer_voxels = 10
+    image_size = segmentation.GetSize()
+    roi_index = []
+    roi_size = []
+    for dim in range(3):
+        start = int(bbox[dim]) - roi_buffer_voxels
+        end = int(bbox[dim] + bbox[dim + 3]) + roi_buffer_voxels
+        start = max(0, start)
+        end = min(int(image_size[dim]), end)
+        roi_index.append(start)
+        roi_size.append(end - start)
+    segmentation = sitk.RegionOfInterest(segmentation, roi_size, roi_index)
+    if verbose:
+        print(
+            "Cropped segmentation to ROI index "
+            f"{tuple(roi_index)} size {tuple(roi_size)} "
+            f"(buffer={roi_buffer_voxels} voxels)"
+        )
         
     # Step 1: Create seeds from disconnected bodies
     if verbose:
@@ -3385,6 +3451,7 @@ if __name__ == '__main__':
 
     # Verbose
     return_failed = False
+    # Keep main output minimal: only write the final centerline file.
     write_files = False
     verbose = True
 
@@ -3501,18 +3568,10 @@ if __name__ == '__main__':
         if if_spacing_file:
             # set the spacing
             segmentation.SetSpacing(spacing_values[segs.index(seg)])
-        # Write segmentation
-        sitk.WriteImage(segmentation, os.path.join(out_dir.replace('images_w', 'truths'),
-                        name+'.mha'))
-
         time_start = time.time()
         # Get end points
         if if_end_points:
             end_points = np.load(os.path.join(end_points_dir, name+'.npy'))
-            # print as polydata
-            polydata_point = points2polydata(end_points)
-            write_geo(os.path.join(out_dir, 'end_points_'+name+'.vtp'),
-                      polydata_point)
             targets = []
             for i in range(len(end_points)):
                 targets.append(end_points[i])
