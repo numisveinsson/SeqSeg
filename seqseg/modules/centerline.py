@@ -7,6 +7,8 @@ import vtk
 import SimpleITK as sitk
 import numpy as np
 from scipy.spatial import cKDTree
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
 # from numba import jit
 sys.path.insert(0, './')
 from seqseg.modules.sitk_functions import create_new, distance_map_from_seg
@@ -2528,63 +2530,130 @@ def cluster_map(segmentation, return_wave_distance_map=False,
                                      'wave_distance_map_output.mha'))
     print("Converted wave distance map to integers")
 
-    # Get unique values in wave distance map
-    unique_values = np.unique(
-        sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0))
+    # Get unique values in wave distance map (cached NumPy view reused below)
+    wave_distance_map_np = sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0)
+    unique_values = np.unique(wave_distance_map_np)
     if verbose:
         print(f"Unique values: {unique_values}")
     # Remove values above threshold 100 thousand
     unique_values = unique_values[unique_values < 100000]
-    # Create new image with same size as wave distance map
-    cluster_map_img = sitk.Image(wave_distance_map.GetSize(), sitk.sitkInt32)
-    cluster_map_img.CopyInformation(wave_distance_map)
+    # Build cluster labels in NumPy and convert once at the end.
+    cluster_map_np = np.zeros_like(wave_distance_map_np, dtype=np.int32)
 
     time_start = time.time()
-    # For each unique value, create a cluster
     # Group every N values
-    if np.max(unique_values) > 100:
+    max_unique = int(np.max(unique_values)) if unique_values.size > 0 else 0
+    if max_unique > 100:
         N = 10
-    elif np.max(unique_values) > 50:
+    elif max_unique > 50:
         N = 5
-    elif np.max(unique_values) > 20:
+    elif max_unique > 20:
         N = 3
-    elif np.max(unique_values) > 10:
+    elif max_unique > 10:
         N = 2
     else:
         N = 1
+
+    # Quantize wave distance into bucket ids once, then find connected
+    # components for equal-valued neighbors in one graph pass (26-connectivity).
+    valid_wave = (wave_distance_map_np > 0) & (wave_distance_map_np < 100000)
+    bucket_ids = np.zeros_like(wave_distance_map_np, dtype=np.int32)
+    if np.any(valid_wave):
+        bucket_ids[valid_wave] = ((wave_distance_map_np[valid_wave] - 1) // N) + 1
+
+    active_mask = bucket_ids > 0
     cluster_count = 1
-    for i, value in enumerate(range(1, np.max(unique_values)+1, N)):
-        if value == 0:
-            continue
-        # Create mask for value
-        mask = sitk.BinaryThreshold(wave_distance_map,
-                                    lowerThreshold=value,
-                                    upperThreshold=(value+N-1))
-        if verbose:
-            print(f"Values: {value} to {value+N-1}")
-        # Connected components
-        connected = sitk.ConnectedComponentImageFilter()
-        # Fully connected to include diagonal connections
-        connected.SetFullyConnected(True)
-        connected = connected.Execute(mask)
-        # Get number of connected components
-        num_connected = np.max(
-            sitk.GetArrayFromImage(connected).transpose(2, 1, 0))
-        if verbose:
-            print(f"   Num connected: {num_connected}")
-        # Assign unique value to each connected component
-        for j in range(1, num_connected+1):
-            mask = sitk.BinaryThreshold(connected,
-                                        lowerThreshold=j,
-                                        upperThreshold=j)
-            # if cluster is too small, ignore
-            # print(f"Cluster has size:{np.sum(sitk.GetArrayFromImage(mask))}")
-            if np.sum(sitk.GetArrayFromImage(mask).transpose(2, 1, 0)) < 5:
+    if np.any(active_mask):
+        shape = bucket_ids.shape
+        flat_indices = np.arange(bucket_ids.size, dtype=np.int64).reshape(shape)
+        active_flats = flat_indices[active_mask]
+        active_bucket_ids = bucket_ids[active_mask].astype(np.int32, copy=False)
+
+        full_to_active = np.full(bucket_ids.size, -1, dtype=np.int64)
+        full_to_active[active_flats] = np.arange(active_flats.size, dtype=np.int64)
+
+        # Half-neighborhood offsets for 26-connectivity.
+        neighbor_offsets = (
+            (1, 0, 0), (0, 1, 0), (0, 0, 1),
+            (1, 1, 0), (1, -1, 0), (1, 0, 1), (1, 0, -1),
+            (0, 1, 1), (0, 1, -1),
+            (1, 1, 1), (1, 1, -1), (1, -1, 1), (1, -1, -1),
+        )
+
+        edge_us = []
+        edge_vs = []
+        for dx, dy, dz in neighbor_offsets:
+            x1 = slice(max(0, -dx), shape[0] - max(0, dx))
+            x2 = slice(max(0, dx), shape[0] - max(0, -dx))
+            y1 = slice(max(0, -dy), shape[1] - max(0, dy))
+            y2 = slice(max(0, dy), shape[1] - max(0, -dy))
+            z1 = slice(max(0, -dz), shape[2] - max(0, dz))
+            z2 = slice(max(0, dz), shape[2] - max(0, -dz))
+
+            b1 = bucket_ids[x1, y1, z1]
+            b2 = bucket_ids[x2, y2, z2]
+            matches = (b1 != 0) & (b1 == b2)
+            if not np.any(matches):
                 continue
-            cluster_map_img = sitk.Mask(cluster_map_img, sitk.Not(mask))
-            mask = sitk.Cast(mask, sitk.sitkInt32) * (cluster_count)
+
+            u_full = flat_indices[x1, y1, z1][matches]
+            v_full = flat_indices[x2, y2, z2][matches]
+            edge_us.append(full_to_active[u_full])
+            edge_vs.append(full_to_active[v_full])
+
+        n_active = active_flats.size
+        if edge_us:
+            u = np.concatenate(edge_us)
+            v = np.concatenate(edge_vs)
+            rows = np.concatenate([u, v])
+            cols = np.concatenate([v, u])
+            data = np.ones(rows.size, dtype=np.uint8)
+            graph = csr_matrix((data, (rows, cols)), shape=(n_active, n_active))
+        else:
+            graph = csr_matrix((n_active, n_active), dtype=np.uint8)
+
+        _, component_labels = connected_components(graph,
+                                                   directed=False,
+                                                   return_labels=True)
+        comp_counts = np.bincount(component_labels)
+
+        order = np.argsort(component_labels, kind="mergesort")
+        comp_sorted = component_labels[order]
+        flat_sorted = active_flats[order]
+        bucket_sorted = active_bucket_ids[order]
+        starts = np.r_[0, np.flatnonzero(comp_sorted[1:] != comp_sorted[:-1]) + 1]
+        comp_ids = comp_sorted[starts]
+        comp_first_flat = flat_sorted[starts]
+        comp_bucket = bucket_sorted[starts]
+        comp_sizes = comp_counts[comp_ids]
+
+        if verbose:
+            buckets_present, num_connected = np.unique(comp_bucket, return_counts=True)
+            for bucket_id, n_conn in zip(buckets_present, num_connected):
+                value = int((bucket_id - 1) * N + 1)
+                print(f"Values: {value} to {value+N-1};   Num connected: {int(n_conn)}")
+
+        keep = comp_sizes >= 5
+        keep_comp_ids = comp_ids[keep]
+        keep_first_flat = comp_first_flat[keep]
+        keep_bucket = comp_bucket[keep]
+
+        # Preserve original order semantics: increasing bucket then scan order.
+        keep_order = np.lexsort((keep_first_flat, keep_bucket))
+        keep_comp_ids = keep_comp_ids[keep_order]
+
+        comp_to_cluster = np.zeros(comp_counts.size, dtype=np.int32)
+        for comp_id in keep_comp_ids:
+            comp_to_cluster[comp_id] = cluster_count
             cluster_count += 1
-            cluster_map_img = cluster_map_img + mask
+
+        cluster_labels_active = comp_to_cluster[component_labels]
+        cluster_map_flat = np.zeros(bucket_ids.size, dtype=np.int32)
+        cluster_map_flat[active_flats] = cluster_labels_active
+        cluster_map_np = cluster_map_flat.reshape(shape)
+
+    cluster_map_img = sitk.GetImageFromArray(np.transpose(cluster_map_np, (2, 1, 0)))
+    cluster_map_img.CopyInformation(wave_distance_map)
 
     print(f"Cluster count: {cluster_count}")
     print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
@@ -2594,7 +2663,6 @@ def cluster_map(segmentation, return_wave_distance_map=False,
         sitk.WriteImage(cluster_map_img, os.path.join(out_dir,
                                                       'cluster_map_img.mha'))
 
-    cluster_map_np = sitk.GetArrayFromImage(cluster_map_img).transpose(2, 1, 0)
     time_start = time.time()
     end_clusters = find_end_clusters(cluster_map_np)
     print(f"Time to find end clusters: {time.time() - time_start:0.2f}")
