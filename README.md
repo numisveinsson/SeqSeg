@@ -2,8 +2,8 @@
 ![example workflow](https://github.com/numisveinsson/SeqSeg/actions/workflows/test.yml/badge.svg)
 
 <p align="center">
-  <img src="seqseg/assets/seqseg_logo.png" alt="SeqSeg — Sequential Vessel Segmentation" width="480"/><br/>
-  <img src="seqseg/assets/coronary.png" alt="Example coronary segmentation (SeqSeg)" width="260"/>
+  <img src="https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/seqseg_logo.png" alt="SeqSeg — Sequential Vessel Segmentation" width="480"/><br/>
+  <img src="https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/coronary.png" alt="Example coronary segmentation (SeqSeg)" width="260"/>
 </p>
 
 # SeqSeg: Sequential Vessel Segmentation and Tracking
@@ -13,7 +13,7 @@
 > **News:** SeqSeg now outputs a full SimVascular project in the `simvascular/` subdirectory. You can open it directly in SimVascular, with automatic pathlines and contours generated for every branch segmented by SeqSeg.
 
 [![Paper](https://img.shields.io/badge/Paper-Annals%20of%20BME-blue)](https://rdcu.be/dU0wy)
-[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/numisveinsson/SeqSeg/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
 
 ## Abstract
@@ -32,7 +32,7 @@ SeqSeg is a novel method for automatic vessel segmentation that combines local d
 - Processing time: ~2-10 minutes per case (depending on vessel complexity)
 - Computational requirements: Standard CPU and GPU (for faster inference) hardware
 
-![SeqSeg Demo](seqseg/assets/mr_model_tracing_fast_shorter.gif)
+![SeqSeg Demo](https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/mr_model_tracing_fast_shorter.gif)
 *Real-time demonstration: Automatic segmentation of abdominal aorta in 3D MR scan*
 
 ## Table of Contents
@@ -73,7 +73,7 @@ SeqSeg employs a **sequential tracking approach** that combines:
 
 ### Technical Workflow
 
-![SeqSeg Workflow](seqseg/assets/seqseg.png)
+![SeqSeg Workflow](https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/seqseg.png)
 
 **Step-by-step process:**
 1. **Initialization**: Place seed points manually or from prior centerlines
@@ -85,7 +85,7 @@ SeqSeg employs a **sequential tracking approach** that combines:
 
 ### Training Strategy
 
-![Training Pipeline](seqseg/assets/seqseg_training.png)
+![Training Pipeline](https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/seqseg_training.png)
 
 The neural network is trained on **local subvolume patches** extracted from annotated vessel datasets, enabling:
 - **Generalization** across different vessel scales and orientations
@@ -288,13 +288,13 @@ SeqSeg generates several output files for each processed case. Filenames include
 
 ### Aortic segmentation example
 
-![Aortic segmentation: SeqSeg vs. 2D nnU-Net on the ATV dataset](seqseg/assets/ATV_dataset_results.png)
+![Aortic segmentation: SeqSeg vs. 2D nnU-Net on the ATV dataset](https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/ATV_dataset_results.png)
 
 *Qualitative comparison on 18 cases: ground truth, SeqSeg, 2D nnU-Net (with post-processing), and 2D nnU-Net raw predictions. SeqSeg tends to preserve a continuous aortic tree and peripheral branches where the 2D nnU-Net baselines are more fragmented or incomplete.*
 
 ### Coronary segmentation example
 
-![Coronary artery segmentation with SeqSeg](seqseg/assets/coronary.png)
+![Coronary artery segmentation with SeqSeg](https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/coronary.png)
 
 *3D visualization: coronary tree segmented with SeqSeg (red) overlaid on the heart (transparent blue). Seed markers show the minimal initialization points used to grow the left and right coronary systems.*
 
