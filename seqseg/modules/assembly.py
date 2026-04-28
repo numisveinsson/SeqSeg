@@ -717,9 +717,9 @@ class VesselTree:
         """
         Function to plot the radius distribution of the tree
         """
-        import matplotlib
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
+        # import matplotlib
+        # matplotlib.use('Agg')
+        # import matplotlib.pyplot as plt
         radii = [step['radius'] for step in self.steps]
         n_step = len(radii)
         plt.hist(radii, bins=20)
