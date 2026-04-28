@@ -2594,17 +2594,21 @@ def cluster_map(segmentation, return_wave_distance_map=False,
         sitk.WriteImage(cluster_map_img, os.path.join(out_dir,
                                                       'cluster_map_img.mha'))
 
+    cluster_map_np = sitk.GetArrayFromImage(cluster_map_img).transpose(2, 1, 0)
     time_start = time.time()
-    end_clusters = find_end_clusters(sitk.GetArrayFromImage(
-        cluster_map_img).transpose(2, 1, 0))
+    end_clusters = find_end_clusters(cluster_map_np)
     print(f"Time to find end clusters: {time.time() - time_start:0.2f}")
     print(f"End clusters: {end_clusters}")
     print(f"Number of end clusters: {len(end_clusters)}")
 
+    distance_map_np = sitk.GetArrayFromImage(distance_map_masked).transpose(
+        2, 1, 0)
     time_start = time.time()
     end_points = get_end_points(cluster_map_img,
                                 end_clusters,
-                                distance_map_masked)
+                                distance_map_masked,
+                                cluster_map_np=cluster_map_np,
+                                distance_map_np=distance_map_np)
     print(f"Time to get end points: {time.time() - time_start:0.2f}")
 
     # Convert end points to physical points
@@ -2921,9 +2925,15 @@ def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=F
         }
 
 
-def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
+def get_end_points(cluster_map_img, end_clusters, distance_map_masked,
+                   cluster_map_np=None, distance_map_np=None):
     """
     Function to get the end points of a cluster map.
+
+    For each end cluster label, returns the voxel of that label with maximum
+    distance value. Tie and non-positive behavior matches legacy:
+    keep the first voxel in ``np.argwhere`` order among equal maxima, and
+    return ``None`` when all distances in the label are <= 0.
 
     Parameters
     ----------
@@ -2933,42 +2943,51 @@ def get_end_points(cluster_map_img, end_clusters, distance_map_masked):
         End clusters.
     distance_map_masked : sitk image
         Distance map masked with the segmentation.
+    cluster_map_np : np.ndarray, optional
+        Same voxel layout as ``sitk.GetArrayFromImage(cluster_map_img).T(2,1,0)``.
+        If provided, avoids copying the cluster map from SimpleITK.
+    distance_map_np : np.ndarray, optional
+        Same layout for the masked distance map.
 
     Returns
     -------
     end_points : list of np.array
+        One entry per ``end_cluster``; ``None`` if the label has no voxels.
     """
-    # Get array from cluster map
-    cluster_map = sitk.GetArrayFromImage(
-        cluster_map_img).transpose(2, 1, 0)
-    # Get array from distance map
-    distance_map = sitk.GetArrayFromImage(
-        distance_map_masked).transpose(2, 1, 0)
-    # Initialize end points
-    end_points = []
-    # Iterate over all end clusters
-    for end_cluster in end_clusters:
-        # Get indices of current cluster
-        indices = np.argwhere(cluster_map == end_cluster)
-        # Initialize maximum distance
-        max_distance = 0
-        # Initialize end point
-        end_point = None
-        # Iterate over all indices
-        for index in indices:
-            # Get distance at current index
-            distance = distance_map[tuple(index)]
-            # If distance is greater than maximum distance
-            if distance > max_distance:
-                # Update maximum distance
-                max_distance = distance
-                # Update end point
-                end_point = index
-        # Add end point to list
-        end_points.append(end_point)
-        # print(f"End point: {end_point}, Max distance: {max_distance}")
+    if not end_clusters:
+        return []
 
-    return end_points
+    if cluster_map_np is None:
+        cluster_map_np = sitk.GetArrayFromImage(
+            cluster_map_img).transpose(2, 1, 0)
+    if distance_map_np is None:
+        distance_map_np = sitk.GetArrayFromImage(
+            distance_map_masked).transpose(2, 1, 0)
+
+    end_set = np.asarray(end_clusters, dtype=np.int64)
+    mask = np.isin(cluster_map_np, end_set)
+    if not np.any(mask):
+        return [None] * len(end_clusters)
+
+    labs = cluster_map_np[mask].astype(np.int64, copy=False)
+    dists = np.asarray(distance_map_np[mask], dtype=np.float64)
+    z, y, x = np.where(mask)
+    coords = np.column_stack((z, y, x))
+
+    # Stable sort: primary label, descending distance, then ascending (z,y,x)
+    # so the first row per label matches legacy (max distance, then first
+    # argwhere index among ties).
+    order = np.lexsort((x, y, z, -dists, labs))
+    sorted_labs = labs[order]
+    sorted_coords = coords[order]
+    sorted_dists = dists[order]
+    uniq, first = np.unique(sorted_labs, return_index=True)
+    label_to_point = {
+        int(lab): sorted_coords[idx] if sorted_dists[idx] > 0 else None
+        for lab, idx in zip(uniq, first)
+    }
+
+    return [label_to_point.get(int(c), None) for c in end_clusters]
 
 
 def calc_multi_component_centerlines(segmentation, nr_seeds=None,
@@ -3273,8 +3292,8 @@ if __name__ == '__main__':
     # is not identity, the centerline calculation will fail.
     ###
     # Path to segmentation
-    path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
-    # path_segs = '/Users/nsveinsson/Documents/datasets/airRC_dataset/truths/'
+    # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
+    path_segs = '/Users/nsveinsson/Documents/datasets/airRC_dataset/truths/'
 
     # Output directory
     # out_dir = path_segs + '/centerlines_fmm_only_successful/'

@@ -717,9 +717,9 @@ class VesselTree:
         """
         Function to plot the radius distribution of the tree
         """
-        # import matplotlib
-        # matplotlib.use('Agg')
-        # import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
         radii = [step['radius'] for step in self.steps]
         n_step = len(radii)
         plt.hist(radii, bins=20)
@@ -912,7 +912,7 @@ def calc_centerline_global(predicted_vessels, initial_seeds,
     centerline_poly, success_info = calc_multi_component_centerlines(
         predicted_vessels,
         nr_seeds=nr_seeds,
-        min_res=300,
+        min_res=500,
         out_dir=None,
         write_files=False,
         move_target_if_fail=False,
