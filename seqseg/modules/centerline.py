@@ -1187,8 +1187,10 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         List of target points.
     post_process_kwargs : dict, optional
         Extra keyword arguments for :func:`post_process_centerline`, e.g.
-        ``{'merge_method': 'tree', 'tree_merge_radius_factor': 1.2}``.
-        Default remains vtkClean-based merge (``merge_method='clean'``).
+        ``{'merge_method': 'tree', 'tree_merge_radius_factor': 1.2}``. Use
+        ``tree_merge_decimate_max_points_per_branch=None`` to disable
+        pre-merge arc-length decimation. Default remains vtkClean-based merge
+        (``merge_method='clean'``).
 
     Returns
     -------
@@ -1568,6 +1570,160 @@ def _extract_polylines_from_polydata(centerline):
     return polylines
 
 
+def _resample_polyline_by_arc_length(coords, max_points, radii=None):
+    """
+    Resample a polyline to at most ``max_points`` vertices spaced uniformly
+    by arc length (endpoints preserved when n >= 2).
+
+    Parameters
+    ----------
+    coords : (n, 3) array
+    max_points : int
+        Must be >= 2.
+    radii : (n,) array or None
+        Interpolated linearly along segments when provided.
+
+    Returns
+    -------
+    coords_out, radii_out
+        radii_out is None if radii was None.
+    """
+    coords = np.asarray(coords, dtype=float)
+    n = coords.shape[0]
+    if n < 2 or max_points < 2 or n <= max_points:
+        out_r = None if radii is None else np.asarray(radii, dtype=float).copy()
+        return coords.copy(), out_r
+
+    seg_len = np.linalg.norm(np.diff(coords, axis=0), axis=1)
+    cumul = np.zeros(n, dtype=float)
+    cumul[1:] = np.cumsum(seg_len)
+    total = float(cumul[-1])
+    if total < 1e-30:
+        c2 = np.vstack((coords[0], coords[-1]))
+        if radii is None:
+            return c2, None
+        r = np.asarray(radii, dtype=float)
+        return c2, np.array([r[0], r[-1]], dtype=float)
+
+    targets = np.linspace(0.0, total, max_points)
+    out_coords = np.zeros((max_points, 3), dtype=float)
+    if radii is not None:
+        rad = np.asarray(radii, dtype=float)
+        out_rad = np.zeros(max_points, dtype=float)
+    else:
+        rad = None
+        out_rad = None
+
+    for j, d in enumerate(targets):
+        idx = int(np.searchsorted(cumul, d, side='right') - 1)
+        idx = max(0, min(idx, n - 2))
+        denom = float(seg_len[idx]) + 1e-30
+        t = (d - cumul[idx]) / denom
+        t = min(1.0, max(0.0, t))
+        out_coords[j] = (1.0 - t) * coords[idx] + t * coords[idx + 1]
+        if rad is not None:
+            out_rad[j] = (1.0 - t) * rad[idx] + t * rad[idx + 1]
+
+    return out_coords, out_rad
+
+
+def _decimate_centerline_polylines_before_tree_merge(polydata,
+                                                     max_points_per_branch):
+    """
+    Per-cell arc-length decimation for VTK_LINE / VTK_POLY_LINE cells only.
+    Other cell types are omitted from the output. Vertices are not merged
+    across cells (safe before tree merge).
+
+    Parameters
+    ----------
+    polydata : vtkPolyData
+    max_points_per_branch : int or None
+        If None or < 2, returns ``polydata`` unchanged.
+
+    Returns
+    -------
+    vtkPolyData
+    """
+    if max_points_per_branch is None:
+        return polydata
+    max_points_per_branch = int(max_points_per_branch)
+    if max_points_per_branch < 2:
+        return polydata
+
+    n_cells = polydata.GetNumberOfCells()
+    if n_cells == 0:
+        return polydata
+
+    radii_arr = polydata.GetPointData().GetArray(
+        "MaximumInscribedSphereRadius")
+    cid_arr = polydata.GetPointData().GetArray("CenterlineId")
+    gid_arr = polydata.GetPointData().GetArray("GlobalNodeID")
+
+    out = vtk.vtkPolyData()
+    pts = vtk.vtkPoints()
+    lines = vtk.vtkCellArray()
+    out_rad = None
+    if radii_arr is not None:
+        out_rad = vtk.vtkDoubleArray()
+        out_rad.SetName("MaximumInscribedSphereRadius")
+    out_cid = vtk.vtkIntArray()
+    out_cid.SetName("CenterlineId")
+    out_gid = None
+    if gid_arr is not None:
+        out_gid = vtk.vtkIntArray()
+        out_gid.SetName("GlobalNodeID")
+
+    out_branch_idx = 0
+    for ci in range(n_cells):
+        cell = polydata.GetCell(ci)
+        ctype = cell.GetCellType()
+        if ctype not in (vtk.VTK_LINE, vtk.VTK_POLY_LINE):
+            continue
+        np_cell = cell.GetNumberOfPoints()
+        if np_cell < 2:
+            continue
+        ids = [cell.GetPointId(j) for j in range(np_cell)]
+        coords = np.array([polydata.GetPoint(pid) for pid in ids],
+                          dtype=float)
+        if radii_arr is not None:
+            radii = np.array(
+                [radii_arr.GetValue(pid) for pid in ids], dtype=float)
+        else:
+            radii = None
+
+        c_dec, r_dec = _resample_polyline_by_arc_length(
+            coords, max_points_per_branch, radii=radii)
+        m = c_dec.shape[0]
+        cl_id = (int(cid_arr.GetValue(ids[0])) if cid_arr is not None
+                 else out_branch_idx)
+
+        pl = vtk.vtkPolyLine()
+        pl.GetPointIds().SetNumberOfIds(m)
+        for k in range(m):
+            pid = pts.InsertNextPoint(
+                float(c_dec[k, 0]), float(c_dec[k, 1]), float(c_dec[k, 2]))
+            pl.GetPointIds().SetId(k, pid)
+            if out_rad is not None and r_dec is not None:
+                out_rad.InsertNextValue(float(r_dec[k]))
+            out_cid.InsertNextValue(cl_id)
+            if out_gid is not None:
+                out_gid.InsertNextValue(k)
+        lines.InsertNextCell(pl)
+        out_branch_idx += 1
+
+    if lines.GetNumberOfCells() == 0:
+        return polydata
+
+    out.SetPoints(pts)
+    out.SetLines(lines)
+    if out_rad is not None:
+        out.GetPointData().AddArray(out_rad)
+    out.GetPointData().AddArray(out_cid)
+    if out_gid is not None:
+        out.GetPointData().AddArray(out_gid)
+    return out
+
+
 def _tree_merge_state_to_polydata(state_pts, state_radii, state_cid,
                                   state_gid, out_cells,
                                   state_bif_label=None):
@@ -1621,7 +1777,8 @@ def merge_centerline_branches_tree(
         connector_interp_points=3,
         bifurcation_label_radius=0.0,
         vertex_eps=1e-5,
-        verbose=False):
+        verbose=False,
+        decimate_max_points_per_branch=5000):
     """
     Merge overlapping branch polylines into a tree: start from the longest
     polyline, then attach each other branch by walking from its distal end
@@ -1659,6 +1816,10 @@ def merge_centerline_branches_tree(
         If the closest point on merged geometry is within this distance of
         an endpoint of the segment, snap to that vertex instead of inserting.
     verbose : bool
+    decimate_max_points_per_branch : int or None
+        Before merging, resample each branch polyline to at most this many
+        points along cumulative arc length (per cell, no cross-cell welding).
+        ``None`` or values ``< 2`` disable decimation.
 
     Returns
     -------
@@ -1671,6 +1832,9 @@ def merge_centerline_branches_tree(
         if verbose:
             dt = time.perf_counter() - merge_t0
             print(f"Total tree merge time: {dt:.3f} s")
+
+    centerline = _decimate_centerline_polylines_before_tree_merge(
+        centerline, decimate_max_points_per_branch)
 
     polylines = _extract_polylines_from_polydata(centerline)
     if not polylines:
@@ -2018,10 +2182,11 @@ def post_process_centerline(centerline, verbose=False,
                             tree_merge_min_tolerance=1e-6,
                             tree_merge_max_widen_attempts=3,
                             tree_merge_widen_factor=1.5,
-                            tree_merge_branch_scan_stride_divisor=1000,
-                            tree_merge_connector_interp_points=30,
+                            tree_merge_branch_scan_stride_divisor=5000,
+                            tree_merge_connector_interp_points=5,
                             tree_merge_bifurcation_label_radius=1.0,
-                            tree_merge_vertex_eps=1e-5):
+                            tree_merge_vertex_eps=1e-5,
+                            tree_merge_decimate_max_points_per_branch=5000):
     """
     Function to post process the centerline using vtk functionalities.
 
@@ -2030,7 +2195,7 @@ def post_process_centerline(centerline, verbose=False,
         2. Smooth centerline.
 
     merge_method ``'tree'``:
-        1. Merge branches with merge_centerline_branches_tree (radius-based tolerance, longest branch first, connector segments; no vtk clean).
+        1. Arc-length decimate each branch (see ``tree_merge_decimate_max_points_per_branch``), then merge branches with merge_centerline_branches_tree (radius-based tolerance, longest branch first, connector segments; no vtk clean).
         2. Smooth centerline.
 
     Parameters
@@ -2049,6 +2214,10 @@ def post_process_centerline(centerline, verbose=False,
     tree_merge_connector_interp_points : int
     tree_merge_bifurcation_label_radius : float
     tree_merge_vertex_eps : float
+    tree_merge_decimate_max_points_per_branch : int or None
+        Passed to :func:`merge_centerline_branches_tree` as
+        ``decimate_max_points_per_branch`` (arc-length decimation per branch
+        before merging). Ignored when ``merge_method`` is ``'clean'``.
 
     Returns
     -------
@@ -2079,6 +2248,8 @@ def post_process_centerline(centerline, verbose=False,
             bifurcation_label_radius=tree_merge_bifurcation_label_radius,
             vertex_eps=tree_merge_vertex_eps,
             verbose=verbose,
+            decimate_max_points_per_branch=(
+                tree_merge_decimate_max_points_per_branch),
         )
         # Now clean
         cleaner = vtk.vtkCleanPolyData()
@@ -3102,8 +3273,8 @@ if __name__ == '__main__':
     # is not identity, the centerline calculation will fail.
     ###
     # Path to segmentation
-    # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
-    path_segs = '/Users/nsveinsson/Documents/datasets/airRC_dataset/truths/'
+    path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
+    # path_segs = '/Users/nsveinsson/Documents/datasets/airRC_dataset/truths/'
 
     # Output directory
     # out_dir = path_segs + '/centerlines_fmm_only_successful/'
