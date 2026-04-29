@@ -279,6 +279,22 @@ def main():
         )
         # Write sweep segmentation
         sitk.WriteImage(pred_sweep, dir_output0+'/'+case+'_sweep_seg.mha')
+        # Write sweep surfaces (raw + Taubin-smoothed) for inspection.
+        sweep_surface = vf.evaluate_surface(pred_sweep, 1)
+        vf.write_vtk_polydata(
+            sweep_surface,
+            dir_output0 + '/' + case + '_sweep_surface_nonsmooth.vtp'
+        )
+        sweep_surface_smooth = vf.taubin_smooth_polydata(
+            sweep_surface, it=75, mu1=0.5, mu2=0.51
+        )
+        sweep_surface_smooth = vf.compute_polydata_normals(
+            sweep_surface_smooth
+        )
+        vf.write_vtk_polydata(
+            sweep_surface_smooth,
+            dir_output0 + '/' + case + '_sweep_surface.vtp'
+        )
 
         # Create directories for results
         create_directories(dir_output, write_samples)
