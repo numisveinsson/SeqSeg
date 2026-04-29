@@ -138,10 +138,6 @@ def main():
                         default='global',
                         type=str,
                         help='Name of configuration file')
-    parser.add_argument('-pt_centerline', '--pt_centerline',
-                        default=50,
-                        type=int,
-                        help='Use point centerline')
     parser.add_argument('-num_seeds_centerline', '--num_seeds_centerline',
                         default=1,
                         type=int,
@@ -199,7 +195,6 @@ def main():
     global_test_name = args.global_test_name
     global_scale = args.global_scale
 
-    pt_centerline = args.pt_centerline
     num_seeds = args.num_seeds_centerline
 
     # Weight directory
@@ -281,11 +276,13 @@ def main():
             potential_branches,
             max_step_size,
             max_n_branches,
+            args.max_n_steps_per_branch,
             global_config,
             unit,
             seqseg_scale,
             dir_seg,
-            start_seg=pred_sweep  # Note this is binary (should be prob)
+            # Start tracing from sweep probabilities for better initialization.
+            start_seg=prob_pred_sweep
         )
 
         print("\nTotal calculation time is:"
@@ -314,8 +311,8 @@ def main():
         # Assembly work
         assembly_org = assembly_obj.assembly
         # assembly_ups = assembly_obj.upsample_sitk()
-        print("""\nTotal calculation time is: "
-              + str((time.time() - start_time)/60) + " min\n""")
+        print("\nTotal calculation time is:"
+              + str((time.time() - start_time)/60) + " min\n")
         # sitk.WriteImage(assembly_org, dir_output+'/'+case+'_assembly_'
         #                 + test_name + '_'+str(i)+'.mha')
 
