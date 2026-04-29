@@ -28,12 +28,27 @@ def initialize_predictor(model_folder, fold):
     )
     print('About to load model')
     print('Model folder:', model_folder)
-    # initializes the network architecture, loads the checkpoint
-    predictor.initialize_from_trained_model_folder(
-        model_folder,
-        use_folds=(fold,),
-        checkpoint_name='checkpoint_best.pth',
-    )
+    # Initialize architecture and load an available checkpoint.
+    # Some trainings only export checkpoint_final.pth.
+    checkpoint_candidates = ('checkpoint_best.pth', 'checkpoint_final.pth')
+    last_error = None
+    for checkpoint_name in checkpoint_candidates:
+        try:
+            predictor.initialize_from_trained_model_folder(
+                model_folder,
+                use_folds=(fold,),
+                checkpoint_name=checkpoint_name,
+            )
+            print(f'Loaded checkpoint: {checkpoint_name}')
+            break
+        except FileNotFoundError as error:
+            print(f'Checkpoint not found: {checkpoint_name}')
+            last_error = error
+    else:
+        raise FileNotFoundError(
+            f'Could not find any checkpoint in {model_folder} for fold {fold}. '
+            f'Tried: {", ".join(checkpoint_candidates)}'
+        ) from last_error
     print('Done loading model, ready to predict')
 
     return predictor
