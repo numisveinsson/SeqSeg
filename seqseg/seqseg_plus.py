@@ -5,21 +5,40 @@ import os
 import sys
 import argparse
 import SimpleITK as sitk
+from importlib import resources
+import yaml
 
-from modules import sitk_functions as sf
-from modules import vtk_functions as vf
-from modules import initialization as init
-from modules.assembly import calc_centerline_global
-from modules.tracing import trace_centerline
-from modules.datasets import get_testing_samples
-from modules.params import load_yaml
-from modules.capping import cap_surface
-from modules.sweep import run_global_segmentation
-from modules.simvascular import write_simvascular_proj
+from seqseg.modules import sitk_functions as sf
+from seqseg.modules import vtk_functions as vf
+from seqseg.modules import initialization as init
+from seqseg.modules.assembly import calc_centerline_global
+from seqseg.modules.tracing import trace_centerline
+from seqseg.modules.datasets import get_testing_samples
+from seqseg.modules.capping import cap_surface
+from seqseg.modules.sweep import run_global_segmentation
+from seqseg.modules.simvascular import write_simvascular_proj
 
 sys.stdout.flush()
 start_time = time.time()
 faulthandler.enable()
+
+
+def load_yaml_config(config_name):
+    """Load YAML configuration file with package-aware fallback."""
+    try:
+        with resources.files('seqseg.config').joinpath(
+            f'{config_name}.yaml'
+        ).open('r') as f:
+            return yaml.safe_load(f)
+    except (ImportError, FileNotFoundError, ModuleNotFoundError):
+        config_dir = os.path.join(os.path.dirname(__file__), 'config')
+        config_path = os.path.join(config_dir, f'{config_name}.yaml')
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        raise FileNotFoundError(
+            f"Configuration file '{config_name}.yaml' not found in {config_dir}"
+        )
 
 
 def create_directories(output_folder, write_samples):
@@ -165,7 +184,7 @@ def main():
 
     print(args)
 
-    global_config = load_yaml("./config/"+args.config_name+".yaml")
+    global_config = load_yaml_config(args.config_name)
     print(f"Using config file: {args.config_name}")
 
     dir_output0 = args.outdir
