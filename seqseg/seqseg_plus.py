@@ -161,6 +161,22 @@ def main():
                         default=1,
                         type=int,
                         help='Number of seeds for centerline')
+    parser.add_argument('-write_steps', '--write_steps',
+                        default=0,
+                        type=int,
+                        help='Whether to write all intermediate steps')
+    parser.add_argument('-extract_global_centerline', '--extract_global_centerline',
+                        default=0,
+                        type=int,
+                        help='Whether to extract global centerline after segmentation')
+    parser.add_argument('-cap_surface_cent', '--cap_surface_cent',
+                        default=0,
+                        type=int,
+                        help='Whether to cap surface centerline')
+    parser.add_argument('-assembly_threshold', '--assembly_threshold',
+                        default=0.5,
+                        type=float,
+                        help='Threshold for converting global probability assembly to binary segmentation')
     parser.add_argument('-global_test_name', '--global_test_name',
                         default='3d_fullres',
                         type=str,
@@ -200,9 +216,11 @@ def main():
     unit = args.unit
     max_step_size = args.max_n_steps
     max_n_branches = args.max_n_branches
-    write_samples = global_config['WRITE_STEPS']
-    take_time = global_config['TIME_ANALYSIS']
-    calc_global_centerline = global_config['GLOBAL_CENTERLINE']
+    write_samples = args.write_steps
+    take_time = global_config.get('TIME_ANALYSIS', False)
+    calc_global_centerline = args.extract_global_centerline
+    cap_surface_cent = args.cap_surface_cent
+    assembly_threshold = args.assembly_threshold
 
     seqseg_dataset = args.seqseg_train_dataset
     seqseg_fold = args.seqseg_fold
@@ -274,7 +292,7 @@ def main():
          initial_seeds) = init.initialize_from_seg(pred_sweep, dir_output)
 
         # print to .txt file all outputs
-        if not global_config['DEBUG']:
+        if not global_config.get('DEBUG', False):
             # write to file
             sys.stdout = open(dir_output+"/out.txt", "w")
         else:
@@ -320,7 +338,7 @@ def main():
         #         in_target += target
 
         # Plot tree info
-        if global_config['TREE_ANALYSIS']:
+        if global_config.get('TREE_ANALYSIS', False):
             # vessel_tree.create_tree_graph(dir_output)
             # vessel_tree.create_tree_graph_smaller(dir_output)
             vessel_tree.create_tree_polydata_v1(dir_output)
@@ -337,7 +355,7 @@ def main():
 
         assembly = assembly_org
 
-        assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=0.5,
+        assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=assembly_threshold,
                                                upperThreshold=1)
         sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_raw_seg_'
                         + seqseg_test_name + '_' + str(i) + '.mha')
@@ -395,29 +413,30 @@ def main():
                     + str(n_steps_taken)
                     + '_targets.vtp')
 
-                capped_surface, capped_seg = cap_surface(
-                    pred_surface=assembly_surface,
-                    centerline=global_centerline,
-                    pred_seg=assembly_binary,
-                    file_name=case,
-                    outdir=dir_output,
-                    targets=targets)
-                vf.write_vtk_polydata(
-                    capped_surface, dir_output+'/'
-                    + case + '_' + seqseg_test_name + '_'+str(i)+'_'
-                    + str(n_steps_taken)+'_capped_surface.vtp')
-                sitk.WriteImage(capped_seg, dir_output+'/'
-                                + case + '_' + str(n_steps_taken)
-                                + '_capped_seg.mha')
+                if cap_surface_cent:
+                    capped_surface, capped_seg = cap_surface(
+                        pred_surface=assembly_surface,
+                        centerline=global_centerline,
+                        pred_seg=assembly_binary,
+                        file_name=case,
+                        outdir=dir_output,
+                        targets=targets)
+                    vf.write_vtk_polydata(
+                        capped_surface, dir_output+'/'
+                        + case + '_' + seqseg_test_name + '_'+str(i)+'_'
+                        + str(n_steps_taken)+'_capped_surface.vtp')
+                    sitk.WriteImage(capped_seg, dir_output+'/'
+                                    + case + '_' + str(n_steps_taken)
+                                    + '_capped_seg.mha')
 
-        if global_config['PREVENT_RETRACE']:
+        if global_config.get('PREVENT_RETRACE', False):
             final_inside_pts = vf.appendPolyData(inside_pts)
             vf.write_vtk_polydata(
                 final_inside_pts, dir_output + '/final_'
                 + case + '_' + seqseg_test_name + '_'+str(i)+'_'
                 + str(n_steps_taken)+'_inside_points.vtp')
 
-        if not global_config['DEBUG']:
+        if not global_config.get('DEBUG', False):
             # close the file
             sys.stdout.close()
             sys.stdout = sys.__stdout__
