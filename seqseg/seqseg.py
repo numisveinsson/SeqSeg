@@ -436,7 +436,7 @@ def main():
             global_centerline, targets, success = calc_centerline_global(
                 assembly_binary,
                 initial_seeds,
-                nr_seeds=num_seeds,
+                nr_seeds=len(initial_seeds),
                 merge_method=global_config.get('CENTERLINE_MERGE_METHOD',
                                                'clean'))
             
