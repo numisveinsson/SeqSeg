@@ -305,7 +305,19 @@ def main():
         write_simvascular_proj(os.path.join(dir_output, 'simvascular'))
 
         (potential_branches,
-         initial_seeds) = init.initialize_from_seg(pred_sweep, dir_output)
+         initial_seeds,
+         sweep_centerline) = init.initialize_from_seg(
+            pred_sweep,
+            dir_output,
+            return_centerline=True
+        )
+        if sweep_centerline is not None:
+            vf.write_vtk_polydata(
+                sweep_centerline,
+                dir_output0 + '/' + case + '_sweep_centerline.vtp'
+            )
+        else:
+            print("Sweep centerline extraction failed in initialization")
 
         # print to .txt file all outputs
         if not global_config.get('DEBUG', False):

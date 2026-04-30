@@ -5,6 +5,7 @@ import SimpleITK as sitk
 
 # sys.path.insert(0, './')
 from seqseg.modules.vtk_functions import write_geo, points2polydata
+from seqseg.modules import vtk_functions as vf
 from seqseg.modules.tracing_functions import get_seed, get_largest_radius_seed
 from seqseg.modules.assembly import create_step_dict
 from seqseg.modules.datasets import get_directories
@@ -219,7 +220,8 @@ def get_seeds_cardiac_mesh(mesh_dir, name, unit):
 def initialize_from_seg(segmentation,
                         dir_output,
                         num_seeds=1,
-                        write_samples=False):
+                        write_samples=False,
+                        return_centerline=False):
     """
     Initialize the potential branches and initial seeds for the
     segmentation process, based on the segmentation
@@ -277,6 +279,7 @@ def initialize_from_seg(segmentation,
     # Seed points
     initial_seeds = []
     potential_branches = []
+    extracted_centerlines = []
     for segmentation in segs:
         # Calculate centerline of segmentation
         centerline, success, targets_np = calc_centerline_fmm(
@@ -292,6 +295,7 @@ def initialize_from_seg(segmentation,
             verbose=True
         )
         if success:
+            extracted_centerlines.append(centerline)
             # Write the centerline
             write_geo(dir_output + 'centerline.vtp', centerline)
             # Get the seeds
@@ -307,6 +311,13 @@ def initialize_from_seg(segmentation,
                                               initial_seeds, initial_radiuss)
         else:
             print("Centerline calculation failed! - No seeds found!")
+
+    if return_centerline:
+        if extracted_centerlines:
+            return (potential_branches,
+                    initial_seeds,
+                    vf.appendPolyData(extracted_centerlines))
+        return potential_branches, initial_seeds, None
 
     return potential_branches, initial_seeds
 
