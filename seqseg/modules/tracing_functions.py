@@ -323,7 +323,8 @@ def get_seed(cent_fn, centerline_num, point_on_cent):
     return c_loc[id_point], radii[id_point]
 
 
-def get_largest_radius_seed(dir_cent, pt_centerline=0, num_seeds=1):
+def get_largest_radius_seed(dir_cent, pt_centerline=0, num_seeds=1,
+                            from_end=False):
     """
     Get the seed point with the largest radius
     Args:
@@ -335,7 +336,10 @@ def get_largest_radius_seed(dir_cent, pt_centerline=0, num_seeds=1):
         initial_radius: initial radius
     """
     pt_along = pt_centerline
-    print(f"\nGetting seed at point {pt_along} along centerline\n")
+    if from_end:
+        print(f"\nGetting seed near end at offset {pt_along} along centerline\n")
+    else:
+        print(f"\nGetting seed at point {pt_along} along centerline\n")
     add_step = 2
 
     # Centerline
@@ -357,10 +361,80 @@ def get_largest_radius_seed(dir_cent, pt_centerline=0, num_seeds=1):
 
     old_seeds, old_radiuss, initial_seeds, initial_radiuss = [], [], [], []
     for i in range(num_seeds):
-        old_seed = c_loc[cent_ids[i][pt_along]]
-        old_radius = radii[cent_ids[i][pt_along]]
-        initial_seed = c_loc[cent_ids[i][pt_along+add_step]]
-        initial_radius = radii[cent_ids[i][pt_along+add_step]]
+        if from_end:
+            old_idx = -(pt_along + 1)
+            init_idx = -(pt_along + add_step + 1)
+        else:
+            old_idx = pt_along
+            init_idx = pt_along + add_step
+        old_seed = c_loc[cent_ids[i][old_idx]]
+        old_radius = radii[cent_ids[i][old_idx]]
+        initial_seed = c_loc[cent_ids[i][init_idx]]
+        initial_radius = radii[cent_ids[i][init_idx]]
+        old_seeds.append(old_seed)
+        old_radiuss.append(old_radius)
+        initial_seeds.append(initial_seed)
+        initial_radiuss.append(initial_radius)
+
+    return old_seeds, old_radiuss, initial_seeds, initial_radiuss
+
+
+def get_equally_spaced_radius_seeds(dir_cent, num_positions=1,
+                                    position_idx=0, num_branches=None):
+    """
+    Get seed pairs sampled at equally spaced positions along each centerline.
+
+    Parameters
+    ----------
+    dir_cent : str
+        Path to centerline polydata.
+    num_positions : int
+        Total number of positions to sample along each centerline branch.
+    position_idx : int
+        Zero-based index of the equally spaced position to sample.
+    num_branches : int or None
+        Number of centerline branches to use. If None, use all branches.
+    """
+    cent = read_geo(dir_cent).GetOutput()
+    (num_points, c_loc, radii,
+     cent_ids, bifurc_id, num_cent) = sort_centerline(cent)
+    cent_ips = sort_centerline_by_length(cent_ids, c_loc)
+    cent_ids = [cent_ids[i] for i in cent_ips]
+    cent_ids = flip_radius(cent_ids, radii)
+
+    if len(cent_ids) == 0:
+        return [], [], [], []
+
+    if num_branches is None:
+        num_branches = len(cent_ids)
+    num_branches = min(max(1, int(num_branches)), len(cent_ids))
+    num_positions = max(1, int(num_positions))
+    position_idx = min(max(0, int(position_idx)), num_positions - 1)
+    t = 0.0 if num_positions == 1 else position_idx / (num_positions - 1)
+    add_step = 2
+
+    old_seeds, old_radiuss, initial_seeds, initial_radiuss = [], [], [], []
+    for i in range(num_branches):
+        branch_ids = cent_ids[i]
+        n_pts = len(branch_ids)
+        if n_pts < 2:
+            continue
+        old_idx = int(round(t * (n_pts - 1)))
+        if old_idx + add_step < n_pts:
+            init_idx = old_idx + add_step
+        elif old_idx - add_step >= 0:
+            init_idx = old_idx - add_step
+        elif old_idx + 1 < n_pts:
+            init_idx = old_idx + 1
+        elif old_idx - 1 >= 0:
+            init_idx = old_idx - 1
+        else:
+            continue
+
+        old_seed = c_loc[branch_ids[old_idx]]
+        old_radius = radii[branch_ids[old_idx]]
+        initial_seed = c_loc[branch_ids[init_idx]]
+        initial_radius = radii[branch_ids[init_idx]]
         old_seeds.append(old_seed)
         old_radiuss.append(old_radius)
         initial_seeds.append(initial_seed)

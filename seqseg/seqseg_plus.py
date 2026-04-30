@@ -158,7 +158,7 @@ def main():
                         type=str,
                         help='Name of configuration file')
     parser.add_argument('-num_seeds_centerline', '--num_seeds_centerline',
-                        default=1,
+                        default=3,
                         type=int,
                         help='Number of seeds for centerline')
     parser.add_argument('-write_steps', '--write_steps',
@@ -309,6 +309,7 @@ def main():
          sweep_centerline) = init.initialize_from_seg(
             pred_sweep,
             dir_output,
+            num_seeds=num_seeds,
             return_centerline=True
         )
         if sweep_centerline is not None:

@@ -5,12 +5,12 @@ import SimpleITK as sitk
 
 # sys.path.insert(0, './')
 from seqseg.modules.vtk_functions import write_geo, points2polydata
-from seqseg.modules import vtk_functions as vf
-from seqseg.modules.tracing_functions import get_seed, get_largest_radius_seed
+from seqseg.modules.tracing_functions import (get_seed,
+                                              get_largest_radius_seed,
+                                              get_equally_spaced_radius_seeds)
 from seqseg.modules.assembly import create_step_dict
 from seqseg.modules.datasets import get_directories
-from seqseg.modules.centerline import calc_centerline_fmm
-from seqseg.modules.sitk_functions import connected_comp_info
+from seqseg.modules.centerline import calc_multi_component_centerlines
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -219,7 +219,7 @@ def get_seeds_cardiac_mesh(mesh_dir, name, unit):
 
 def initialize_from_seg(segmentation,
                         dir_output,
-                        num_seeds=1,
+                        num_seeds=3,
                         write_samples=False,
                         return_centerline=False):
     """
@@ -244,79 +244,56 @@ def initialize_from_seg(segmentation,
     initial_seeds : list
         List of initial seeds
     """
-    # Connected info
-    stats, means, sizes = connected_comp_info(segmentation,
-                                       True)
-    # Keep the largest connected component
-    ccimage = sitk.ConnectedComponent(segmentation)
-    # stats = sitk.LabelIntensityStatisticsImageFilter()
-    # stats.Execute(ccimage, segmentation)
-
-    # max_label = stats.GetMaximum()
-    # Get the largest connected component
-    largest_label = np.argmax(sizes)+1
-    segmentation_1 = sitk.Mask(ccimage, ccimage == largest_label)
-    segmentation_1 = segmentation_1 > 0
-
-    # Get the second largest connected component
-    sizes[largest_label-1] = 0
-    second_largest_label = np.argmax(sizes)+1
-    segmentation_2 = sitk.Mask(ccimage, ccimage == second_largest_label)
-    segmentation_2 = segmentation_2 > 0
-
-    # Get the third largest connected component
-    sizes[second_largest_label-1] = 0
-    third_largest_label = np.argmax(sizes)+1
-    segmentation_3 = sitk.Mask(ccimage, ccimage == third_largest_label)
-    segmentation_3 = segmentation_3 > 0
-
-    if write_samples:
-        sitk.WriteImage(segmentation_1, dir_output + 'seg_1.mha')
-        sitk.WriteImage(segmentation_2, dir_output + 'seg_2.mha')
-        sitk.WriteImage(segmentation_3, dir_output + 'seg_3.mha')
-
-    segs = [segmentation_1, segmentation_2]#, segmentation_3]
     # Seed points
     initial_seeds = []
     potential_branches = []
-    extracted_centerlines = []
-    for segmentation in segs:
-        # Calculate centerline of segmentation
-        centerline, success, targets_np = calc_centerline_fmm(
-            segmentation,
-            seed=None,
-            targets=None,
-            min_res=300,
-            out_dir=dir_output,
-            write_files=write_samples,
-            move_target_if_fail=False,
-            relax_factor=1,
-            return_target=True,
-            verbose=True
-        )
-        if success:
-            extracted_centerlines.append(centerline)
-            # Write the centerline
-            write_geo(dir_output + 'centerline.vtp', centerline)
-            # Get the seeds
+    extracted_centerline = None
+
+    # Use multi-component centerline extraction over the three largest bodies.
+    centerline, success_info = calc_multi_component_centerlines(
+        segmentation,
+        nr_seeds=3,
+        min_res=300,
+        out_dir=dir_output,
+        write_files=write_samples,
+        move_target_if_fail=False,
+        relax_factor=1,
+        verbose=True,
+        return_failed=False,
+    )
+    success = bool(success_info.get('overall_success', False))
+    if success and centerline.GetNumberOfPoints() > 0:
+        extracted_centerline = centerline
+        write_geo(dir_output + 'centerline.vtp', centerline)
+        # num_seeds controls how many equally spaced seed pairs are placed
+        # per branch; use all branches available in the centerline.
+        n_positions = max(1, num_seeds)
+        for position_idx in range(n_positions):
             (old_seeds, old_radiuss,
-             initial_seeds, initial_radiuss) = get_largest_radius_seed(
+             component_initial_seeds, initial_radiuss) = get_equally_spaced_radius_seeds(
                 dir_cent=dir_output+'centerline.vtp',
-                pt_centerline=3,
-                num_seeds=len(targets_np)
+                num_positions=n_positions,
+                position_idx=position_idx,
+                num_branches=None
                 )
-            # Create potential branches
-            potential_branches += create_pots(len(targets_np),
-                                              old_seeds, old_radiuss,
-                                              initial_seeds, initial_radiuss)
-        else:
-            print("Centerline calculation failed! - No seeds found!")
+            if len(component_initial_seeds) == 0:
+                continue
+            potential_branches += create_pots(
+                len(component_initial_seeds),
+                old_seeds,
+                old_radiuss,
+                component_initial_seeds,
+                initial_radiuss
+            )
+            initial_seeds.extend(component_initial_seeds)
+    else:
+        print("Centerline calculation failed! - No seeds found!")
 
     if return_centerline:
-        if extracted_centerlines:
+        if extracted_centerline is not None:
             return (potential_branches,
                     initial_seeds,
-                    vf.appendPolyData(extracted_centerlines))
+                    extracted_centerline)
         return potential_branches, initial_seeds, None
 
     return potential_branches, initial_seeds
