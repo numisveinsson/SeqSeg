@@ -1,4 +1,4 @@
-name: Test seqseg Without Torch Build
+name: test seqseg without torch build
 
 on:
   push:
