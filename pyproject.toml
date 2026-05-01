@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seqseg"
-version = "1.0.3"
+version = "1.0.4"
 description = "A deep learning-based medical image blood vessel tracking and segmentation tool."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -37,10 +37,11 @@ classifiers = [
 ]
 
 dependencies = [
-    "vtk",
-    "SimpleITK",
-    "PyYAML",
-    "nnunetv2",
+    "vtk>9",
+    "SimpleITK>2",
+    "PyYAML==6.0.3",
+    "nnunetv2==2.6.2",
+    "numpy>2",
     "scipy",
 ]
 
