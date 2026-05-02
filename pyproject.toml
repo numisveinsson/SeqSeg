@@ -41,7 +41,6 @@ dependencies = [
     "SimpleITK>2",
     "PyYAML==6.0.3",
     "nnunetv2>=2.5.1",
-    "numpy>2",
     "scipy",
 ]
 
