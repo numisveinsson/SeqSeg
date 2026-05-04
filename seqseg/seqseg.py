@@ -358,7 +358,9 @@ def main():
         # Process and save final segmentation results
         # Global assembly contains accumulated segmentations from all tracing steps
         assembly = assembly_obj.assembly
-        n_udpates = assembly_obj.get_n_updates_image()
+        n_udpates = None
+        if write_samples:
+            n_udpates = assembly_obj.get_n_updates_image()
 
         # Optionally resample final assembly outputs to a finer/coarser grid.
         if assembly_spacing_factor != 1.0:
@@ -367,8 +369,9 @@ def main():
             print(f"Resampling final assembly to spacing: {target_spacing}")
             assembly = sf.resample_to_spacing(assembly, target_spacing,
                                               is_label=False)
-            n_udpates = sf.resample_to_spacing(n_udpates, target_spacing,
-                                               is_label=False)
+            if write_samples:
+                n_udpates = sf.resample_to_spacing(n_udpates, target_spacing,
+                                                   is_label=False)
 
         # Create binary segmentation by thresholding probability map
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=assembly_threshold,
@@ -377,10 +380,11 @@ def main():
         # Save intermediate segmentation results
         sitk.WriteImage(assembly_binary, dir_output+'/'+case+'_binary_seg_'
                         + test_name + '_' + str(i) + '.mha')
-        sitk.WriteImage(assembly, dir_output+'/'+case+'_prob_seg_'
-                        + test_name + '_' + str(i) + '.mha')
-        sitk.WriteImage(n_udpates, dir_output+'/'+case+'_n_updates_'
-                        + test_name + '_' + str(i) + '.mha')
+        if write_samples:
+            sitk.WriteImage(assembly, dir_output+'/'+case+'_prob_seg_'
+                            + test_name + '_' + str(i) + '.mha')
+            sitk.WriteImage(n_udpates, dir_output+'/'+case+'_n_updates_'
+                            + test_name + '_' + str(i) + '.mha')
         
         # Print out ratio of voxels processed by SeqSeg (the non-zero updates)
         assembly_obj.calc_ratio_updates()
