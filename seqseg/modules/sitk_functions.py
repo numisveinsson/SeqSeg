@@ -1,5 +1,7 @@
 # Functions to bind SITK functionality
 
+import os
+
 import SimpleITK as sitk
 import numpy as np
 
@@ -83,6 +85,98 @@ def resample_to_spacing(image, new_spacing, is_label=False):
     else:
         resample.SetInterpolator(sitk.sitkLinear)
     return resample.Execute(image)
+
+
+def parse_resample_spacing_arg(spacing_arg):
+    """
+    Convert CLI ``--resample_spacing`` values to an (sx, sy, sz) tuple.
+
+    Parameters
+    ----------
+    spacing_arg : list[float] | None
+        From argparse ``nargs='+'``. None or empty means disabled.
+
+    Returns
+    -------
+    tuple[float, float, float] | None
+        SimpleITK spacing order, or None if resampling is disabled.
+    """
+    if not spacing_arg:
+        return None
+    if len(spacing_arg) == 1:
+        s = float(spacing_arg[0])
+        return (s, s, s)
+    if len(spacing_arg) == 3:
+        return tuple(float(x) for x in spacing_arg)
+    raise ValueError(
+        '--resample_spacing expects 1 value (isotropic) or 3 values '
+        f'(sx, sy, sz in SimpleITK order); got {len(spacing_arg)} values.'
+    )
+
+
+def maybe_resample_volume_paths(
+    dir_image,
+    dir_seg,
+    target_spacing,
+    out_dir,
+    stem,
+    img_ext,
+):
+    """
+    Optionally resample the case image (and truth seg) to ``target_spacing``.
+
+    Writes under ``out_dir`` only; original dataset paths are not modified.
+
+    Parameters
+    ----------
+    dir_image : str
+        Path to the input image volume.
+    dir_seg : str | None
+        Optional path to a label/truth volume aligned with the image.
+    target_spacing : tuple[float, float, float] | None
+        If None, returns ``(dir_image, dir_seg)`` unchanged.
+    out_dir : str
+        Existing directory for resampled outputs.
+    stem : str
+        Case stem used in output filenames.
+    img_ext : str
+        File extension including dot (e.g. ``.nii.gz``).
+
+    Returns
+    -------
+    tuple[str, str | None]
+        ``(dir_image_out, dir_seg_out)`` paths to use for the pipeline.
+    """
+    if target_spacing is None:
+        return dir_image, dir_seg
+
+    if any(s <= 0 for s in target_spacing):
+        raise ValueError(
+            f'target_spacing must be positive in all dimensions; got {target_spacing}'
+        )
+
+    img_in = sitk.ReadImage(dir_image)
+    orig_sp = img_in.GetSpacing()
+    print(
+        f'Resampling input image to spacing {target_spacing} '
+        f'(original spacing {orig_sp})'
+    )
+    img_out = resample_to_spacing(img_in, target_spacing, is_label=False)
+    out_image_path = os.path.join(out_dir, f'{stem}_resampled{img_ext}')
+    write_image(img_out, out_image_path)
+
+    out_seg_path = dir_seg
+    if dir_seg and isinstance(dir_seg, str) and os.path.isfile(dir_seg):
+        seg_in = sitk.ReadImage(dir_seg)
+        print(
+            f'Resampling truth segmentation to spacing {target_spacing} '
+            f'(original spacing {seg_in.GetSpacing()})'
+        )
+        seg_out = resample_to_spacing(seg_in, target_spacing, is_label=True)
+        out_seg_path = os.path.join(out_dir, f'{stem}_truth_resampled{img_ext}')
+        write_image(seg_out, out_seg_path)
+
+    return out_image_path, out_seg_path
 
 
 def write_image(image, outputImageFileName):

@@ -210,6 +210,17 @@ def main():
                         default=0.5,
                         type=float,
                         help='Threshold for converting global probability assembly to binary segmentation')
+    parser.add_argument(
+        '-resample_spacing', '--resample_spacing',
+        nargs='+',
+        type=float,
+        default=None,
+        metavar='S',
+        help='Resample input image (and truth seg if present) to this spacing before '
+             'running SeqSeg: one value for isotropic spacing, or three values '
+             'sx sy sz in SimpleITK order. Writes copies under the case output '
+             'folder; original dataset files are not modified.',
+    )
     args = parser.parse_args()
 
     # Load algorithm configuration from YAML file
@@ -241,6 +252,8 @@ def main():
 
     if assembly_spacing_factor <= 0:
         raise ValueError("assembly_spacing_factor must be > 0")
+
+    resample_spacing = sf.parse_resample_spacing_arg(args.resample_spacing)
 
     # nnU-Net model configuration
     dataset = args.train_dataset                       # Training dataset name
@@ -283,6 +296,15 @@ def main():
 
         # Create directories for results
         create_directories(dir_output, write_samples)
+        if resample_spacing is not None:
+            dir_image, dir_seg = sf.maybe_resample_volume_paths(
+                dir_image,
+                dir_seg,
+                resample_spacing,
+                dir_output,
+                case,
+                img_format,
+            )
         vf.write_image_as_vti(
             dir_image,
             os.path.join(dir_output, 'simvascular', 'Images', f'{case}.vti')

@@ -196,6 +196,17 @@ def main():
                         default='Dataset012_COROASOCACT',
                         help="""Name of dataset used to train nnUNet
                              , eg Dataset012_COROASOCACT""")
+    parser.add_argument(
+        '-resample_spacing', '--resample_spacing',
+        nargs='+',
+        type=float,
+        default=None,
+        metavar='S',
+        help='Resample input image (and truth seg if present) to this spacing before '
+             'global sweep and SeqSeg: one value for isotropic spacing, or three values '
+             'sx sy sz in SimpleITK order. Writes copies under the case output folder; '
+             'original dataset files are not modified.',
+    )
     args = parser.parse_args()
 
     print(args)
@@ -234,6 +245,8 @@ def main():
 
     num_seeds = args.num_seeds_centerline
 
+    resample_spacing = sf.parse_resample_spacing_arg(args.resample_spacing)
+
     # Weight directory
     dir_model_weights_seqseg = (seqseg_dataset
                                 + '/nnUNetTrainer__nnUNetPlans__'
@@ -269,6 +282,17 @@ def main():
                                                          dir_output0,
                                                          img_format,
                                                          seqseg_test_name)
+
+        if resample_spacing is not None:
+            os.makedirs(dir_output, exist_ok=True)
+            dir_image, dir_seg = sf.maybe_resample_volume_paths(
+                dir_image,
+                dir_seg,
+                resample_spacing,
+                dir_output,
+                case,
+                img_format,
+            )
 
         # Get sweep segmentation
         pred_sweep, prob_pred_sweep = run_global_segmentation(
