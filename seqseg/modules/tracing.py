@@ -900,10 +900,14 @@ def trace_centerline(
                                 # remove identical points
                                 pth_points = list(dict.fromkeys(pth_points))
                                 pth_points = [list(point) for point in pth_points]
+                                branch_number_prefix = str(branch).zfill(3)
+                                branch_file_stem = (
+                                    f"{branch_number_prefix}_{case}_{i}"
+                                )
                                 pth_output_path = (
                                     output_folder
-                                    + '/simvascular/Paths/branch_'+case+'_'
-                                    + str(branch)+'_'+str(i)
+                                    + '/simvascular/Paths/'
+                                    + branch_file_stem
                                     + '.pth')
                                 simvascular_path_counter += 1
                                 create_pth(
@@ -918,12 +922,8 @@ def trace_centerline(
                                     try:
                                         ctgr_output_path = (
                                             output_folder
-                                            + "/simvascular/Segmentations/branch_"
-                                            + case
-                                            + "_"
-                                            + str(branch)
-                                            + "_"
-                                            + str(i)
+                                            + "/simvascular/Segmentations/"
+                                            + branch_file_stem
                                             + ".ctgr"
                                         )
                                         write_ctgr_for_pth(
