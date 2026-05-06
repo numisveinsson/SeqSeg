@@ -393,7 +393,7 @@ def main():
                                               is_label=False)
             if write_samples:
                 n_udpates = sf.resample_to_spacing(n_udpates, target_spacing,
-                                                   is_label=False)
+                                                   is_label=True)
 
         # Create binary segmentation by thresholding probability map
         assembly_binary = sitk.BinaryThreshold(assembly, lowerThreshold=assembly_threshold,

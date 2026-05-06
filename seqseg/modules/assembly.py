@@ -54,16 +54,21 @@ class Segmentation:
         else:
             print("Please provide either an image file or an image object")
 
-        self.number_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
+        shape = sitk_to_numpy(self.assembly).shape
+        # Counts per voxel (non-weighted); summed weights (weighted) — float32
+        # in weighted mode for fractional weights.
+        nu_dtype = np.float32 if weighted else np.int32
+        self.number_updates = np.zeros(shape, dtype=nu_dtype)
 
         self.weighted = weighted
 
         if weighted:
-            # also keep track of how many updates to pixels
+            # Per-voxel number of prediction merges (integer; saved as n_updates).
             if start_seg is None:
-                self.n_updates = np.zeros(sitk_to_numpy(self.assembly).shape)
+                self.n_updates = np.zeros(shape, dtype=np.int32)
             else:
-                self.n_updates = sitk_to_numpy(self.assembly)
+                self.n_updates = sitk_to_numpy(self.assembly).astype(
+                    np.int32, copy=False)
             # print("Creating weighted segmentation")
             assert weight_type, "Please provide a weight type"
             assert weight_type in ['radius', 'gaussian'], """Weight type
@@ -83,9 +88,9 @@ class Segmentation:
             size_extract: number of voxels to extract in each dim
             weight: weight for the weighted average
         """
-        # Load the volumes
-        np_arr = sitk_to_numpy(self.assembly).astype(float)
-        np_arr_add = sitk_to_numpy(volume_seg).astype(float)
+        # Load the volumes (probabilistic assembly in float32 on disk)
+        np_arr = sitk_to_numpy(self.assembly).astype(np.float32, copy=False)
+        np_arr_add = sitk_to_numpy(volume_seg).astype(np.float32, copy=False)
 
         # Calculate boundaries
         cut = 0
@@ -111,8 +116,9 @@ class Segmentation:
 
         if not self.weighted:  # Then we do plain average
             # Update those values, calculating an average
-            curr_sub_section[ind] = 1/(curr_n[ind]+1) * (
-                np_arr_add[ind] + (curr_n[ind])*curr_sub_section[ind])
+            cn = curr_n[ind].astype(np.float32, copy=False)
+            curr_sub_section[ind] = (1.0 / (cn + 1.0)) * (
+                np_arr_add[ind] + cn * curr_sub_section[ind])
             # Add to update counter for these voxels
             self.number_updates[index_extract[2]:edges[2],
                                 index_extract[1]:edges[1],
@@ -120,13 +126,14 @@ class Segmentation:
 
         else:
             if self.weight_type == 'radius':
-                curr_sub_section[ind] = 1/(curr_n[ind]+weight)*(
-                    weight*np_arr_add[ind] + (
-                        curr_n[ind])*curr_sub_section[ind])
+                w = np.float32(weight)
+                cn = curr_n[ind]
+                curr_sub_section[ind] = (1.0 / (cn + w)) * (
+                    w * np_arr_add[ind] + cn * curr_sub_section[ind])
                 # Add to update weight sum for these voxels
                 self.number_updates[index_extract[2]:edges[2],
                                     index_extract[1]:edges[1],
-                                    index_extract[0]:edges[0]] += weight
+                                    index_extract[0]:edges[0]] += w
                 self.n_updates[index_extract[2]:edges[2],
                                index_extract[1]:edges[1],
                                index_extract[0]:edges[0]] += 1
@@ -138,10 +145,10 @@ class Segmentation:
                 # print(f"weight array size: {weight_array.shape},
                 # ind size: {ind.shape}")
                 # Update those values, calculating an average
-                curr_sub_section[ind] = 1/(
-                    curr_n[ind]+weight_array[ind])*(
-                        weight_array[ind]*np_arr_add[ind]
-                        + (curr_n[ind])*curr_sub_section[ind])
+                wa = weight_array[ind]
+                cn = curr_n[ind]
+                curr_sub_section[ind] = (1.0 / (cn + wa)) * (
+                    wa * np_arr_add[ind] + cn * curr_sub_section[ind])
                 # Add to update weight sum for these voxels
                 self.number_updates[index_extract[2]:edges[2],
                                     index_extract[1]:edges[1],
@@ -161,11 +168,20 @@ class Segmentation:
         """Function to calculate the weight array for
         a gaussian weighted segmentation"""
         # define std as 10% of the size of the volume
-        std = 0.5*np.ones_like(size_extract)  # 0.1
+        std = np.float32(0.5) * np.ones_like(size_extract, dtype=np.float32)
         # create a grid of distances to the center of the volume
-        x = np.linspace(-size_extract[0]/2, size_extract[0]/2, size_extract[0])
-        y = np.linspace(-size_extract[1]/2, size_extract[1]/2, size_extract[1])
-        z = np.linspace(-size_extract[2]/2, size_extract[2]/2, size_extract[2])
+        x = np.linspace(
+            np.float32(-size_extract[0] / 2),
+            np.float32(size_extract[0] / 2),
+            size_extract[0], dtype=np.float32)
+        y = np.linspace(
+            np.float32(-size_extract[1] / 2),
+            np.float32(size_extract[1] / 2),
+            size_extract[1], dtype=np.float32)
+        z = np.linspace(
+            np.float32(-size_extract[2] / 2),
+            np.float32(size_extract[2] / 2),
+            size_extract[2], dtype=np.float32)
         # normalize
         x = x/(size_extract[0]/2)
         y = y/(size_extract[1]/2)
@@ -177,12 +193,12 @@ class Segmentation:
         y = y.transpose(1, 0, 2)
         z = z.transpose(1, 0, 2)
         # calculate the weight array
-        weight_array = np.exp(-0.5*(x**2/std[0]**2
-                                    + y**2/std[1]**2
-                                    + z**2/std[2]**2))
+        weight_array = np.exp(np.float32(-0.5) * (
+            x ** 2 / std[0] ** 2 + y ** 2 / std[1] ** 2 + z ** 2 / std[2] ** 2
+        ))
         # print(f"Max weight: {np.max(weight_array)}")
         # print(f"Min weight: {np.min(weight_array)}")
-        return weight_array
+        return weight_array.astype(np.float32, copy=False)
 
     def create_mask(self):
         "Function to create a global image mask of areas that were segmented"
@@ -216,8 +232,14 @@ class Segmentation:
         return resampled
     
     def get_n_updates_image(self):
-        "Function to get the n_updates as a sitk image"
-        return numpy_to_sitk(self.number_updates, self.image_reader)
+        """Integer sitk image: per-voxel update count (non-weighted and
+        weighted), not the internal summed-weight buffer used in weighted
+        averaging."""
+        if self.weighted:
+            arr = self.n_updates.astype(np.int32, copy=False)
+        else:
+            arr = self.number_updates.astype(np.int32, copy=False)
+        return numpy_to_sitk(arr, self.image_reader)
     
     def calc_ratio_updates(self):
         "Function to calculate ratio of voxels updated at least once"
