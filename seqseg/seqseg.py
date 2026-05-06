@@ -360,15 +360,6 @@ def main():
         if take_time:
             vessel_tree.time_analysis()
 
-        # End points
-        # if calc_global_centerline:
-        #     end_points = vessel_tree.get_end_points()
-        #     in_source = end_points[0].tolist()
-        #     in_target_lists = [point.tolist() for point in end_points[1:]]
-        #     in_target = []
-        #     for target in in_target_lists:
-        #         in_target += target
-
         # Plot tree info
         if global_config['TREE_ANALYSIS']:
             # vessel_tree.create_tree_graph(dir_output)
