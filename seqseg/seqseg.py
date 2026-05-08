@@ -318,6 +318,11 @@ def main():
                                               pt_centerline, num_seeds,
                                               write_samples)
 
+        ref_image = sitk.ReadImage(dir_image)
+        sf.validate_potential_branches_image_bounds(
+            ref_image, potential_branches, case=case, image_path=dir_image
+        )
+
         # Configure output logging (redirect to file unless debugging)
         if not global_config['DEBUG']:
             sys.stdout = open(dir_output+"/out.txt", "w")

@@ -192,6 +192,77 @@ def write_image(image, outputImageFileName):
     writer.Execute(image)
 
 
+def validate_potential_branches_image_bounds(image, potential_branches,
+                                             case=None, image_path=None):
+    """
+    Ensure all tracing seed points (old and initial) lie inside the image grid.
+
+    Uses continuous index vs image size so physical points are rejected when
+    they map outside [0, size[d]) in any dimension.
+
+    Parameters
+    ----------
+    image : sitk.Image
+        Reference volume (same geometry as the image used for tracing).
+    potential_branches : list
+        Initialization steps from seqseg.modules.initialization; each dict must
+        contain 'old point' and 'point' (3D physical coordinates).
+    case : str, optional
+        Case name for error messages.
+    image_path : str, optional
+        Path to the image file for error messages.
+
+    Raises
+    ------
+    ValueError
+        If any seed is out of bounds or not 3D (for a 3D image).
+    """
+    if not potential_branches:
+        return
+
+    dim = image.GetDimension()
+    size = image.GetSize()
+    failures = []
+
+    for bi, step in enumerate(potential_branches):
+        for role, key in (("old point", "old point"), ("initial point", "point")):
+            pt = step[key]
+            arr = np.asarray(pt, dtype=float).ravel()
+            if arr.size != dim:
+                failures.append(
+                    (bi, role, tuple(arr.tolist()),
+                     f"expected {dim} coordinates, got length {arr.size}")
+                )
+                continue
+            phys = tuple(arr.tolist())
+            cix = image.TransformPhysicalPointToContinuousIndex(phys)
+            if any(cix[d] < 0 or cix[d] >= size[d] for d in range(dim)):
+                failures.append(
+                    (bi, role, phys,
+                     tuple(round(float(cix[i]), 4) for i in range(dim)))
+                )
+
+    if not failures:
+        return
+
+    lines = []
+    for bi, role, phys, detail in failures:
+        lines.append(f"  branch {bi} {role}: physical={phys!r} ({detail})")
+
+    prefix_parts = []
+    if case is not None:
+        prefix_parts.append(f"case {case!r}")
+    if image_path is not None:
+        prefix_parts.append(f"image {image_path!r}")
+    prefix = (" (" + ", ".join(prefix_parts) + ")") if prefix_parts else ""
+
+    raise ValueError(
+        f"Seed point(s) lie outside the image volume bounds{prefix}. "
+        f"Image size={size!r}, spacing={image.GetSpacing()!r}, "
+        f"origin={image.GetOrigin()!r}.\n" + "\n".join(lines)
+    )
+
+
 def keep_component_seeds(image, seeds):
     """
     Keep only the component containing the seed point

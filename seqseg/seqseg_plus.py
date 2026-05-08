@@ -344,6 +344,11 @@ def main():
         else:
             print("Sweep centerline extraction failed in initialization")
 
+        ref_image = sitk.ReadImage(dir_image)
+        sf.validate_potential_branches_image_bounds(
+            ref_image, potential_branches, case=case, image_path=dir_image
+        )
+
         # print to .txt file all outputs
         if not global_config.get('DEBUG', False):
             # write to file
