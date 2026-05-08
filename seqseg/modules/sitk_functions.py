@@ -379,7 +379,7 @@ def extract_volume(reader_im, index_extract, size_extract):
 
 
 def map_to_image(point, radius, size_volume, origin_im, spacing_im,
-                 size_im, min_resolution_any_dim=5):
+                 size_im, min_resolution_any_dim=5, direction_im=None):
     """
     Function to map a point and radius to volume metrics
     Also checks if sub-volume is within global
@@ -390,24 +390,58 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im,
     global volume border
 
     args:
-        point: point of volume center
+        point: point of volume center (physical coordinates)
         radius: radius at that point
         size_volume: multiple of radius equal the intended
             volume size
         origin_im: image origin
         spacing_im: image spacing
+        size_im: image size in voxels (per dimension)
+        min_resolution_any_dim: minimum voxel count required along any
+            dimension; the radius is grown by 5% per iteration until met
+        direction_im: image direction cosines as either a 3x3 array or a
+            flat 9-element sequence (SimpleITK ``GetDirection()`` order).
+            If ``None``, an identity direction is assumed (legacy
+            behavior). Passing the actual direction is required for
+            images whose direction matrix is not diagonal (e.g. oblique
+            acquisitions); otherwise the extraction index will be wrong.
     return:
         size_extract: number of voxels to extract in each dim
         index_extract: index for sitk volume extraction
         border: boolean, if subvolume is on global border
     """
+    point = np.asarray(point, dtype=float).ravel()
+    origin_im = np.asarray(origin_im, dtype=float).ravel()
+    spacing_im = np.asarray(spacing_im, dtype=float).ravel()
+    dim = origin_im.size
+
+    # Build the inverse of the physical-to-index transform. SimpleITK
+    # convention: physical = origin + D @ diag(spacing) @ index, so
+    # index = diag(1/spacing) @ D^{-1} @ (physical - origin). For an
+    # orthonormal direction D^{-1} == D.T, but use the true inverse so
+    # we remain robust to mild numerical noise.
+    if direction_im is None:
+        d_inv = np.eye(dim)
+    else:
+        d_mat = np.asarray(direction_im, dtype=float).reshape(dim, dim)
+        d_inv = np.linalg.inv(d_mat)
+
     min_res = 0
     border = False
 
     while min_res < min_resolution_any_dim:
+        # Voxel extent of the requested physical box, independent of the
+        # image direction (extraction is always axis-aligned in index
+        # space).
         size_extract = np.ceil(size_volume*radius/spacing_im).astype(int)
-        index_extract = np.rint((point-origin_im - (size_volume/2)*radius) /
-                                spacing_im).astype(int)
+        # Continuous index of the box center via the proper inverse
+        # direction transform, then step back the same physical
+        # half-extent the original code used. For an identity direction
+        # this collapses to round((point - origin - (size_volume/2)*r) /
+        # spacing), i.e. it reproduces the legacy result exactly.
+        center_cidx = (d_inv @ (point - origin_im)) / spacing_im
+        half_extent_idx = (size_volume / 2.0) * radius / spacing_im
+        index_extract = np.rint(center_cidx - half_extent_idx).astype(int)
         radius *= 1.05
         min_res = size_extract.min()
         print(f"Subvolume resolution: {size_extract}, Radius: {radius:.3f}")

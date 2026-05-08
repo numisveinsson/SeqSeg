@@ -310,7 +310,8 @@ def trace_centerline(
                                         origin_im,
                                         spacing_im,
                                         size_im,
-                                        global_config['MIN_RES'])
+                                        global_config['MIN_RES'],
+                                        direction_im=reader_im.GetDirection())
 
                 step_seg['img_index'] = index_extract
                 step_seg['img_size'] = size_extract
