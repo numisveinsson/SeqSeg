@@ -994,64 +994,63 @@ def colliding_fronts(segmentation, point1, point2):
 
 def interpolate_gradient(gradient, current, seg_img):
     """
-    Function to interpolate the gradient at a point.
+    Trilinearly interpolate a per-voxel gradient field at a physical point.
+
+    The continuous index of ``current`` is computed via SimpleITK so the
+    interpolation weights are correct for any image direction / spacing.
+    The gradient field is assumed to already be in the desired output
+    frame (e.g. world-space gradient as produced by
+    :func:`calc_centerline_fmm`); this function does not rotate or
+    rescale the gradient values, only blends 8 neighbors with proper
+    [0, 1] weights.
 
     Parameters
     ----------
-    gradient : np.array
-        Gradient of the distance map.
-    current : np.array
-        Current point.
-    seg_img : sitk image
-        Segmentation of the vessel.
+    gradient : np.ndarray, shape (3, nx, ny, nz)
+        Gradient field sampled on the image grid.
+    current : np.ndarray, shape (3,)
+        Query point in physical coordinates.
+    seg_img : sitk.Image
+        Reference image providing the physical-to-index transform.
 
     Returns
     -------
-    gradient_current : np.array
+    np.ndarray, shape (3,)
+        Interpolated gradient at ``current``.
     """
-    # Get index of current point
-    current_index = seg_img.TransformPhysicalPointToIndex(current.tolist())
-    # Get fractional part of current point
-    frac = current - np.array(seg_img
-                              .TransformIndexToPhysicalPoint(current_index))
-    # Get gradient at current point
-    gradient_current = gradient[:, current_index[0],
-                                current_index[1],
-                                current_index[2]]
-    # Get gradient at neighboring points
-    gradient_x1 = gradient[:, current_index[0]+1,
-                           current_index[1],
-                           current_index[2]]
-    gradient_y1 = gradient[:, current_index[0],
-                           current_index[1]+1,
-                           current_index[2]]
-    gradient_z1 = gradient[:, current_index[0],
-                           current_index[1],
-                           current_index[2]+1]
-    gradient_x2 = gradient[:, current_index[0]+1,
-                           current_index[1]+1,
-                           current_index[2]]
-    gradient_y2 = gradient[:, current_index[0],
-                           current_index[1]+1,
-                           current_index[2]+1]
-    gradient_z2 = gradient[:, current_index[0]+1,
-                           current_index[1],
-                           current_index[2]+1]
-    gradient_x3 = gradient[:, current_index[0]+1,
-                           current_index[1]+1,
-                           current_index[2]+1]
-    # Interpolate gradient
-    gradient_current = (1-frac[0]) * (1-frac[1]) * \
-        (1-frac[2]) * gradient_current + \
-        frac[0] * (1-frac[1]) * (1-frac[2]) * gradient_x1 + \
-        (1-frac[0]) * frac[1] * (1-frac[2]) * gradient_y1 + \
-        (1-frac[0]) * (1-frac[1]) * frac[2] * gradient_z1 + \
-        frac[0] * frac[1] * (1-frac[2]) * gradient_x2 + \
-        (1-frac[0]) * frac[1] * frac[2] * gradient_y2 + \
-        frac[0] * (1-frac[1]) * frac[2] * gradient_z2 + \
-        frac[0] * frac[1] * frac[2] * gradient_x3
+    cidx = np.asarray(
+        seg_img.TransformPhysicalPointToContinuousIndex(current.tolist()),
+        dtype=np.float64,
+    )
+    size = np.asarray(seg_img.GetSize(), dtype=np.int64)
 
-    return gradient_current
+    # Clamp lower corner so base+1 stays in-bounds; the caller already
+    # bails out at the volume border so this only protects the very last
+    # in-bounds voxel from indexing past the array.
+    base = np.floor(cidx).astype(np.int64)
+    base = np.clip(base, 0, size - 2)
+    frac = np.clip(cidx - base, 0.0, 1.0)
+    fx, fy, fz = frac
+
+    g000 = gradient[:, base[0],     base[1],     base[2]]
+    g100 = gradient[:, base[0] + 1, base[1],     base[2]]
+    g010 = gradient[:, base[0],     base[1] + 1, base[2]]
+    g001 = gradient[:, base[0],     base[1],     base[2] + 1]
+    g110 = gradient[:, base[0] + 1, base[1] + 1, base[2]]
+    g101 = gradient[:, base[0] + 1, base[1],     base[2] + 1]
+    g011 = gradient[:, base[0],     base[1] + 1, base[2] + 1]
+    g111 = gradient[:, base[0] + 1, base[1] + 1, base[2] + 1]
+
+    return (
+        (1 - fx) * (1 - fy) * (1 - fz) * g000
+        + fx       * (1 - fy) * (1 - fz) * g100
+        + (1 - fx) * fy       * (1 - fz) * g010
+        + (1 - fx) * (1 - fy) * fz       * g001
+        + fx       * fy       * (1 - fz) * g110
+        + fx       * (1 - fy) * fz       * g101
+        + (1 - fx) * fy       * fz       * g011
+        + fx       * fy       * fz       * g111
+    )
 
 
 def backtracking_gradient(gradient, distance_map_surf_np,
@@ -1348,13 +1347,29 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         os.path.join(out_dir, 'masked_out_fmm.mha'))
         sitk.WriteImage(segmentation,
                         os.path.join(out_dir, 'segmentation_from_fmm.mha'))
-    # Get gradient of distance map
+    # Get gradient of distance map. ``np.gradient`` returns finite
+    # differences along the array (image-grid) axes, in units of "value
+    # per voxel". To use this to step a *physical* point we need a
+    # gradient in world-space units (value per mm, components along
+    # world axes). The conversion is:
+    #     grad_world = D @ diag(1/spacing) @ grad_grid
+    # where D is the SimpleITK direction matrix. Doing the conversion
+    # here once means every consumer (``backtracking_gradient``,
+    # ``interpolate_gradient``) gets a geometrically correct gradient
+    # without having to know about the image direction.
     gradient = gradient_matrix(
         sitk.GetArrayFromImage(output).transpose(2, 1, 0))
+    inv_spacing = 1.0 / np.asarray(segmentation.GetSpacing(),
+                                   dtype=np.float64)
+    direction_matrix = np.asarray(segmentation.GetDirection(),
+                                  dtype=np.float64).reshape(3, 3)
+    gradient = gradient * inv_spacing[:, None, None, None]
+    gradient = np.tensordot(direction_matrix, gradient,
+                            axes=([1], [0]))
     if verbose:
         # Calculate and print gradient magnitude statistics
         gradient_magnitude = np.sqrt(np.sum(gradient**2, axis=0))
-        print("Gradient calculated")
+        print("Gradient calculated (world-frame, mm^-1)")
         print(f"    Gradient magnitude - Min: {gradient_magnitude.min():.6f}, Max: {gradient_magnitude.max():.6f}, Mean: {gradient_magnitude.mean():.6f}")
 
     points_list, success_list = [], []
@@ -3421,10 +3436,6 @@ def test_centerline_fmm(directory, out_dir):
 
 if __name__ == '__main__':
 
-    ###
-    # NOTE: A bug exists where if the Direction of the segmentation
-    # is not identity, the centerline calculation will fail.
-    ###
     # Path to segmentation
     # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
     path_segs = '/Users/nsveinsson/Documents/datasets/airRC_dataset/truths/'
@@ -3515,10 +3526,8 @@ if __name__ == '__main__':
         print(f"  Origin: {segmentation.GetOrigin()}")
         print(f"  Direction: {segmentation.GetDirection()}")
 
-        # Set Direction to identity
-        segmentation.SetDirection((1.0, 0.0, 0.0,
-                                  0.0, 1.0, 0.0,
-                                  0.0, 0.0, 1.0))
+        # Direction is honored end-to-end (gradients are mapped to physical
+        # space inside ``calc_centerline_fmm``); no need to overwrite it.
 
         # Cast to uint8
         segmentation = sitk.Cast(segmentation, sitk.sitkUInt8)
