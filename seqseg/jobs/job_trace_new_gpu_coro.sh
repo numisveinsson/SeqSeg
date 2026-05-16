@@ -42,7 +42,7 @@ export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/
 
-python3 seqseg.py \
+python3 -m seqseg.seqseg \
     -test_name 3d_fullres \
     -train_dataset Dataset045_SEQCOROASOCAMORECT \
     -fold 2 \

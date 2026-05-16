@@ -46,6 +46,7 @@ dependencies = [
 
 [project.scripts]
 seqseg = "seqseg.seqseg:main"
+seqseg-plus = "seqseg.seqseg_plus:main"
 
 [project.urls]
 homepage = "https://github.com/numisveinsson/SeqSeg"
@@ -57,6 +58,9 @@ package-data = { "seqseg" = ["config/*.yaml"] }
 [project.optional-dependencies]
 dev = [
   "pytest>=7",
+]
+viz = [
+  "matplotlib>=3.5",
 ]
 
 [tool.pytest.ini_options]
