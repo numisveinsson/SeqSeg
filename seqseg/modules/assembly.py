@@ -5,6 +5,7 @@ from .centerline import calc_centerline_fmm, calc_multi_component_centerlines
 from .vtk_functions import (write_vtk_polydata,
                             points2polydata, appendPolyData)
 import numpy as np
+import os
 import SimpleITK as sitk
 import operator
 from datetime import datetime
@@ -46,10 +47,12 @@ class Segmentation:
                 new_img = create_new(self.image_reader)
                 self.assembly = new_img
 
-        elif image:
-
+        elif image is not None:
             self.image_reader = image
-            self.assembly = image
+            if start_seg is not None:
+                self.assembly = start_seg
+            else:
+                self.assembly = create_new(image)
 
         else:
             print("Please provide either an image file or an image object")
@@ -856,32 +859,40 @@ def print_error(output_folder,
                 image=None,
                 predicted_vessel=None,
                 old_point_ref=None,
-                centerline_poly=None):
+                centerline_poly=None,
+                disk_io=True):
+
+    if not disk_io:
+        print(
+            f"[print_error] step {i}: disk_io=False; skipping error dump to disk"
+        )
+        return
 
     now = datetime.now()
     dt_string = now.strftime("_%d_%m_%Y_%H_%M_%S")
-    directory = output_folder + 'errors/'+str(i) + '_error_'+dt_string
+    directory = os.path.join(output_folder, "errors", f"{i}_error_{dt_string}")
+    os.makedirs(directory, exist_ok=True)
 
     polydata_point = points2polydata([step_seg['point'].tolist()])
-    write_vtk_polydata(polydata_point, directory + 'point.vtp')
+    write_vtk_polydata(polydata_point, os.path.join(directory, "point.vtp"))
 
     try:
         if step_seg['img_file'] and not step_seg['is_inside']:
-            sitk.WriteImage(image, directory + 'img.mha')
+            sitk.WriteImage(image, os.path.join(directory, "img.mha"))
 
             if step_seg['seg_file']:
-                sitk.WriteImage(predicted_vessel, directory + 'seg.mha')
+                sitk.WriteImage(predicted_vessel, os.path.join(directory, "seg.mha"))
 
                 if step_seg['surf_file']:
-                    write_vtk_polydata(step_seg['surface'], directory + 'surf.vtp')
+                    write_vtk_polydata(step_seg['surface'], os.path.join(directory, "surf.vtp"))
 
                     if step_seg['centerline']:
                         polydata_point = points2polydata(
                             [step_seg['old_point_ref'].tolist()])
                         write_vtk_polydata(polydata_point,
-                                        directory + 'old_point_ref.vtp')
+                                        os.path.join(directory, "old_point_ref.vtp"))
                         write_vtk_polydata(centerline_poly,
-                                        directory + 'cent.vtp')
+                                        os.path.join(directory, "cent.vtp"))
     except Exception as e:
         print('Didnt work to save error')
         print(e)

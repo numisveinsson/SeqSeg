@@ -363,14 +363,21 @@ def connected_comp_info(original_seg, print_condition=False):
 
 def extract_volume(reader_im, index_extract, size_extract):
     """
-    Function to extract a smaller volume from a larger one using sitk
-    args:
-        reader_im: sitk image reader
-        index_extract: the index of the lower corner for extraction
-        size_extract: number of voxels to extract in each direction
-    return:
-        new_img: sitk image volume
+    Extract a subvolume from a full image.
+
+    Parameters
+    ----------
+    reader_im : sitk.ImageFileReader or sitk.Image
+        Full volume on disk (reader) or in memory (image).
+    index_extract, size_extract : sequence of int
+        Lower corner and size in voxels (SimpleITK index order).
     """
+    if isinstance(reader_im, sitk.Image):
+        roi = sitk.RegionOfInterestImageFilter()
+        roi.SetIndex([int(x) for x in index_extract])
+        roi.SetSize([int(x) for x in size_extract])
+        return roi.Execute(reader_im)
+
     reader_im.SetExtractIndex(index_extract)
     reader_im.SetExtractSize(size_extract)
     new_img = reader_im.Execute()
@@ -467,18 +474,24 @@ def map_to_image(point, radius, size_volume, origin_im, spacing_im,
     return size_extract.tolist(), index_extract.tolist(), border
 
 
-def import_image(image_dir):
+def import_image(image_dir_or_volume):
     """
-    Function to import image via sitk
-    args:
-        file_dir_image: image directory
-    return:
-        reader_img: sitk image volume reader
-        origin_im: image origin coordinates
-        size_im: image size
-        spacing_im: image spacing
+    Load image metadata and a handle suitable for :func:`extract_volume`.
+
+    Parameters
+    ----------
+    image_dir_or_volume : str or sitk.Image
+        Path to a volume on disk, or an in-memory ``sitk.Image`` (same geometry
+        used for cropping and assembly).
     """
-    reader_im = read_image(image_dir)
+    if isinstance(image_dir_or_volume, sitk.Image):
+        reader_im = image_dir_or_volume
+        origin_im = np.array(list(reader_im.GetOrigin()))
+        size_im = np.array(list(reader_im.GetSize()))
+        spacing_im = np.array(list(reader_im.GetSpacing()))
+        return reader_im, origin_im, size_im, spacing_im
+
+    reader_im = read_image(image_dir_or_volume)
     origin_im = np.array(list(reader_im.GetOrigin()))
     size_im = np.array(list(reader_im.GetSize()))
     spacing_im = np.array(list(reader_im.GetSpacing()))
