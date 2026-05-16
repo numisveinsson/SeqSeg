@@ -41,6 +41,7 @@ SeqSeg is a novel method for automatic vessel segmentation that combines local d
 - [Algorithm Overview](#algorithm-overview)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [High-level API (`seqseg.api`)](#high-level-api-seqsegapi)
 - [Performance & Benchmarks](#performance--benchmarks)
 - [Configuration](#configuration)
 - [Research & Development](#research--development)
@@ -55,9 +56,38 @@ For immediate use with pre-trained models:
 pip install seqseg
 
 # Download weights (see tutorial for links)
-# Run segmentation
-seqseg -data_dir your_data/ -nnunet_results_path path/to/weights/ -config_name aorta_tutorial
+# Classic batch tracing (explicit subcommand)
+seqseg run batch \
+  -data_dir your_data/ \
+  -nnunet_results_path path/to/weights/ \
+  -outdir output_run/ \
+  -img_ext .nii.gz \
+  -config_name aorta_tutorial
+
+# Legacy: the same flags without ``run batch`` are still accepted
+seqseg -data_dir your_data/ -nnunet_results_path path/to/weights/ -outdir output_run/ -img_ext .nii.gz -config_name aorta_tutorial
+
+# Optional checks
+seqseg doctor
+seqseg doctor --model-folder /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres
+
+# Package version
+seqseg --version
+
+# Scaffold an on-disk dataset (images/, seeds.json template, …)
+seqseg init dataset --path /path/to/new_dataset/
+
+# Compare your merged config keys to the packaged default
+seqseg config fingerprint --name global --baseline global_default
+
+# Trace a single volume without hand-building the dataset tree
+# (extension is inferred from --image; staging lives under <outdir>/_seqseg_single_staging/)
+seqseg run single --image /path/to/case.nii.gz --outdir /path/to/run/ \
+  --model-folder /path/to/nnUNet_results/Dataset005_.../nnUNetTrainer__nnUNetPlans__3d_fullres \
+  --seed 0 0 5 1.0 --train-dataset Dataset005_SEQAORTANDFEMOMR
 ```
+
+See also: ``seqseg run plus batch`` (global sweep + SeqSeg), ``seqseg simvascular init``, and ``seqseg post global-centerline``.
 
 **📖 Complete Tutorial**: [Step-by-step guide](https://github.com/numisveinsson/SeqSeg/blob/main/seqseg/tutorial/tutorial.md) with example data and detailed instructions.
 
@@ -114,12 +144,19 @@ pip install seqseg
 seqseg --help  # Verify installation
 ```
 
+Optional plotting (matplotlib):
+
+```bash
+pip install "seqseg[viz]"
+```
+
 ### Option 2: Development Installation
 
 ```bash
 git clone https://github.com/numisveinsson/SeqSeg.git
 cd SeqSeg
-pip install -e .
+pip install -e ".[dev]"   # includes pytest
+# optional: pip install -e ".[dev,viz]"
 ```
 
 ### Option 3: Conda Environment
@@ -144,7 +181,7 @@ scipy                    # Scientific computing
 
 **Optional Dependencies:**
 ```
-matplotlib               # Plotting and visualization
+matplotlib               # Plotting and visualization (install with ``pip install "seqseg[viz]"``)
 vmtk                    # Advanced vascular modeling tools
 ```
 
@@ -165,6 +202,80 @@ Pre-trained weights are required for inference:
 - Additional models for cerebral and pulmonary vessels available upon request
 
 ## Usage
+
+### Command-line interface
+
+After installation, the ``seqseg`` console script is available:
+
+| Command | Purpose |
+| -------- | ------- |
+| ``seqseg --version`` | Print the installed package version |
+| ``seqseg run batch ...`` | Classic SeqSeg batch tracing (nnU-Net + sequential tracking) |
+| ``seqseg run single ...`` | One volume: stages ``<outdir>/_seqseg_single_staging/`` then runs like batch (``--image``, ``--outdir``, ``--model-folder``; seeds via ``--seed`` or ``--seeds-json``) |
+| ``seqseg run plus batch ...`` | Global sweep model then SeqSeg (same workflow as ``python -m seqseg.seqseg_plus``) |
+| ``seqseg init dataset --path DIR`` | Create ``images/``, ``centerlines/``, ``truths/``, and a template ``seeds.json`` |
+| ``seqseg simvascular init --case-dir DIR`` | Create / refresh ``simvascular/`` project layout (optional ``--source-image`` to rewrite ``Images/*.vti``) |
+| ``seqseg simvascular init-batch --parent-dir DIR [--case-glob '*']`` | Run init on each child directory |
+| ``seqseg post global-centerline single`` | Global centerline from one segmentation + dataset ``seeds.json`` |
+| ``seqseg post global-centerline batch`` | Same over many segmentations matched by glob |
+| ``seqseg config dump --name global`` | Print merged YAML as JSON |
+| ``seqseg config fingerprint [--name global] [--baseline global_default]`` | List YAML keys whose values differ from a baseline packaged config |
+| ``seqseg doctor [--model-folder PATH]`` | Verify imports (SimpleITK, vtk, nnunetv2, scipy), print nnU-Net env vars, optionally check a trainer folder |
+
+Omitting the subcommand (e.g. ``seqseg -data_dir ...``) is treated as ``seqseg run batch`` for backward compatibility.
+
+**Python API:** stable names are re-exported lazily from the top-level package (see ``seqseg/__init__.py``), including tracing types, batch runners, post-processing helpers, and the high-level helpers below.
+
+#### High-level API (`seqseg.api`)
+
+For library use, prefer **`run_tracing`**: it accepts a ``sitk.Image``, simple seed definitions, and an nnU-Net **trainer folder** on disk (weights are still loaded from disk inside the predictor). Seeds can be ``BranchSeed`` instances, mappings with ``old_point`` / ``new_point`` / ``radius``, ``(old, new, radius)`` tuples, or ``(point, radius)`` pairs (old point is derived along a tangent; see ``branch_seed_at_point``).
+
+```python
+import SimpleITK as sitk
+from seqseg.api import TracingOptions, branch_seed_at_point, run_tracing
+
+image = sitk.ReadImage("case.nii.gz")  # or any in-memory sitk.Image
+opts = TracingOptions(disk_io=False, max_n_steps=200)  # optional: no case output tree
+result = run_tracing(
+    image,
+    [branch_seed_at_point([0.0, 0.0, 5.0], 1.1)],
+    "/path/to/nnUNet_results/Dataset005_.../nnUNetTrainer__nnUNetPlans__3d_fullres",
+    case="case1",
+    config="global",
+    options=opts,
+    output_folder="",
+)
+prob = result.assembly.assembly
+```
+
+Lower-level control unchanged: ``from seqseg import TracingContext, trace_centerline_from_context, AlgorithmConfig`` (and the in-memory example further below).
+
+**In-memory volumes (no SeqSeg output files):** pass a ``sitk.Image`` as ``TracingContext.image_file`` (and optionally ``seg_file`` when ``SEGMENTATION`` is true), set ``disk_io=False``, and set ``output_folder`` to any string (paths are not created when ``disk_io`` is false). nnU-Net still loads weights from ``model_folder`` on disk. Example:
+
+```python
+from seqseg import AlgorithmConfig, TracingContext, trace_centerline_from_context
+from seqseg.modules.assembly import create_step_dict
+import numpy as np
+
+step = create_step_dict(np.zeros(3), 1.0, np.array([1.0, 0.0, 0.0]), 1.0, None)
+step["connection"] = [0, 0]
+ctx = TracingContext(
+    output_folder="",
+    image_file=my_sitk_image,
+    case="mem",
+    model_folder="/path/to/nnUNet/results/...",
+    fold="all",
+    potential_branches=[step],
+    max_step_size=100,
+    max_n_branches=20,
+    max_n_steps_per_branch=50,
+    global_config=AlgorithmConfig.from_name("global"),
+    write_samples=False,
+    disk_io=False,
+)
+result = trace_centerline_from_context(ctx)
+prob_seg = result.assembly.assembly
+```
 
 ### Data Preparation
 

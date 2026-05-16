@@ -1,6 +1,16 @@
 import os
 
 
+def normalize_dataset_root(path: str) -> str:
+    """
+    Return an absolute, expanded dataset root without a trailing separator.
+
+    Call sites should build subpaths with ``os.path.join`` so roots work with
+    or without a trailing ``/`` (or ``\\\\`` on Windows).
+    """
+    return os.path.normpath(os.path.abspath(os.path.expanduser(path)))
+
+
 # def vmr_directories(directory, model, dir_seg_exist=True, global_scale=None):
 #     """
 #     Function to return the directories of
@@ -38,10 +48,11 @@ def get_directories(directory_data, case, img_ext, dir_seg=True):
     for a specific model in the
     Vascular Model Repository
     """
-    dir_image = directory_data + 'images/'+case+img_ext
-    dir_seg = directory_data + 'truths/'+case+img_ext if dir_seg else None
-    dir_cent = directory_data + 'centerlines/'+case+'.vtp'
-    dir_surf = directory_data + 'surfaces/'+case+'.vtp'
+    root = normalize_dataset_root(directory_data)
+    dir_image = os.path.join(root, "images", f"{case}{img_ext}")
+    dir_seg = os.path.join(root, "truths", f"{case}{img_ext}") if dir_seg else None
+    dir_cent = os.path.join(root, "centerlines", f"{case}.vtp")
+    dir_surf = os.path.join(root, "surfaces", f"{case}.vtp")
 
     return dir_image, dir_seg, dir_cent, dir_surf
 
@@ -83,15 +94,21 @@ def get_testing_samples(dataset, data_dir=None):
     """
     if data_dir:
         print('Data directory provided')
-        directory = data_dir
+        directory = normalize_dataset_root(data_dir)
         print('Checking for json file')
-        dir_json = directory + 'seeds.json'
+        dir_json = os.path.join(directory, "seeds.json")
         if os.path.isfile(dir_json):
             print('Json file found')
             testing_samples = get_testing_samples_json(dir_json)
         else:
             print('Json file not found, trying image and centerline folders')
-            testing_samples = os.listdir(directory + 'images/')
+            images_dir = os.path.join(directory, "images")
+            if not os.path.isdir(images_dir):
+                raise FileNotFoundError(
+                    f"Dataset images directory not found: {images_dir!r} "
+                    f"(resolved from data_dir={data_dir!r})"
+                ) from None
+            testing_samples = os.listdir(images_dir)
             # no hidden files
             testing_samples = [s for s in testing_samples if s[0] != '.']
             print('Image extensions:', testing_samples[0].split('.')[-1])
@@ -100,7 +117,7 @@ def get_testing_samples(dataset, data_dir=None):
             print('Number of testing samples:', len(testing_samples))
 
             # testing samples centerlines
-            testing_samples_cent = os.listdir(directory + 'centerlines/')
+            testing_samples_cent = os.listdir(os.path.join(directory, "centerlines"))
             # no hidden files
             testing_samples_cent = [s for s in testing_samples_cent
                                     if s[0] != '.']
@@ -121,7 +138,7 @@ def get_testing_samples(dataset, data_dir=None):
         print('No data directory provided.')
         print('Using default data directory based on training dataset.')
 
-        directory = '/global/scratch/users/numi/vascular_data_3d/'
+        directory = normalize_dataset_root("/global/scratch/users/numi/vascular_data_3d/")
         if dataset in ['Dataset005_SEQAORTANDFEMOMR',
                        'Dataset018_SEQAORTASONEMR',
                        'Dataset020_SEQAORTAS015MR',
@@ -149,9 +166,9 @@ def get_testing_samples(dataset, data_dir=None):
                          'Dataset025_SEQAORTAS050CT',
                          'Dataset027_SEQAORTAS075CT'
                          ]:
-        
-            directory = '/global/scratch/users/numi/vascular_data_3d/'
-            # dir_json = directory + 'seeds.json'
+
+            directory = normalize_dataset_root("/global/scratch/users/numi/vascular_data_3d/")
+            # dir_json = os.path.join(directory, 'seeds.json')
             testing_samples = [  # get_testing_samples_json(dir_json)
 
                 ['0139_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
@@ -176,26 +193,26 @@ def get_testing_samples(dataset, data_dir=None):
             ]
         elif dataset == 'Dataset009_SEQAORTASMICCT':
 
-            directory = '/global/scratch/users/numi/test_data/miccai_aortas/'
-            dir_json = directory + 'seeds.json'
+            directory = normalize_dataset_root("/global/scratch/users/numi/test_data/miccai_aortas/")
+            dir_json = os.path.join(directory, "seeds.json")
             testing_samples = get_testing_samples_json(dir_json)
 
         elif dataset == 'Dataset010_SEQCOROASOCACT':
 
-            directory = '/global/scratch/users/numi/ASOCA_test/'
-            # directory = '/global/scratch/users/numi/Karthik_test/'
-            dir_json = directory + 'seeds.json'
+            directory = normalize_dataset_root("/global/scratch/users/numi/ASOCA_test/")
+            # directory = normalize_dataset_root('/global/scratch/users/numi/Karthik_test/')
+            dir_json = os.path.join(directory, "seeds.json")
             testing_samples = get_testing_samples_json(dir_json)
 
         elif dataset == 'Dataset016_SEQPULMPARSECT':
-            directory = '/global/scratch/users/numi/PARSE_dataset/'
-            dir_asoca_json = directory + 'seeds.json'
+            directory = normalize_dataset_root("/global/scratch/users/numi/PARSE_dataset/")
+            dir_asoca_json = os.path.join(directory, "seeds.json")
             testing_samples = get_testing_samples_json(dir_asoca_json)
 
         elif dataset == 'Dataset048_SEQAORTAVMRGALACT':
 
-            directory = '/global/scratch/users/numi/vascular_data_3d/'
-            # dir_json = directory + 'seeds.json'
+            directory = normalize_dataset_root("/global/scratch/users/numi/vascular_data_3d/")
+            # dir_json = os.path.join(directory, 'seeds.json')
             testing_samples = [  # get_testing_samples_json(dir_json)
                 ['0139_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT
                 ['0141_1001', 0, 0, 1, 'ct'],  # Aortofemoral CT

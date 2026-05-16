@@ -42,7 +42,7 @@ export nnUNet_results="/global/scratch/users/numi/nnUnet_data/nnUNet_results"
 
 cd /global/scratch/users/numi/SeqSeg/
 
-python3 seqseg_plus.py \
+python3 -m seqseg.seqseg_plus \
     -outdir output_sweep_asoca_2000steps/ \
     -global_test_name 3d_fullres \
     -global_train_dataset Dataset012_COROASOCACT \

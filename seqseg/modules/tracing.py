@@ -1,8 +1,11 @@
 import time
 import pdb
+import sys
+from dataclasses import dataclass
+from typing import Any, Mapping, Optional, Union
+
 import numpy as np
 import SimpleITK as sitk
-import sys
 
 from .sitk_functions import (import_image, is_point_in_image,
                              map_to_image, extract_volume, copy_settings,
@@ -35,6 +38,95 @@ from .nnunet import initialize_predictor
 sys.stdout.flush()
 
 
+@dataclass
+class TracingContext:
+    """Keyword-style bundle for :func:`trace_centerline_from_context`."""
+
+    output_folder: str
+    image_file: Union[str, sitk.Image]
+    case: str
+    model_folder: str
+    fold: str
+    potential_branches: list
+    max_step_size: int
+    max_n_branches: int
+    max_n_steps_per_branch: int
+    global_config: Mapping[str, Any]
+    unit: str = "cm"
+    scale: float = 1.0
+    seg_file: Optional[Union[str, sitk.Image]] = None
+    start_seg: Any = None
+    write_samples: bool = False
+    disk_io: bool = True
+
+
+@dataclass
+class TracingResult:
+    centerlines: list
+    surfaces: list
+    points: list
+    inside_pts: list
+    assembly: Any
+    vessel_tree: Any
+    n_steps_taken: int
+
+
+def trace_centerline_from_context(ctx: TracingContext) -> TracingResult:
+    """
+    Run tracing from a :class:`TracingContext` and return a :class:`TracingResult`.
+
+    Quick in-memory example (nnU-Net still reads ``model_folder`` from disk)::
+
+        from seqseg import AlgorithmConfig
+        from seqseg.modules.assembly import create_step_dict
+        from seqseg.modules.tracing import TracingContext, trace_centerline_from_context
+        import numpy as np
+        import SimpleITK as sitk
+
+        img = sitk.ReadImage(\"/path/to/volume.nii.gz\")
+        s0 = create_step_dict(np.zeros(3), 1.0, np.array([0.0, 0.0, 5.0]), 1.0, None)
+        s0[\"connection\"] = [0, 0]
+        ctx = TracingContext(
+            output_folder=\"\",
+            image_file=img,
+            case=\"api\",
+            model_folder=\"/path/to/nnUNet_results/.../nnUNetTrainer__nnUNetPlans__3d_fullres\",
+            fold=\"all\",
+            potential_branches=[s0],
+            max_step_size=200,
+            max_n_branches=20,
+            max_n_steps_per_branch=50,
+            global_config=AlgorithmConfig.from_name(\"global\"),
+            disk_io=False,
+            write_samples=False,
+        )
+        result = trace_centerline_from_context(ctx)
+        prob = result.assembly.assembly  # sitk.Image
+
+    Prefer :func:`seqseg.api.run_tracing` when you want simple seeds instead of
+    building ``potential_branches`` by hand.
+    """
+    tup = trace_centerline(
+        ctx.output_folder,
+        ctx.image_file,
+        ctx.case,
+        ctx.model_folder,
+        ctx.fold,
+        ctx.potential_branches,
+        ctx.max_step_size,
+        ctx.max_n_branches,
+        ctx.max_n_steps_per_branch,
+        ctx.global_config,
+        unit=ctx.unit,
+        scale=ctx.scale,
+        seg_file=ctx.seg_file,
+        start_seg=ctx.start_seg,
+        write_samples=ctx.write_samples,
+        disk_io=ctx.disk_io,
+    )
+    return TracingResult(*tup)
+
+
 def trace_centerline(
     output_folder,
     image_file,
@@ -50,7 +142,8 @@ def trace_centerline(
     scale=1,
     seg_file=None,
     start_seg=None,
-    write_samples=False
+    write_samples=False,
+    disk_io=True,
 ):
     """
     Trace vessel centerlines using sequential segmentation and tracking.
@@ -70,13 +163,14 @@ def trace_centerline(
     Parameters:
     -----------
     output_folder : str
-        Directory for output files
-    image_file : str
-        Path to input medical image
+        Directory prefix for outputs when ``disk_io`` is True; unused paths when False.
+    image_file : str or sitk.Image
+        Path to the input volume, or an in-memory ``sitk.Image`` (same geometry
+        as file-based runs).
     case : str
-        Case identifier for naming outputs
+        Case identifier for naming outputs (when writing is enabled).
     model_folder : str
-        Path to trained nnU-Net model
+        Path to trained nnU-Net model directory on disk (checkpoints loaded from here).
     fold : str
         Model fold to use ('all' or specific fold number)
     potential_branches : list
@@ -93,13 +187,15 @@ def trace_centerline(
         Image units ('cm' or 'mm'), default 'cm'
     scale : float, optional
         Scaling factor for image data, default 1
-    seg_file : str, optional
-        Pre-segmented file to trace (skips prediction)
+    seg_file : str or sitk.Image, optional
+        Pre-segmented volume path or image when ``SEGMENTATION`` is True (skips nnU-Net).
     start_seg : SimpleITK.Image, optional
         Initial segmentation to start assembly
     write_samples : bool, optional
-        Whether to write intermediate files, default False
-        
+        When ``disk_io`` is True, whether to write intermediate debug volumes/geometry.
+    disk_io : bool, optional
+        If False, skip SeqSeg-side file outputs (VTK/MHA/SimVascular exports and error dumps).
+        nnU-Net still loads weights from ``model_folder`` on disk. Default True.
     Returns:
     --------
     tuple
@@ -114,6 +210,7 @@ def trace_centerline(
 
     # Configuration flags: determine if tracing pre-segmented data vs. raw images
     trace_seg = global_config['SEGMENTATION']
+    allow_writes = bool(disk_io)
 
     # Debug settings: enable breakpoints and specify debug step
     debug = global_config['DEBUG']
@@ -160,18 +257,24 @@ def trace_centerline(
     weight_type = global_config['WEIGHT_TYPE']                  # Type of weighting ('radius', 'gaussian', etc.)
 
     # Input data loading: handle either raw images or pre-segmented data
-    if (seg_file and trace_seg):
+    if (seg_file is not None) and trace_seg:
         print("\nWe are tracing a segmented vasculature!")
         print("No need for prediction.")
-        print(f"Reading in seg file: {seg_file}")
+        if isinstance(seg_file, sitk.Image):
+            print("Using in-memory segmentation volume")
+        else:
+            print(f"Reading in seg file: {seg_file}")
         reader_seg, origin_im, size_im, spacing_im = import_image(seg_file)
         print(f"""Seg data.
             size: {size_im},
             spacing: {spacing_im},
             origin: {origin_im}""")
 
-    if not (seg_file and trace_seg):
-        print(f"Reading in image file: {image_file}, scale: {scale}")
+    if not (seg_file is not None and trace_seg):
+        if isinstance(image_file, sitk.Image):
+            print(f"Using in-memory image volume, scale: {scale}")
+        else:
+            print(f"Reading in image file: {image_file}, scale: {scale}")
         reader_im, origin_im, size_im, spacing_im = import_image(image_file)
         print(f"""Image data. size: {size_im},\n
            spacing: {spacing_im},\n origin: {origin_im}""")
@@ -183,10 +286,36 @@ def trace_centerline(
 
     # Initialize data structures for tracking vessel tree and global segmentation
     init_step = potential_branches[0]                           # First branch point to start tracing
-    vessel_tree = VesselTree(case, image_file, init_step, potential_branches)
-    assembly_segs = Segmentation(case, image_file, weighted,
-                                 weight_type=weight_type,
-                                 start_seg=start_seg)
+    vessel_image_label = image_file if isinstance(image_file, str) else "<sitk.Image>"
+    vessel_tree = VesselTree(case, vessel_image_label, init_step, potential_branches)
+
+    if (seg_file is not None) and trace_seg:
+        if isinstance(seg_file, sitk.Image):
+            assembly_segs = Segmentation(
+                case, None, weighted,
+                weight_type=weight_type,
+                image=reader_seg,
+                start_seg=start_seg,
+            )
+        else:
+            assembly_segs = Segmentation(
+                case, seg_file, weighted,
+                weight_type=weight_type,
+                start_seg=start_seg,
+            )
+    elif isinstance(image_file, sitk.Image):
+        assembly_segs = Segmentation(
+            case, None, weighted,
+            weight_type=weight_type,
+            image=reader_im,
+            start_seg=start_seg,
+        )
+    else:
+        assembly_segs = Segmentation(
+            case, image_file, weighted,
+            weight_type=weight_type,
+            start_seg=start_seg,
+        )
 
     # Load neural network model (nnU-Net) for vessel segmentation prediction
     if not (seg_file and trace_seg):
@@ -250,7 +379,7 @@ def trace_centerline(
                     # Record this point as being inside existing segmentation
                     list_inside_pts.append(
                         points2polydata([step_seg['point'].tolist()]))
-                    if write_samples:
+                    if allow_writes and write_samples:
                         polydata_point = points2polydata(
                                          [step_seg['point'].tolist()])
                         pfn = (output_folder +
@@ -276,7 +405,7 @@ def trace_centerline(
             polydata_point = points2polydata([step_seg['point'].tolist()])
 
             # Write point to file for visualization/debugging if requested
-            if write_samples:
+            if allow_writes and write_samples:
                 pfn = output_folder + 'points/point_'+case+'_'+str(i)+'.vtp'
                 write_geo(pfn, polydata_point)
 
@@ -323,7 +452,7 @@ def trace_centerline(
                              'volumes/volume_'+case+'_'+str(i)+'.mha')
 
                 step_seg['img_file'] = volume_fn
-                if write_samples:
+                if allow_writes and write_samples:
                     sitk.WriteImage(cropped_volume, volume_fn)
                     # if seg_file:
                     #     sitk.WriteImage(seg_volume, seg_fn)
@@ -396,7 +525,7 @@ def trace_centerline(
             if run_time:
                 step_seg['time'].append(time.time()-start_time_loc)
                 start_time_loc = time.time()
-            if write_samples:
+            if allow_writes and write_samples:
                 sitk.WriteImage(predicted_vessel, pd_fn)
 
             if global_config['MEGA_SUBVOLUME']:
@@ -407,7 +536,7 @@ def trace_centerline(
                                                        ['NR_MEGA_SUB'],
                                                        i,
                                                        inside_branch)
-                if write_samples:
+                if allow_writes and write_samples:
                     sitk.WriteImage(cropped_volume,
                                     volume_fn.replace('.mha', '_mega' +
                                                       str(time.time())+'.mha'))
@@ -452,7 +581,7 @@ def trace_centerline(
             sfn = output_folder + 'surfaces/surf_'+case+'_'+str(i)+'smooth.vtp'
             cfn = output_folder + 'centerlines/cent_'+case+'_'+str(i)+'.vtp'
 
-            if write_samples:
+            if allow_writes and write_samples:
                 write_vtk_polydata(surface_smooth, sfn)
                 # sfn_un = (output_folder
                 #           + 'surfaces/surf_'+case+'_'+str(i)+'_unsmooth.vtp')
@@ -468,7 +597,7 @@ def trace_centerline(
                                               global_config['MEGA_SUBVOLUME'],
                                               global_config['NR_MEGA_SUB'])
             step_seg['old_point_ref'] = old_point_ref
-            if write_samples:
+            if allow_writes and write_samples:
                 polydata_point = points2polydata([old_point_ref.tolist()])
                 pfn = (output_folder + 'points/point_'
                        + case + '_'+str(i)+'_ref.vtp')
@@ -533,7 +662,7 @@ def trace_centerline(
                                                  step_seg,
                                                  length)
 
-            if write_samples:
+            if allow_writes and write_samples:
                 step_seg['cent_file'] = cfn
                 # write_centerline(centerline_poly, cfn)
                 write_vtk_polydata(centerline_poly, cfn)
@@ -583,7 +712,7 @@ def trace_centerline(
                                                 + vessel_tree.steps
                                                 [-(j+buffer)]['caps'])
 
-                    if len(vessel_tree.steps) % (N*5) == 0 and write_samples:
+                    if len(vessel_tree.steps) % (N*5) == 0 and allow_writes and write_samples:
                         # sitk.WriteImage(assembly_segs.assembly,
                         #                 (output_folder + 'assembly/assembly_'
                         #                  + case + '_'+str(i)+'.mha'))
@@ -613,7 +742,7 @@ def trace_centerline(
                 step_seg['prob_predicted_vessel'] = None
 
             # Print polydata surfaces,cents together for animation
-            if animation and write_samples:
+            if allow_writes and animation and write_samples:
                 # print('Animation step added')
                 # Add to surface and cent lists
                 surfaces_animation.append(surface_smooth)
@@ -716,7 +845,7 @@ def trace_centerline(
                     for pot in point_tree:
                         list_points_pot.append(points2polydata([pot.tolist()]))
                     final_pot = appendPolyData(list_points_pot)
-                    if write_samples:
+                    if allow_writes and write_samples:
                         write_vtk_polydata(final_pot,
                                            (output_folder
                                             + '/points/bifurcation_'+case+'_'
@@ -738,12 +867,14 @@ def trace_centerline(
             # Save debug information with available data for error analysis
             if step_seg['centerline']:
                 print_error(output_folder, i, step_seg, cropped_volume,
-                            predicted_vessel, old_point_ref, centerline_poly)
+                            predicted_vessel, old_point_ref, centerline_poly,
+                            disk_io=disk_io)
             elif step_seg['seg_file']:
                 print_error(output_folder, i, step_seg, cropped_volume,
-                            predicted_vessel)
+                            predicted_vessel, disk_io=disk_io)
             elif step_seg['img_file']:
-                print_error(output_folder, i, step_seg, cropped_volume)
+                print_error(output_folder, i, step_seg, cropped_volume,
+                            disk_io=disk_io)
 
             if i == 0:
                 print("Didnt work for first surface")
@@ -867,30 +998,30 @@ def trace_centerline(
 
                     if take_time:
                         print("Branches are: ", vessel_tree.branches)
-                    # if write_samples:
                     final_surface = appendPolyData(list_surf_branch)
                     final_centerline = appendPolyData(list_cent_branch)
                     final_points = appendPolyData(list_pts_branch)
-                    write_vtk_polydata(final_pot,
-                                       output_folder
-                                       + '/assembly/potentials_'+case+'_'
-                                       + str(branch)+'_'+str(i)
-                                       + '_points.vtp')
-                    write_vtk_polydata(final_surface,
-                                       output_folder
-                                       + '/assembly/branch_'+case+'_'
-                                       + str(branch)+'_'+str(i)
-                                       + '_surfaces.vtp')
-                    write_vtk_polydata(final_centerline,
-                                       output_folder
-                                       + '/assembly/branch_'+case+'_'
-                                       + str(branch)+'_'+str(i)
-                                       + '_centerlines.vtp')
-                    
+                    if allow_writes:
+                        write_vtk_polydata(final_pot,
+                                           output_folder
+                                           + '/assembly/potentials_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_points.vtp')
+                        write_vtk_polydata(final_surface,
+                                           output_folder
+                                           + '/assembly/branch_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_surfaces.vtp')
+                        write_vtk_polydata(final_centerline,
+                                           output_folder
+                                           + '/assembly/branch_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_centerlines.vtp')
+
                     # SimVascular .pth / .ctgr only for branches with >= 3 tracing
                     # steps (indices after the connector at branches[branch][0]).
                     branch_tracing_steps = len(vessel_tree.branches[branch][1:])
-                    if branch_tracing_steps >= 3:
+                    if allow_writes and branch_tracing_steps >= 3:
                         try:
                             centerline_points, _ = get_points_cells(
                                 final_points)
@@ -962,12 +1093,13 @@ def trace_centerline(
                         except Exception as e:
                             print(f"Warning: Could not create .pth file for "
                                   f"branch {branch}: {e}")
-                    
-                    write_vtk_polydata(final_points,
-                                       output_folder
-                                       + '/assembly/branch_'+case+'_'
-                                       + str(branch)+'_'+str(i)
-                                       + '_points.vtp')
+
+                    if allow_writes:
+                        write_vtk_polydata(final_points,
+                                           output_folder
+                                           + '/assembly/branch_'+case+'_'
+                                           + str(branch)+'_'+str(i)
+                                           + '_points.vtp')
 
                     # Record terminal cap positions for mesh capping
                     vessel_tree.caps = (vessel_tree.caps
@@ -1034,9 +1166,10 @@ def trace_centerline(
                                                 'Number': ([idx], 'int')               # Original index in list
                                             }))
         final_pot = appendPolyData(list_pot)
-        write_vtk_polydata(final_pot,
-                           output_folder+'/potentials_'+case+'_'+str(i)
-                           + '_points.vtp')
+        if allow_writes:
+            write_vtk_polydata(final_pot,
+                               output_folder+'/potentials_'+case+'_'+str(i)
+                               + '_points.vtp')
 
     # Final cleanup: add remaining segmentations to global assembly
     if use_buffer:

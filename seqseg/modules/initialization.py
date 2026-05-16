@@ -9,7 +9,7 @@ from seqseg.modules.tracing_functions import (get_seed,
                                               get_largest_radius_seed,
                                               get_equally_spaced_radius_seeds)
 from seqseg.modules.assembly import create_step_dict
-from seqseg.modules.datasets import get_directories
+from seqseg.modules.datasets import get_directories, normalize_dataset_root
 from seqseg.modules.centerline import calc_multi_component_centerlines
 
 
@@ -19,19 +19,19 @@ sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 def process_init(test_case, directory_data, dir_output0, img_format, test):
 
-    path = directory_data + 'seeds.json'
+    root = normalize_dataset_root(directory_data)
+    path = os.path.join(root, "seeds.json")
     json_file_present = os.path.isfile(path)
 
-    dir_seg = os.path.isdir(directory_data + 'truths')
+    dir_seg = os.path.isdir(os.path.join(root, "truths"))
 
     if json_file_present:
         # Information
         i = 0
         case = test_case['name']
-        dir_image, dir_seg, dir_cent, _ = get_directories(directory_data,
-                                                          case,
-                                                          img_format,
-                                                          dir_seg)
+        dir_image, dir_seg, dir_cent, _ = get_directories(
+            root, case, img_format, dir_seg
+        )
         dir_output = dir_output0 + test + '_' + case+'/'
 
     else:
@@ -44,10 +44,9 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
         # dir_image, dir_seg, dir_cent, _ = vmr_directories(directory_data,
         #                                                   case,
         #                                                   dir_seg)
-        dir_image, dir_seg, dir_cent, _ = get_directories(directory_data,
-                                                          case,
-                                                          img_format,
-                                                          dir_seg)
+        dir_image, dir_seg, dir_cent, _ = get_directories(
+            root, case, img_format, dir_seg
+        )
         dir_output = dir_output0 + test + '_'+case+'_'+str(i)+'/'
 
     return dir_output, dir_image, dir_seg, dir_cent, case, i, json_file_present
@@ -197,7 +196,8 @@ def get_seeds_cardiac_mesh(mesh_dir, name, unit):
         radius_est = 1.3
 
     # list_meshes = os.listdir(mesh_dir)
-    mesh_dir += '/cardiac_meshes/'
+    mesh_root = normalize_dataset_root(mesh_dir)
+    mesh_dir = os.path.join(mesh_root, "cardiac_meshes")
 
     # Scale is 1 (assume same unit for image and mesh)
     (region_8_center,
