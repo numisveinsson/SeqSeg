@@ -55,6 +55,16 @@ seqseg doctor --model-folder /path/to/nnUNet_results/Dataset005_SEQAORTANDFEMOMR
 | `seqseg config fingerprint --name global --baseline global_default` | Diff two packaged YAML configs |
 | `from seqseg.api import run_tracing, …` | In-memory `sitk.Image` tracing (`disk_io=False`); see README |
 
+### Newer CLI shortcuts (optional)
+
+These commands complement the batch workflow in the rest of this tutorial:
+
+- **`seqseg init dataset --path /path/to/dataset/`** — Creates `images/`, `centerlines/`, `truths/`, and a template `seeds.json` so you can drop volumes in and edit seeds before running `seqseg run batch`.
+- **`seqseg run single`** — Runs one volume without manually building the full tree: it stages data under `<outdir>/_seqseg_single_staging/`. Use `--image`, `--outdir`, `--model-folder`, and either repeated **`--seed X Y Z R`** or **`--seeds-json`** (see `seqseg --help` after install).
+- **`seqseg config fingerprint --name global --baseline global_default`** — Lists packaged YAML keys that differ from another config (useful after copying or editing configs).
+- **`seqseg doctor --model-folder …/nnUNetTrainer__nnUNetPlans__3d_fullres`** — Checks imports and optionally verifies that the trainer directory exists.
+- **Python:** high-level **`from seqseg.api import run_tracing, TracingOptions, branch_seed_at_point`** for in-memory `sitk.Image` workflows (see the main repository `README.md`).
+
 ## 2. Download Required Files
 
 ### Model Weights
