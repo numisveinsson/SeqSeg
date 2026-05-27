@@ -10,8 +10,9 @@ elsewhere in SeqSeg.
 Contours are intersections of an isosurface threshold with oblique planes
 defined by each path point's ``pos``, ``tangent``, and ``rotation`` (same
 basis SimVascular uses for reslicing along a path). Output uses
-``type="Contour"`` with two ``control_points`` and dense ``contour_points`` in
-**world** coordinates (SimVascular threshold-style groups).
+``type="SplinePolygon"`` with six ``control_points`` and densely subdivided
+``contour_points`` in **world** coordinates (matching SimVascular LevelSet /
+``CONSTANT_SPACING`` spline polygons in the tutorial ``.ctgr`` files).
 
 When a slice intersects **multiple** vessel components, the default is **not**
 to take the largest 2D loop (another branch can dominate the cross-section).
@@ -36,12 +37,19 @@ from vtk.util.numpy_support import vtk_to_numpy as v2n
 from .simvascular import (
     _perpendicular_normal_unit,
     compute_tangents,
+    contour_point_display_sizes_for_unit,
     indent,
     resample_path_like_simvascular,
 )
 from .vtk_functions import exportSitk2VTK
 
 # Default lofting block copied from ``seqseg/tutorial/data/Segmentations/aorta.ctgr``
+# Spline handles on the vessel boundary (SimVascular ``SplinePolygon`` UI count).
+DEFAULT_SPLINE_POLYGON_N_CONTROL = 6
+# ``sv4guiContourSplinePolygon`` uses ``control_points[0:2]`` for center + scaling
+# and fits the spline through ``control_points[2:]`` only.
+SIMVASCULAR_SPLINE_RESERVED_CONTROLS = 2
+
 _DEFAULT_LOFTING_ATTRIBS = {
     "method": "nurbs",
     "sampling": "60",
@@ -475,31 +483,142 @@ def _decimate_indices(n: int, max_control: int) -> np.ndarray:
     return np.unique(np.linspace(0, n - 1, max_control, dtype=int))
 
 
-def _two_control_points_for_contour(
-    xyz: np.ndarray, path_pos: np.ndarray
-) -> np.ndarray:
-    """
-    Two world-space control points for ``type="Contour"`` (threshold line).
-
-    Uses the contour vertex closest to the path ``pos`` and the vertex farthest
-    from ``pos``. If those coincide (e.g. symmetric loop), falls back to
-    vertices separated along the polyline order.
-    """
+def _closed_polyline_arc_length(xyz: np.ndarray) -> float:
     xyz = np.asarray(xyz, dtype=float)
     if xyz.shape[0] < 2:
-        raise ValueError("Contour needs at least two points for control_points")
-    p = np.asarray(path_pos, dtype=float).reshape(3)
-    d = np.linalg.norm(xyz - p, axis=1)
-    i0 = int(np.argmin(d))
-    i1 = int(np.argmax(d))
+        return 0.0
+    extended = np.vstack([xyz, xyz[0:1]])
+    return float(np.sum(np.linalg.norm(np.diff(extended, axis=0), axis=1)))
+
+
+def _point_on_closed_polyline_at_arc(xyz: np.ndarray, arc_dist: float) -> np.ndarray:
+    """Return a point at arc length ``arc_dist`` on a closed polyline (wraps)."""
+    xyz = np.asarray(xyz, dtype=float)
     n = xyz.shape[0]
-    if i1 == i0:
-        i1 = (i0 + max(1, n // 2)) % n
-    p0, p1 = xyz[i0].copy(), xyz[i1].copy()
-    if float(np.linalg.norm(p1 - p0)) < 1e-9:
-        i1 = (i0 + 1) % n
-        p1 = xyz[i1]
-    return np.stack([p0, p1], axis=0)
+    if n < 2:
+        return xyz[0].copy() if n else np.zeros(3, dtype=float)
+    extended = np.vstack([xyz, xyz[0:1]])
+    seg = np.linalg.norm(np.diff(extended, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+    if total < 1e-12:
+        return xyz[0].copy()
+    d = float(arc_dist) % total
+    for i in range(n):
+        seg_len = float(cum[i + 1] - cum[i])
+        if d <= cum[i + 1] + 1e-12:
+            if seg_len < 1e-12:
+                return xyz[i].copy()
+            t = (d - cum[i]) / seg_len
+            i_next = (i + 1) % n
+            return (1.0 - t) * xyz[i] + t * xyz[i_next]
+    return xyz[0].copy()
+
+
+def _rotate_closed_point_ring(points: np.ndarray, anchor: np.ndarray) -> np.ndarray:
+    """Roll ``points`` so index 0 is closest to ``anchor`` (SimVascular alignment)."""
+    pts = np.asarray(points, dtype=float)
+    if pts.shape[0] < 2:
+        return pts
+    anchor = np.asarray(anchor, dtype=float).reshape(3)
+    i0 = int(np.argmin(np.linalg.norm(pts - anchor, axis=1)))
+    return np.roll(pts, -i0, axis=0)
+
+
+def _center_and_scaling_control_points(
+    contour_xyz: np.ndarray,
+    tangent: Sequence[float],
+    rotation: Sequence[float],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    First two SimVascular ``SplinePolygon`` controls (center + in-plane radius).
+
+    Matches ``sv3::Contour::CreateCenterScalingPoints`` / ``AssignCenterScalingPoints``.
+    """
+    pts = np.asarray(contour_xyz, dtype=float)
+    if pts.shape[0] < 1:
+        raise ValueError("Need contour points for center/scaling controls")
+    u, v, w = _plane_basis(tangent, rotation)
+    center = pts.mean(axis=0)
+    dists = np.linalg.norm(pts - center, axis=1)
+    min_dis = float(np.min(dists[dists > 1e-12])) if np.any(dists > 1e-12) else 1.0
+    ortho = u if abs(float(np.dot(u, w))) < 0.9 else v
+    scaling = center + 0.5 * min_dis * _normalize(ortho)
+    return center, scaling
+
+
+def _spline_polygon_control_points(
+    xyz: np.ndarray,
+    n_control: int = DEFAULT_SPLINE_POLYGON_N_CONTROL,
+    anchor: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """
+    Pick ``n_control`` boundary points evenly by arc length on a closed loop.
+
+    These become ``control_points[2:]`` in the ``.ctgr`` (after center/scaling).
+    If ``anchor`` is set (path ``pos``), rotate so the first boundary control is
+    closest to the path.
+    """
+    xyz = np.asarray(xyz, dtype=float)
+    n_control = max(4, int(n_control))
+    if xyz.shape[0] < n_control:
+        raise ValueError(
+            f"Contour has {xyz.shape[0]} points; need at least {n_control} for "
+            "SplinePolygon control_points"
+        )
+    total = _closed_polyline_arc_length(xyz)
+    if total < 1e-9:
+        raise ValueError("Degenerate contour loop for SplinePolygon controls")
+    controls = np.array(
+        [
+            _point_on_closed_polyline_at_arc(xyz, (k / n_control) * total)
+            for k in range(n_control)
+        ],
+        dtype=float,
+    )
+    if anchor is not None:
+        controls = _rotate_closed_point_ring(controls, anchor)
+    return controls
+
+
+def _dense_contour_points_spline_polygon(
+    controls: np.ndarray, subdivision_spacing: float
+) -> np.ndarray:
+    """
+    Subdivide a closed Cardinal spline through ``controls`` with constant spacing.
+
+    Uses the same resampling rules as SimVascular path/spline code
+    (``resample_path_like_simvascular``, ``subdivision_type=2``).
+    """
+    controls = np.asarray(controls, dtype=float)
+    sp = max(float(subdivision_spacing), 1e-6)
+    rows = resample_path_like_simvascular(
+        [tuple(p) for p in controls],
+        closed=True,
+        spacing=sp,
+    )
+    if not rows:
+        return controls.copy()
+    return np.array([row["pos"] for row in rows], dtype=float)
+
+
+def _spline_polygon_from_world_loop(
+    xyz: np.ndarray,
+    path_pos: np.ndarray,
+    path_tangent: Sequence[float],
+    path_rotation: Sequence[float],
+    *,
+    n_control: int = DEFAULT_SPLINE_POLYGON_N_CONTROL,
+    subdivision_spacing: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Build SplinePolygon ``control_points`` and dense ``contour_points``."""
+    boundary = _spline_polygon_control_points(xyz, n_control, anchor=path_pos)
+    dense = _dense_contour_points_spline_polygon(boundary, subdivision_spacing)
+    center, scaling = _center_and_scaling_control_points(
+        dense, path_tangent, path_rotation
+    )
+    controls = np.vstack([center, scaling, boundary])
+    return controls, dense
 
 
 def _fmt_coord(x: float) -> str:
@@ -552,7 +671,10 @@ def write_ctgr(
     *,
     reslice_size: str = "5",
     lofting_attribs: Optional[Dict[str, str]] = None,
-    contour_method: str = "Threshold",
+    contour_method: str = "LevelSet",
+    n_control_points: int = DEFAULT_SPLINE_POLYGON_N_CONTROL,
+    subdivision_spacing: Optional[float] = None,
+    unit: str = "cm",
 ) -> str:
     """
     Write a SimVascular ``.ctgr`` contour group XML.
@@ -560,9 +682,11 @@ def write_ctgr(
     ``path_points[i]`` must correspond to ``contours_xyz[i]`` (same length).
     ``contours_xyz[i]`` may be ``None`` to skip that slice.
 
-    Each written slice uses ``type="Contour"`` with two ``control_points`` and
-    full-resolution ``contour_points`` in world coordinates (native SimVascular
-    threshold contour layout).
+    Each written slice uses ``type="SplinePolygon"`` with ``n_control_points``
+    (default 6) boundary spline handles plus two reserved SimVascular controls
+    (center + scaling at indices 0–1), and ``contour_points`` subdivided along the
+    closed spline at ``subdivision_spacing`` (``CONSTANT_SPACING``,
+    ``subdivision_type=2``).
     """
     if len(path_points) != len(contours_xyz):
         raise ValueError("path_points and contours_xyz must have the same length")
@@ -571,44 +695,62 @@ def write_ctgr(
     if lofting_attribs:
         loft.update(lofting_attribs)
 
+    point_2d_str, point_3d_str = contour_point_display_sizes_for_unit(unit)
+
     root = ET.Element(
         "contourgroup",
         {
             "path_name": path_name,
             "path_id": str(int(path_id)),
             "reslice_size": str(reslice_size),
-            "point_2D_display_size": "",
-            "point_size": "",
+            "point_2D_display_size": point_2d_str,
+            "point_size": point_3d_str,
             "version": "1.0",
         },
     )
     ts = ET.SubElement(root, "timestep", {"id": "0"})
     ET.SubElement(ts, "lofting_parameters", loft)
 
+    if subdivision_spacing is None or float(subdivision_spacing) <= 0.0:
+        subdivision_spacing = 0.078125
+    subdiv_str = _fmt_coord(float(subdivision_spacing))
+    n_spline = max(4, int(n_control_points))
+    n_xml_ctrl = n_spline + SIMVASCULAR_SPLINE_RESERVED_CONTROLS
+
     contour_id = 0
     for pp, xyz in zip(path_points, contours_xyz):
-        if xyz is None or xyz.shape[0] < 3:
+        if xyz is None or xyz.shape[0] < n_spline:
+            continue
+        try:
+            ctrl_pts, contour_pts = _spline_polygon_from_world_loop(
+                xyz,
+                pp["pos"],
+                pp["tangent"],
+                pp["rotation"],
+                n_control=n_spline,
+                subdivision_spacing=float(subdivision_spacing),
+            )
+        except ValueError:
             continue
         co = ET.SubElement(
             ts,
             "contour",
             {
                 "id": str(contour_id),
-                "type": "Contour",
+                "type": "SplinePolygon",
                 "method": str(contour_method),
                 "closed": "true",
-                "min_control_number": "2",
-                "max_control_number": "2",
-                "subdivision_type": "0",
+                "min_control_number": str(n_xml_ctrl),
+                "max_control_number": "200",
+                "subdivision_type": "2",
                 "subdivision_number": "0",
-                "subdivision_spacing": "0",
+                "subdivision_spacing": subdiv_str,
             },
         )
         contour_id += 1
         _append_path_point_xml(co, pp)
-        ctrl2 = _two_control_points_for_contour(xyz, pp["pos"])
-        _append_points_block(co, "control_points", ctrl2, max_points=None)
-        _append_points_block(co, "contour_points", xyz, max_points=None)
+        _append_points_block(co, "control_points", ctrl_pts, max_points=None)
+        _append_points_block(co, "contour_points", contour_pts, max_points=None)
 
     if contour_id == 0:
         raise ValueError(
@@ -624,6 +766,32 @@ def write_ctgr(
         indent(root)
     tree.write(output_path, encoding="UTF-8", xml_declaration=True)
     return output_path
+
+
+def contour_stride_for_branch_steps(
+    n_path_points: int,
+    n_branch_steps: int,
+    *,
+    base_stride: int = 2,
+) -> int:
+    """Pick a ``stride`` so ``.ctgr`` has roughly one slice per SeqSeg branch step.
+
+    ``build_contours_for_path_points`` keeps path samples ``i % stride == 0``.
+    Dense spline ``path_points`` in a ``.pth`` should be thinned to a count
+    comparable to **``n_branch_steps``** (the number of tracing steps on the
+    branch: ``len(branches[b][1:])``), not the hundreds of samples used for
+    smooth lofting.
+
+    ``base_stride`` is the configured floor (``SIMVASCULAR_CONTOUR_STRIDE``).
+    """
+    if base_stride < 1:
+        base_stride = 1
+    if n_path_points < 1:
+        return base_stride
+    if n_branch_steps < 1:
+        n_branch_steps = 1
+    ideal = int(round(float(n_path_points) / float(n_branch_steps)))
+    return max(base_stride, max(1, ideal))
 
 
 def build_contours_for_path_points(
@@ -691,8 +859,10 @@ def write_ctgr_for_pth(
     plane_spacing_mm: Optional[float] = None,
     stride: int = 1,
     path_name: Optional[str] = None,
-    contour_method: str = "Threshold",
+    contour_method: str = "LevelSet",
     component_selection: str = "closest_to_path",
+    n_control_points: int = DEFAULT_SPLINE_POLYGON_N_CONTROL,
+    unit: str = "cm",
 ) -> str:
     """
     Parse ``pth_path``, extract contours from ``sitk_volume``, write ``.ctgr``.
@@ -704,6 +874,11 @@ def write_ctgr_for_pth(
     pts = meta["path_points"]
     if not pts:
         raise ValueError(f"No path points parsed from {pth_path}")
+
+    sp_arr = np.array(sitk_volume.GetSpacing(), dtype=float)
+    if plane_spacing_mm is None:
+        plane_spacing_mm = float(max(1e-6, 0.5 * float(np.min(sp_arr))))
+    subdivision_spacing = float(plane_spacing_mm)
 
     kept, contours = build_contours_for_path_points(
         sitk_volume,
@@ -724,8 +899,11 @@ def write_ctgr_for_pth(
         kept,
         contours,
         output_ctgr_path,
-        reslice_size="5",
+        reslice_size=str(meta.get("reslice_size", "5")),
         contour_method=contour_method,
+        n_control_points=n_control_points,
+        subdivision_spacing=subdivision_spacing,
+        unit=unit,
     )
 
 
