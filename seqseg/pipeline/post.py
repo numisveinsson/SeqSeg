@@ -159,8 +159,9 @@ def run_global_centerline_single(
 
 def _case_name_from_seg_filename(path: str) -> str:
     name = Path(path).name
+    lower_name = name.lower()
     for suf in (".nii.gz", ".nii", ".mha", ".mhd"):
-        if name.endswith(suf):
+        if lower_name.endswith(suf):
             stem = name[: -len(suf)]
             break
     else:
