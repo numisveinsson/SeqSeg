@@ -47,11 +47,12 @@ jobs:
         run: |
           python -c "import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt; import matplotlib.font_manager as fm; fm.fontManager"
 
-      # Test python script
+      # Test python script (global_test uses pre-segmented truths; nnUNet weights are not loaded)
       - name: Test SeqSeg CLI
         run: |
           seqseg \
           -data_dir seqseg/tests/test_data/ \
+          -nnunet_results_path /tmp/nnUNet_results_ci \
           -config_name global_test \
           -img_ext .nii.gz \
           -outdir seqseg/tests/test_out/ \
