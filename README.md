@@ -10,9 +10,10 @@
 
 > **Automatic tracking and segmentation of blood vessels in CT and MR images using deep learning and geometric tracking**
 
-> **News:** SeqSeg now outputs a full SimVascular project in the `simvascular/` subdirectory. You can open it directly in SimVascular, with automatic pathlines and contours generated for every branch segmented by SeqSeg.
+> **News (2.x):** Structured CLI subcommands, a Python library API for in-memory `sitk.Image` tracing, and single-volume runs without hand-building a dataset tree. See [What's new in 2.x](#whats-new-in-2x). SimVascular project output (`simvascular/`) remains available for batch and tracing runs.
 
 [![Paper](https://img.shields.io/badge/Paper-Annals%20of%20BME-blue)](https://rdcu.be/dU0wy)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/numisveinsson/SeqSeg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/numisveinsson/SeqSeg/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
 
@@ -26,6 +27,7 @@ SeqSeg is a novel method for automatic vessel segmentation that combines local d
 - **Multi-modal support**: Works with CT and MR 3D medical imaging modalities
 - **Scalable**: Handles vessels from small coronaries to large aortas
 - **Clinical validation**: Tested on diverse vascular anatomies including coronary, aortic, cerebral, and pulmonary vessels (pre-trained weights released for aorta CT/MR and coronary CT)
+- **Library use (2.x)**: In-memory `sitk.Image` in, probability segmentation out via `run_tracing` (see [What's new in 2.x](#whats-new-in-2x))
 
 **Performance Highlights:**
 - Dice similarity coefficient: >0.9 on validation datasets
@@ -37,6 +39,7 @@ SeqSeg is a novel method for automatic vessel segmentation that combines local d
 
 ## Table of Contents
 
+- [What's new in 2.x](#whats-new-in-2x)
 - [Quick Start](#quick-start)
 - [Algorithm Overview](#algorithm-overview)
 - [Installation](#installation)
@@ -46,6 +49,64 @@ SeqSeg is a novel method for automatic vessel segmentation that combines local d
 - [Configuration](#configuration)
 - [Research & Development](#research--development)
 - [Citation](#citation)
+
+## What's new in 2.x
+
+SeqSeg **2.0** refactors the package around a clearer CLI and a stable Python API. Existing batch workflows still work; legacy invocations without a subcommand (e.g. `seqseg -data_dir ...`) are rewritten to `seqseg run batch` automatically.
+
+### Command-line interface
+
+| Feature | Description |
+| -------- | ----------- |
+| **`seqseg run batch`** | Classic dataset batch tracing (preferred entry point) |
+| **`seqseg run single`** | One volume + seeds: stages under `<outdir>/_seqseg_single_staging/`, then runs like batch |
+| **`seqseg run plus batch`** | Global nnU-Net sweep, then SeqSeg (replaces monolithic `seqseg_plus` script flow) |
+| **`seqseg init dataset`** | Scaffold `images/`, `centerlines/`, `truths/`, and template `seeds.json` |
+| **`seqseg doctor`** | Check imports (SimpleITK, vtk, nnunetv2, scipy) and optional nnU-Net trainer folder |
+| **`seqseg config dump` / `fingerprint`** | Inspect or diff packaged YAML configs |
+| **`seqseg post global-centerline`** | Post-process segmentations into global centerlines |
+| **`seqseg simvascular init`** | Create or refresh SimVascular project layout under a case directory |
+| **`seqseg --version`** | Print installed package version |
+
+### Python library API
+
+Embed tracing in other Python code without writing SeqSeg output files:
+
+- **`seqseg.api.run_tracing`** — pass a `sitk.Image`, seed definitions, and an nnU-Net trainer folder; get a `TracingResult` with global probability segmentation at `result.assembly.assembly`
+- **`TracingOptions(disk_io=False)`** — skip VTK/MHA debug trees on disk (nnU-Net weights still load from `model_folder`)
+- **`BranchSeed`**, **`branch_seed_at_point`**, **`seeds_to_potential_branches`** — simple seed formats instead of hand-built step dicts
+- **`TracingContext`** / **`trace_centerline_from_context`** — lower-level control with the same in-memory image support
+- Lazy re-exports from **`import seqseg`** (see `seqseg/__init__.py`)
+
+Quick example (seeds and config known):
+
+```python
+from seqseg.api import TracingOptions, branch_seed_at_point, run_tracing
+
+result = run_tracing(
+    my_sitk_image,
+    [branch_seed_at_point([x, y, z], radius)],
+    "/path/to/nnUNetTrainer__nnUNetPlans__3d_fullres",
+    config="global",
+    options=TracingOptions(disk_io=False),
+)
+prob_seg = result.assembly.assembly  # sitk.Image; threshold for binary masks
+```
+
+See [High-level API (`seqseg.api`)](#high-level-api-seqsegapi) for full detail.
+
+### Internal structure (for contributors)
+
+- Pipeline modules: `seqseg.pipeline.classic`, `plus`, `post`, `single_trace`
+- Typed config helpers: `AlgorithmConfig`, `NnUNetModelSpec` in `seqseg.config_models`
+- Tracing core accepts **`sitk.Image`** or file paths for the reference volume and optional prior segmentation
+
+### Migrating from 1.x
+
+1. **CLI:** Prefer `seqseg run batch` (or keep legacy flags — they still work).
+2. **Plus workflow:** Use `seqseg run plus batch` instead of `python -m seqseg.seqseg_plus` with the same nnU-Net path flags.
+3. **Library:** Use `run_tracing` or `TracingContext` rather than calling `trace_centerline` with only file paths.
+4. **Version:** `pip install -U seqseg` and check with `seqseg --version` (expects **2.0.0**).
 
 ## Quick Start
 
