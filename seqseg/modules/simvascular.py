@@ -330,8 +330,8 @@ def path_calculation_number_for_control_count(
     """Pick ``calculation_number`` for ``create_pth`` from spline control count.
 
     ``n_controls`` is the number of ``control_points`` on the path polyline
-    (SeqSeg: merged per-step path vertices written to the ``.pth``, usually one
-    per tracing step on the branch unless duplicate positions are dropped).
+    (SeqSeg: up to two mother-branch steps ending at the connector, plus merged
+    per-step path vertices on the branch, unless duplicate positions are dropped).
 
     ``resample_path_like_simvascular`` divides ``calculation_number`` across
     ``n_controls - 1`` open spline segments. The legacy default (100) with

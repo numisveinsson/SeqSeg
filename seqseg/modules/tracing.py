@@ -893,8 +893,19 @@ def trace_centerline(
                     branch_tracing_steps = len(vessel_tree.branches[branch][1:])
                     if branch_tracing_steps >= 3:
                         try:
+                            # .pth controls: up to 2 mother steps + branch [y, z, a, b, c, ...]
+                            list_pts_pth = []
+                            for step_id in vessel_tree.pth_control_step_ids(
+                                    branch, n_mother=1):
+                                step_pd = vessel_tree.steps[step_id]['point_pd']
+                                if step_pd is None:
+                                    step_pd = points2polydata(
+                                        [vessel_tree.steps[step_id]['point'].tolist()]
+                                    )
+                                list_pts_pth.append(step_pd)
+                            final_points_pth = appendPolyData(list_pts_pth)
                             centerline_points, _ = get_points_cells(
-                                final_points)
+                                final_points_pth)
                             if len(centerline_points) > 0:
                                 # Convert points to list of tuples for create_pth
                                 pth_points = [tuple(point)
@@ -912,8 +923,8 @@ def trace_centerline(
                                     + branch_file_stem
                                     + '.pth')
                                 simvascular_path_counter += 1
-                                # Spline controls = merged per-step path vertices
-                                # (typically one per tracing step; dedup can remove a few).
+                                # Spline controls = up to two mother-branch steps
+                                # (including connector) + per-step path vertices.
                                 _calc_n = path_calculation_number_for_control_count(
                                     len(pth_points)
                                 )
