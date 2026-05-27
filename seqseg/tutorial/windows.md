@@ -44,8 +44,15 @@ This might take a few minutes as it will download and install all necessary depe
 ## 5. Verify installation ✅
 ```bash
 seqseg --help
+seqseg --version
 ```
-If the installation was successful, you should see the help message for the SeqSeg command-line interface.
+If the installation was successful, you should see subcommands (`run`, `post`, `config`, `doctor`, …) and version **2.0.0** or newer.
+
+For the aorta tutorial, run batch tracing from the cloned repo (see `seqseg/tutorial/tutorial.md`):
+
+```powershell
+seqseg run batch -data_dir seqseg\tutorial\data\ -nnunet_results_path ..\nnUNet_results\ -outdir tutorial_output\ -img_ext .mha -config_name aorta_tutorial
+```
 
 ## 6. Git clone the SeqSeg repository 📂
 
