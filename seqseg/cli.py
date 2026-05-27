@@ -156,13 +156,13 @@ def _seqseg_version() -> str:
 def _validate_trace_batch(ns: argparse.Namespace) -> None:
     missing = []
     if not ns.data_directory:
-        missing.append("-data_dir / --data-directory")
+        missing.append("-data_dir / --data_directory")
     if not ns.outdir:
         missing.append("-outdir / --outdir")
     if not ns.img_ext:
-        missing.append("-img_ext / --img-ext")
+        missing.append("-img_ext / --img_ext")
     if not ns.nnunet_results_path:
-        missing.append("-nnunet_results_path / --nnunet-results-path")
+        missing.append("-nnunet_results_path / --nnunet_results_path")
     if missing:
         print(
             "seqseg run batch: missing required arguments:\n  "
