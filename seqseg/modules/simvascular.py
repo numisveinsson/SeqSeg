@@ -261,6 +261,93 @@ def resample_path_like_simvascular(
     return spline_points
 
 
+def reslice_size_for_unit(unit: str = "cm") -> str:
+    """SimVascular XML ``reslice_size`` for the project's physical units.
+
+    SimVascular expects ``5`` when coordinates are in centimeters and ``50``
+    when they are in millimeters (same ~50 mm cross-section window).
+    """
+    if str(unit).strip().lower() == "mm":
+        return "50"
+    return "5"
+
+
+# Viewer handle sizes (mm projects); cm values are ÷10 (same scaling as ``reslice_size``).
+_MM_PATH_POINT_2D = 2.0
+_MM_PATH_POINT_3D = 3.0
+_MM_CONTOUR_POINT_2D = 3.0
+_MM_CONTOUR_POINT_3D = 5.0
+
+
+def _physical_unit_scale(unit: str = "cm") -> float:
+    """Scale factor from mm-native display sizes to project ``unit``."""
+    if str(unit).strip().lower() == "mm":
+        return 1.0
+    return 0.1
+
+
+def _format_sv_display_size(value: float) -> str:
+    """Format a SimVascular XML point display size attribute."""
+    v = float(value)
+    if abs(v - round(v)) < 1e-9:
+        return str(int(round(v)))
+    return f"{v:g}"
+
+
+def path_point_display_sizes_for_unit(unit: str = "cm") -> tuple:
+    """
+    SimVascular path XML ``point_2D_display_size`` and ``point_size`` (3D).
+
+    Defaults (mm): 2D = 2, 3D = 3. Centimeter projects use one tenth of each.
+    """
+    scale = _physical_unit_scale(unit)
+    return (
+        _format_sv_display_size(scale * _MM_PATH_POINT_2D),
+        _format_sv_display_size(scale * _MM_PATH_POINT_3D),
+    )
+
+
+def contour_point_display_sizes_for_unit(unit: str = "cm") -> tuple:
+    """
+    SimVascular contour group XML ``point_2D_display_size`` and ``point_size`` (3D).
+
+    Defaults (mm): 2D = 3, 3D = 5. Centimeter projects use one tenth of each.
+    """
+    scale = _physical_unit_scale(unit)
+    return (
+        _format_sv_display_size(scale * _MM_CONTOUR_POINT_2D),
+        _format_sv_display_size(scale * _MM_CONTOUR_POINT_3D),
+    )
+
+
+def path_calculation_number_for_control_count(
+    n_controls: int,
+    *,
+    per_segment: int = 4,
+    minimum: int = 8,
+    maximum: int = 100,
+) -> int:
+    """Pick ``calculation_number`` for ``create_pth`` from spline control count.
+
+    ``n_controls`` is the number of ``control_points`` on the path polyline
+    (SeqSeg: up to two mother-branch steps ending at the connector, plus merged
+    per-step path vertices on the branch, unless duplicate positions are dropped).
+
+    ``resample_path_like_simvascular`` divides ``calculation_number`` across
+    ``n_controls - 1`` open spline segments. The legacy default (100) with
+    only a few vertices makes ``inter_number`` large, so short branches inherit
+    roughly as many ``path_points`` as long ones and ``.ctgr`` contour slices
+    pile up unnecessarily.
+
+    ``per_segment`` sets the intended minimum samples per inter-control segment
+    before the ``minimum`` / ``maximum`` clamps apply.
+    """
+    if n_controls < 2:
+        return int(maximum)
+    target = int(per_segment) * (n_controls - 1) + 1
+    return min(int(maximum), max(int(minimum), target))
+
+
 def indent(elem, level=0):
     """Manual pretty-printer for XML (for Python < 3.9)."""
     i = "\n" + level * "    "
@@ -390,6 +477,7 @@ def create_pth(
     calculation_number=100,
     spacing=0.0,
     further_subdivision_number=10,
+    unit="cm",
 ):
     """Create a SimVascular-style .pth XML file given a list of (x,y,z) points.
 
@@ -414,12 +502,24 @@ def create_pth(
         If > 0, uses CONSTANT_SPACING-style subdivision between controls (see
         SimVascular ``sv3_Spline.cxx``). When > 0, ``method`` is set to 2 in XML.
     further_subdivision_number : int, optional
-        Matches SimVascular ``m_FurtherSubdivisionNumber`` for tangent fineness.
+        Matches SimVascular ``m_FurtherSubdivisionNumber`` for         tangent fineness.
+    unit : str, optional
+        Physical units of ``points`` (``cm`` or ``mm``). Sets XML
+        ``reslice_size`` to ``5`` (cm) or ``50`` (mm), and path viewer handle
+        sizes (2D/3D) scaled like ``reslice_size`` (mm defaults 2 and 3).
+
+    Returns
+    -------
+    int
+        Number of ``path_point`` samples written (dense spline samples or one per
+        control when ``spline_resample`` is False).
     """
     use_spacing = float(spacing) > 0.0
     method_enum = "2" if use_spacing else "0"
     calc_str = str(int(calculation_number))
     spacing_str = str(float(spacing))
+    reslice_size_str = reslice_size_for_unit(unit)
+    point_2d_str, point_3d_str = path_point_display_sizes_for_unit(unit)
 
     if spline_resample or use_spacing:
         sampled = resample_path_like_simvascular(
@@ -440,9 +540,9 @@ def create_pth(
             "calculation_number": calc_str,
             "spacing": spacing_str,
             "version": "1.0",
-            "reslice_size": "5",
-            "point_2D_display_size": "",
-            "point_size": "",
+            "reslice_size": reslice_size_str,
+            "point_2D_display_size": point_2d_str,
+            "point_size": point_3d_str,
         },
     )
 
@@ -483,6 +583,8 @@ def create_pth(
             for (x, y, z), t in zip(points, tangents)
         ]
 
+    num_path_points = len(path_iter)
+
     for i, (pos, tan, rot) in enumerate(path_iter):
         x, y, z = float(pos[0]), float(pos[1]), float(pos[2])
         path_point_elem = ET.SubElement(path_points_elem, "path_point", {"id": str(i)})
@@ -511,6 +613,7 @@ def create_pth(
 
     tree.write(output_path, encoding="UTF-8", xml_declaration=True)
     print(f"✅ SimVascular .pth file written to {output_path}")
+    return num_path_points
 
 
 def write_pths_from_vtp(vtp_path, out_dir=None, prefix=None, verbose=True):

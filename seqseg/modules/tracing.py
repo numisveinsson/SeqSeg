@@ -22,8 +22,8 @@ from .vtk_functions import (points2polydata, write_geo, smooth_surface,
 from .assembly import (Segmentation, VesselTree, print_error,
                        create_step_dict, get_old_ref_point)
 
-from .simvascular import create_pth
-from .simvascular_contour import write_ctgr_for_pth
+from .simvascular import create_pth, path_calculation_number_for_control_count
+from .simvascular_contour import contour_stride_for_branch_steps, write_ctgr_for_pth
 
 from .local_assembly import construct_subvolume
 
@@ -1018,13 +1018,25 @@ def trace_centerline(
                                            + str(branch)+'_'+str(i)
                                            + '_centerlines.vtp')
 
-                    # SimVascular .pth / .ctgr only for branches with >= 3 tracing
-                    # steps (indices after the connector at branches[branch][0]).
+                    # SimVascular .pth / .ctgr for branches with >= 3 tracing steps.
+                    # ``branch_tracing_steps`` = len(branches[branch][1:]) (excludes
+                    # connector ``branches[branch][0]``); used to scale .ctgr stride.
                     branch_tracing_steps = len(vessel_tree.branches[branch][1:])
                     if allow_writes and branch_tracing_steps >= 3:
                         try:
+                            # .pth controls: up to 2 mother steps + branch [y, z, a, b, c, ...]
+                            list_pts_pth = []
+                            for step_id in vessel_tree.pth_control_step_ids(
+                                    branch, n_mother=1):
+                                step_pd = vessel_tree.steps[step_id]['point_pd']
+                                if step_pd is None:
+                                    step_pd = points2polydata(
+                                        [vessel_tree.steps[step_id]['point'].tolist()]
+                                    )
+                                list_pts_pth.append(step_pd)
+                            final_points_pth = appendPolyData(list_pts_pth)
                             centerline_points, _ = get_points_cells(
-                                final_points)
+                                final_points_pth)
                             if len(centerline_points) > 0:
                                 # Convert points to list of tuples for create_pth
                                 pth_points = [tuple(point)
@@ -1042,11 +1054,18 @@ def trace_centerline(
                                     + branch_file_stem
                                     + '.pth')
                                 simvascular_path_counter += 1
-                                create_pth(
+                                # Spline controls = up to two mother-branch steps
+                                # (including connector) + per-step path vertices.
+                                _calc_n = path_calculation_number_for_control_count(
+                                    len(pth_points)
+                                )
+                                _n_spline_pts = create_pth(
                                     pth_points,
                                     pth_output_path,
                                     path_id=simvascular_path_counter,
                                     spline_resample=True,
+                                    calculation_number=_calc_n,
+                                    unit=unit,
                                 )
                                 # One SimVascular contour group (.ctgr) per completed branch,
                                 # referencing the same path basename and path_id as the .pth.
@@ -1058,6 +1077,18 @@ def trace_centerline(
                                             + branch_file_stem
                                             + ".ctgr"
                                         )
+                                        _base_stride = int(
+                                            global_config.get(
+                                                "SIMVASCULAR_CONTOUR_STRIDE", 2
+                                            )
+                                        )
+                                        _contour_stride = (
+                                            contour_stride_for_branch_steps(
+                                                _n_spline_pts,
+                                                branch_tracing_steps,
+                                                base_stride=_base_stride,
+                                            )
+                                        )
                                         write_ctgr_for_pth(
                                             assembly_segs.assembly,
                                             pth_output_path,
@@ -1067,11 +1098,7 @@ def trace_centerline(
                                                     "SIMVASCULAR_CONTOUR_ISO", 0.5
                                                 )
                                             ),
-                                            stride=int(
-                                                global_config.get(
-                                                    "SIMVASCULAR_CONTOUR_STRIDE", 2
-                                                )
-                                            ),
+                                            stride=_contour_stride,
                                             half_extent_mm=float(
                                                 global_config.get(
                                                     "SIMVASCULAR_CONTOUR_HALF_EXTENT_MM",
@@ -1084,6 +1111,13 @@ def trace_centerline(
                                                     "closest_to_path",
                                                 )
                                             ),
+                                            n_control_points=int(
+                                                global_config.get(
+                                                    "SIMVASCULAR_CONTOUR_N_CONTROL",
+                                                    6,
+                                                )
+                                            ),
+                                            unit=unit,
                                         )
                                     except Exception as e_ct:
                                         print(

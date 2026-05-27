@@ -372,6 +372,46 @@ class VesselTree:
 
         return self.steps[ind_prev]
 
+    def pth_control_step_ids(self, branch, n_mother=2):
+        """Step ids for SimVascular ``.pth`` spline controls.
+
+        Up to ``n_mother`` step ids on the mother branch ending at the
+        connector (``branches[branch][0]``), then this branch's tracing steps
+        (``branches[branch][1:]``). Root branch 0 has no mother: use the first
+        ``n_mother`` steps on branch 0 instead.
+        """
+        branch_ids = self.branches[branch]
+        if len(branch_ids) < 2:
+            return list(branch_ids)
+        connector_id = branch_ids[0]
+        tracing_ids = branch_ids[1:]
+        n_mother = int(n_mother)
+
+        if branch == 0:
+            prefix = branch_ids[: min(n_mother, len(branch_ids))]
+            return prefix + [sid for sid in tracing_ids if sid not in prefix]
+
+        mother_branch = None
+        connector_pos = None
+        for b_idx, br in enumerate(self.branches):
+            if b_idx == branch:
+                continue
+            if connector_id not in br:
+                continue
+            pos = br.index(connector_id)
+            if pos > 0:
+                mother_branch = br
+                connector_pos = pos
+                break
+
+        if mother_branch is None:
+            prefix_ids = [connector_id]
+        else:
+            start = max(0, connector_pos - (n_mother - 1))
+            prefix_ids = mother_branch[start:connector_pos + 1]
+
+        return prefix_ids + tracing_ids
+
     def restart_branch(self, branch):
         "Function to restart a branch from beginning"
 
