@@ -14,6 +14,7 @@ from typing import List, Optional, Sequence
 import faulthandler
 import numpy as np
 
+from seqseg.citations import print_citation_banner
 from seqseg.config_models import AlgorithmConfig, NnUNetModelSpec, load_yaml_config
 from seqseg.modules import sitk_functions as sf
 from seqseg.modules.datasets import get_testing_samples
@@ -729,6 +730,7 @@ def dispatch(argv: Optional[Sequence[str]] = None) -> None:
     if handler is None:
         parser.print_help()
         return
+    print_citation_banner()
     handler(ns)
 
 

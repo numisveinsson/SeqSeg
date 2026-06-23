@@ -12,6 +12,7 @@ from seqseg.cli import (
     _cmd_config_fingerprint,
     _cmd_init_dataset,
     _inject_legacy_run_batch,
+    dispatch,
 )
 
 
@@ -111,3 +112,24 @@ def test_cmd_config_fingerprint_same_config(capsys):
     _cmd_config_fingerprint(ns)
     out = capsys.readouterr().out
     assert "No differences" in out
+
+
+def test_dispatch_prints_citation_banner(tmp_path):
+    root = str(tmp_path / "dataset")
+    buf_out = io.StringIO()
+    buf_err = io.StringIO()
+    with patch.object(sys, "stdout", buf_out), patch.object(sys, "stderr", buf_err):
+        dispatch(["init", "dataset", "--path", root])
+    err = buf_err.getvalue()
+    assert "Please cite the following paper when using SeqSeg" in err
+    assert "Please cite the following paper when using nnU-Net" in err
+    assert "Sveinsson Cepero" in err
+    assert "Isensee" in err
+
+
+def test_dispatch_no_citation_on_help(capsys):
+    with pytest.raises(SystemExit) as exc:
+        dispatch(["--help"])
+    assert exc.value.code == 0
+    err = capsys.readouterr().err
+    assert "Please cite" not in err
