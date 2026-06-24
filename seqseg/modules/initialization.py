@@ -213,7 +213,7 @@ def get_seeds_cardiac_mesh(mesh_dir, name, unit):
 
     return (region_8_center,
             radius_est,
-            region_8_center+2*radius_est*region_8_normal,
+            region_8_center+1.5*radius_est*region_8_normal,
             radius_est)
 
 
