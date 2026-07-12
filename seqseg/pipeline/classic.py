@@ -46,6 +46,7 @@ def run_classic_batch(
     cap_surface_cent: bool,
     assembly_threshold: float,
     resample_spacing: Optional[Sequence[float]],
+    simvascular: bool = False,
     start_time_global: float,
 ) -> None:
     """Run classic tracing for ``testing_samples[start:stop]``."""
@@ -65,7 +66,7 @@ def run_classic_batch(
             )
         )
 
-        create_case_directories(dir_output, write_samples)
+        create_case_directories(dir_output, write_samples, simvascular=simvascular)
         if resample_spacing is not None:
             dir_image, dir_seg = sf.maybe_resample_volume_paths(
                 dir_image,
@@ -75,11 +76,12 @@ def run_classic_batch(
                 case,
                 img_format,
             )
-        vf.write_image_as_vti(
-            dir_image,
-            os.path.join(dir_output, "simvascular", "Images", f"{case}.vti"),
-        )
-        write_simvascular_proj(os.path.join(dir_output, "simvascular"))
+        if simvascular:
+            vf.write_image_as_vti(
+                dir_image,
+                os.path.join(dir_output, "simvascular", "Images", f"{case}.vti"),
+            )
+            write_simvascular_proj(os.path.join(dir_output, "simvascular"))
 
         potential_branches, initial_seeds = init.initialization(
             json_file_present,
@@ -126,6 +128,7 @@ def run_classic_batch(
             scale=scale,
             seg_file=dir_seg,
             write_samples=write_samples,
+            simvascular=simvascular,
         )
         tr = trace_centerline_from_context(ctx)
         centerlines = tr.centerlines

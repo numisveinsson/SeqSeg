@@ -19,6 +19,7 @@ from seqseg.config_models import AlgorithmConfig, NnUNetModelSpec, load_yaml_con
 from seqseg.modules import sitk_functions as sf
 from seqseg.modules.datasets import get_testing_samples
 from seqseg.pipeline.classic import run_classic_batch
+from seqseg.pipeline.plus import run_plus_batch
 from seqseg.pipeline.single_trace import prepare_single_image_dataset
 from seqseg.pipeline.post import (
     bootstrap_simvascular_project,
@@ -115,6 +116,13 @@ def _add_classic_trace_args(p: argparse.ArgumentParser) -> None:
         default=None,
         metavar="S",
         help="Isotropic spacing or sx sy sz before SeqSeg",
+    )
+    p.add_argument(
+        "-simvascular",
+        "--simvascular",
+        default=0,
+        type=int,
+        help="Write SimVascular project layout (simvascular/ dirs, .pth, .ctgr) (0/1)",
     )
 
 
@@ -241,6 +249,7 @@ def _cmd_trace_batch(ns: argparse.Namespace) -> None:
         cap_surface_cent=bool(ns.cap_surface_cent),
         assembly_threshold=ns.assembly_threshold,
         resample_spacing=resample_spacing,
+        simvascular=bool(ns.simvascular),
         start_time_global=t0,
     )
     print("\nTotal calculation time for all cases is: ")
@@ -317,6 +326,7 @@ def _cmd_trace_plus_batch(ns: argparse.Namespace) -> None:
         global_config=global_config,
         start=ns.start,
         stop=stop,
+        simvascular=bool(ns.simvascular),
         start_time_global=t0,
     )
     print("\nTotal calculation time is: ")
@@ -445,6 +455,7 @@ def _cmd_trace_single(ns: argparse.Namespace) -> None:
         cap_surface_cent=bool(ns.cap_surface_cent),
         assembly_threshold=ns.assembly_threshold,
         resample_spacing=None,
+        simvascular=bool(ns.simvascular),
         start_time_global=t0,
     )
     print("\nTotal calculation time for run single: ")
@@ -605,6 +616,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_single.add_argument("--extract-global-centerline", default=0, type=int)
     p_single.add_argument("--cap-surface-cent", default=0, type=int)
     p_single.add_argument("--assembly-threshold", default=0.5, type=float)
+    p_single.add_argument(
+        "--simvascular",
+        default=0,
+        type=int,
+        help="Write SimVascular project layout (simvascular/ dirs, .pth, .ctgr) (0/1)",
+    )
     p_single.add_argument(
         "--seed",
         action="append",

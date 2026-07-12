@@ -58,6 +58,7 @@ class TracingContext:
     start_seg: Any = None
     write_samples: bool = False
     disk_io: bool = True
+    simvascular: bool = False
 
 
 @dataclass
@@ -123,6 +124,7 @@ def trace_centerline_from_context(ctx: TracingContext) -> TracingResult:
         start_seg=ctx.start_seg,
         write_samples=ctx.write_samples,
         disk_io=ctx.disk_io,
+        simvascular=ctx.simvascular,
     )
     return TracingResult(*tup)
 
@@ -144,6 +146,7 @@ def trace_centerline(
     start_seg=None,
     write_samples=False,
     disk_io=True,
+    simvascular=False,
 ):
     """
     Trace vessel centerlines using sequential segmentation and tracking.
@@ -196,6 +199,9 @@ def trace_centerline(
     disk_io : bool, optional
         If False, skip SeqSeg-side file outputs (VTK/MHA/SimVascular exports and error dumps).
         nnU-Net still loads weights from ``model_folder`` on disk. Default True.
+    simvascular : bool, optional
+        When True (and ``disk_io`` is True), write SimVascular project files
+        (``.pth``, ``.ctgr``) under ``output_folder/simvascular/``.
     Returns:
     --------
     tuple
@@ -1021,7 +1027,7 @@ def trace_centerline(
                     # SimVascular .pth / .ctgr only for branches with >= 3 tracing
                     # steps (indices after the connector at branches[branch][0]).
                     branch_tracing_steps = len(vessel_tree.branches[branch][1:])
-                    if allow_writes and branch_tracing_steps >= 3:
+                    if allow_writes and simvascular and branch_tracing_steps >= 3:
                         try:
                             # .pth controls: up to 2 mother steps + branch [y, z, a, b, c, ...]
                             list_pts_pth = []

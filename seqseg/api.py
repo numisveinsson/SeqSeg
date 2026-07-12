@@ -119,6 +119,7 @@ class TracingOptions:
     max_n_steps_per_branch: int = 100
     write_samples: bool = False
     disk_io: bool = True
+    simvascular: bool = False
     unit: str = "cm"
     scale: float = 1.0
     fold: str = "all"
@@ -188,5 +189,6 @@ def run_tracing(
         start_seg=opts.start_seg,
         write_samples=opts.write_samples,
         disk_io=opts.disk_io,
+        simvascular=opts.simvascular,
     )
     return trace_centerline_from_context(ctx)

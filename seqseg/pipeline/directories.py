@@ -3,18 +3,27 @@
 import os
 
 
-def create_case_directories(output_folder: str, write_samples: bool) -> None:
+def create_case_directories(
+    output_folder: str,
+    write_samples: bool,
+    simvascular: bool = False,
+) -> None:
     """Create per-case folder tree (classic and plus compatible)."""
     directories = [
         output_folder,
         output_folder + "errors",
         output_folder + "assembly",
-        output_folder + "simvascular",
-        output_folder + "simvascular/Images",
-        output_folder + "simvascular/Paths",
-        output_folder + "simvascular/Segmentations",
-        output_folder + "simvascular/Models",
     ]
+    if simvascular:
+        directories.extend(
+            [
+                output_folder + "simvascular",
+                output_folder + "simvascular/Images",
+                output_folder + "simvascular/Paths",
+                output_folder + "simvascular/Segmentations",
+                output_folder + "simvascular/Models",
+            ]
+        )
     if write_samples:
         directories.extend(
             [

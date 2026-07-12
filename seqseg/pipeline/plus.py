@@ -48,6 +48,7 @@ def run_plus_batch(
     global_config: Mapping[str, Any],
     start: int,
     stop: int,
+    simvascular: bool = False,
     start_time_global: float,
 ) -> None:
     testing_samples, directory_data = get_testing_samples(seqseg_dataset, data_dir)
@@ -93,12 +94,13 @@ def run_plus_batch(
             dir_output0 + "/" + case + "_sweep_surface.vtp",
         )
 
-        create_case_directories(dir_output, write_samples)
-        vf.write_image_as_vti(
-            dir_image,
-            os.path.join(dir_output, "simvascular", "Images", f"{case}.vti"),
-        )
-        write_simvascular_proj(os.path.join(dir_output, "simvascular"))
+        create_case_directories(dir_output, write_samples, simvascular=simvascular)
+        if simvascular:
+            vf.write_image_as_vti(
+                dir_image,
+                os.path.join(dir_output, "simvascular", "Images", f"{case}.vti"),
+            )
+            write_simvascular_proj(os.path.join(dir_output, "simvascular"))
 
         potential_branches, initial_seeds, sweep_centerline = init.initialize_from_seg(
             pred_sweep,
@@ -144,6 +146,7 @@ def run_plus_batch(
             seg_file=dir_seg,
             start_seg=prob_pred_sweep,
             write_samples=write_samples,
+            simvascular=simvascular,
         )
         tr = trace_centerline_from_context(ctx)
         centerlines = tr.centerlines
