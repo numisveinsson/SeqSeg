@@ -27,6 +27,12 @@ from seqseg.pipeline.post import (
     run_global_centerline_batch,
     run_global_centerline_single,
 )
+from seqseg.pipeline.train import (
+    TrainDependencyError,
+    dataset_id_from_name,
+    prepare_training_dataset,
+    run_nnunet_training,
+)
 
 _TOP_LEVEL_COMMANDS = frozenset(
     {
@@ -36,6 +42,7 @@ _TOP_LEVEL_COMMANDS = frozenset(
         "config",
         "doctor",
         "init",
+        "train",
         "-h",
         "--help",
         "--version",
@@ -372,10 +379,13 @@ def _cmd_init_dataset(ns: argparse.Namespace) -> None:
     else:
         print(f"Skipped existing {seeds_path} (use --force to overwrite)")
     print(
-        "Next: add volumes under images/, optional centerlines/ and truths/, "
-        "edit seeds.json, then run:\n"
+        "Next (inference): add volumes under images/, edit seeds.json, then:\n"
         f"  seqseg run batch -data_dir {root}/ -outdir ... -img_ext .nii.gz "
         "-nnunet_results_path ...\n"
+        "\nNext (train a new model): also fill centerlines/ and truths/, then:\n"
+        f'  pip install "seqseg[train]"\n'
+        f"  seqseg train prepare --data-dir {root}/ --outdir extracted/ "
+        "--name MYDATA --dataset-number 999 --modality CT\n"
     )
 
 
@@ -472,11 +482,15 @@ def _cmd_doctor(ns: argparse.Namespace) -> None:
         ("vtk", "vtk"),
         ("nnunetv2", "nnunetv2"),
         ("scipy", "scipy"),
+        ("vascular_segment_sampler", "vascular_segment_sampler"),
     ):
         try:
             importlib.import_module(modname)
         except ImportError as e:
-            print(f"  {label}: MISSING ({e})")
+            extra = ""
+            if modname == "vascular_segment_sampler":
+                extra = ' — optional; pip install "seqseg[train]"'
+            print(f"  {label}: MISSING ({e}){extra}")
         else:
             print(f"  {label}: OK")
 
@@ -494,6 +508,86 @@ def _cmd_doctor(ns: argparse.Namespace) -> None:
             print(f"  --model-folder: OK ({mf})")
         else:
             print(f"  --model-folder: NOT FOUND ({mf})")
+
+
+def _cmd_train_prepare(ns: argparse.Namespace) -> None:
+    try:
+        result = prepare_training_dataset(
+            data_dir=ns.data_dir,
+            outdir=ns.outdir,
+            name=ns.name,
+            dataset_number=ns.dataset_number,
+            modality=ns.modality,
+            config=ns.config_name,
+            nnunet_raw=ns.nnunet_raw,
+            perc_dataset=ns.perc_dataset,
+            num_cores=ns.num_cores,
+            start_from=ns.start_from,
+            end_at=ns.end_at,
+            testing=ns.testing,
+            validation_prop=ns.validation_prop,
+            max_samples=ns.max_samples,
+            truth_from_surface=ns.truth_from_surface,
+            truth_target_spacing=ns.truth_target_spacing,
+            truth_regenerate=ns.truth_regenerate,
+            skip_sample=ns.skip_sample,
+            skip_convert=ns.skip_convert,
+            also_test=ns.also_test,
+            yes=ns.yes,
+            verbose=ns.verbose,
+        )
+    except TrainDependencyError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:  # noqa: BLE001
+        print(f"seqseg train prepare failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print("\nPrepare complete.")
+    print(f"  Patches: {result.extracted_dir}")
+    for name, path in zip(result.dataset_names, result.dataset_dirs):
+        try:
+            ds_id = dataset_id_from_name(name)
+        except ValueError:
+            ds_id = "?"
+        print(f"  nnU-Net dataset: {name}")
+        print(f"    path: {path}")
+        print(
+            "    next:\n"
+            f"      export nnUNet_raw=... nnUNet_preprocessed=... nnUNet_results=...\n"
+            f"      seqseg train nnunet --dataset-id {ds_id} --configuration 3d_fullres --fold 0"
+        )
+
+
+def _cmd_train_nnunet(ns: argparse.Namespace) -> None:
+    dataset_id = ns.dataset_id
+    if dataset_id is None:
+        if not ns.dataset_name:
+            print(
+                "seqseg train nnunet: provide --dataset-id or --dataset-name",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        try:
+            dataset_id = dataset_id_from_name(ns.dataset_name)
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(2)
+
+    try:
+        run_nnunet_training(
+            dataset_id,
+            configuration=ns.configuration,
+            fold=ns.fold,
+            skip_plan=ns.skip_plan,
+            plan_only=ns.plan_only,
+            np=ns.np,
+            trainer=ns.trainer,
+            plans=ns.plans,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"seqseg train nnunet failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def _cmd_simvascular_init(ns: argparse.Namespace) -> None:
@@ -729,6 +823,153 @@ def _build_parser() -> argparse.ArgumentParser:
         help="If set, verify this nnU-Net trainer directory exists",
     )
     doc.set_defaults(_handler=_cmd_doctor)
+
+    train_p = sub.add_parser(
+        "train",
+        help="Prepare patch datasets and train nnU-Net models for SeqSeg",
+    )
+    train_sub = train_p.add_subparsers(dest="train_cmd", required=True)
+
+    p_prep = train_sub.add_parser(
+        "prepare",
+        help="Extract vascular patches and convert to nnU-Net DatasetXXX format",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p_prep.add_argument(
+        "--data-dir",
+        "-data_dir",
+        required=True,
+        type=str,
+        help="Input cases: images/, truths/, centerlines/ (+ optional surfaces/)",
+    )
+    p_prep.add_argument(
+        "--outdir",
+        "-outdir",
+        default="./extracted_data/",
+        type=str,
+        help="Directory for extracted patches",
+    )
+    p_prep.add_argument(
+        "--name",
+        "-name",
+        required=True,
+        type=str,
+        help="Dataset name stem (e.g. MYDATA → Dataset0XX_MYDATACT)",
+    )
+    p_prep.add_argument(
+        "--dataset-number",
+        "-dataset_number",
+        required=True,
+        type=int,
+        help="nnU-Net dataset id (e.g. 999). Incremented per modality if several",
+    )
+    p_prep.add_argument(
+        "--modality",
+        "-modality",
+        default="CT",
+        type=str,
+        help="CT, MR, or comma-separated list (CT,MR)",
+    )
+    p_prep.add_argument(
+        "--config-name",
+        "-config_name",
+        default="global",
+        type=str,
+        help="Sampler YAML name/path (from vascular-segment-sampler)",
+    )
+    p_prep.add_argument(
+        "--nnunet-raw",
+        default=None,
+        type=str,
+        help="If set, write DatasetXXX_* under this directory (else --outdir)",
+    )
+    p_prep.add_argument("--perc-dataset", default=1.0, type=float)
+    p_prep.add_argument("--num-cores", default=1, type=int)
+    p_prep.add_argument("--start-from", default=0, type=int)
+    p_prep.add_argument("--end-at", default=-1, type=int)
+    p_prep.add_argument("--testing", action="store_true")
+    p_prep.add_argument("--validation-prop", default=None, type=float)
+    p_prep.add_argument("--max-samples", default=None, type=float)
+    p_prep.add_argument(
+        "--truth-from-surface",
+        action="store_true",
+        help="Rasterize surfaces/ into truths/ when needed",
+    )
+    p_prep.add_argument(
+        "--truth-target-spacing",
+        nargs=3,
+        type=float,
+        metavar=("SX", "SY", "SZ"),
+        default=None,
+    )
+    p_prep.add_argument("--truth-regenerate", action="store_true")
+    p_prep.add_argument(
+        "--skip-sample",
+        action="store_true",
+        help="Only convert existing patches in --outdir",
+    )
+    p_prep.add_argument(
+        "--skip-convert",
+        action="store_true",
+        help="Only extract patches; skip nnU-Net Dataset conversion",
+    )
+    p_prep.add_argument(
+        "--also-test",
+        action="store_true",
+        help="Also convert modality_test folders when present",
+    )
+    p_prep.add_argument("--yes", action="store_true", help="Non-interactive confirms")
+    p_prep.add_argument("--verbose", action="store_true")
+    p_prep.set_defaults(_handler=_cmd_train_prepare)
+
+    p_nn = train_sub.add_parser(
+        "nnunet",
+        help="Run nnUNetv2_plan_and_preprocess and/or nnUNetv2_train",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p_nn.add_argument(
+        "--dataset-id",
+        type=int,
+        default=None,
+        help="nnU-Net dataset id (e.g. 999 for Dataset999_...)",
+    )
+    p_nn.add_argument(
+        "--dataset-name",
+        type=str,
+        default=None,
+        help="Alternative to --dataset-id (e.g. Dataset0999_MYDATACT)",
+    )
+    p_nn.add_argument(
+        "--configuration",
+        default="3d_fullres",
+        choices=["3d_fullres", "2d", "3d_lowres", "3d_cascade_fullres"],
+        help="nnU-Net configuration",
+    )
+    p_nn.add_argument(
+        "--fold",
+        default="0",
+        type=str,
+        help="Fold to train (0-4 or all)",
+    )
+    p_nn.add_argument(
+        "--skip-plan",
+        action="store_true",
+        help="Skip plan_and_preprocess; only train",
+    )
+    p_nn.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Only run plan_and_preprocess",
+    )
+    p_nn.add_argument(
+        "--np",
+        type=int,
+        default=None,
+        help="Processes for plan_and_preprocess (-np)",
+    )
+    p_nn.add_argument("--trainer", default="nnUNetTrainer", type=str)
+    p_nn.add_argument("--plans", default="nnUNetPlans", type=str)
+    p_nn.set_defaults(_handler=_cmd_train_nnunet)
 
     return root
 

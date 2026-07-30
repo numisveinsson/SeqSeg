@@ -11,8 +11,15 @@ from seqseg.cli import (
     _build_parser,
     _cmd_config_fingerprint,
     _cmd_init_dataset,
+    _cmd_train_nnunet,
+    _cmd_train_prepare,
     _inject_legacy_run_batch,
     dispatch,
+)
+from seqseg.pipeline.train import (
+    TrainDependencyError,
+    dataset_id_from_name,
+    expected_nnunet_dataset_name,
 )
 
 
@@ -133,3 +140,102 @@ def test_dispatch_no_citation_on_help(capsys):
     assert exc.value.code == 0
     err = capsys.readouterr().err
     assert "Please cite" not in err
+
+
+def test_parser_train_prepare():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--data-dir",
+            "/tmp/data",
+            "--name",
+            "MYDATA",
+            "--dataset-number",
+            "999",
+            "--modality",
+            "CT",
+        ]
+    )
+    assert ns.command == "train"
+    assert ns.train_cmd == "prepare"
+    assert ns.data_dir == "/tmp/data"
+    assert ns.name == "MYDATA"
+    assert ns.dataset_number == 999
+
+
+def test_parser_train_nnunet():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        ["train", "nnunet", "--dataset-id", "999", "--fold", "all", "--plan-only"]
+    )
+    assert ns.command == "train"
+    assert ns.train_cmd == "nnunet"
+    assert ns.dataset_id == 999
+    assert ns.plan_only is True
+
+
+def test_dataset_id_from_name():
+    assert dataset_id_from_name("Dataset010_SEQCOROASOCACT") == 10
+    assert dataset_id_from_name("Dataset0999_MYDATACT") == 999
+    assert expected_nnunet_dataset_name("MYDATA", 999, "ct") == "Dataset0999_MYDATACT"
+
+
+def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
+    ns = argparse.Namespace(
+        data_dir=str(tmp_path),
+        outdir=str(tmp_path / "out"),
+        name="MYDATA",
+        dataset_number=999,
+        modality="CT",
+        config_name="global",
+        nnunet_raw=None,
+        perc_dataset=1.0,
+        num_cores=1,
+        start_from=0,
+        end_at=-1,
+        testing=False,
+        validation_prop=None,
+        max_samples=None,
+        truth_from_surface=False,
+        truth_target_spacing=None,
+        truth_regenerate=False,
+        skip_sample=False,
+        skip_convert=False,
+        also_test=False,
+        yes=False,
+        verbose=False,
+    )
+    with patch(
+        "seqseg.cli.prepare_training_dataset",
+        side_effect=TrainDependencyError("missing"),
+    ):
+        with pytest.raises(SystemExit) as exc:
+            _cmd_train_prepare(ns)
+    assert exc.value.code == 1
+    assert "missing" in capsys.readouterr().err
+
+
+def test_cmd_train_nnunet_resolves_name(monkeypatch):
+    called = {}
+
+    def fake_run(dataset_id, **kwargs):
+        called["dataset_id"] = dataset_id
+        called["kwargs"] = kwargs
+
+    monkeypatch.setattr("seqseg.cli.run_nnunet_training", fake_run)
+    ns = argparse.Namespace(
+        dataset_id=None,
+        dataset_name="Dataset0999_MYDATACT",
+        configuration="3d_fullres",
+        fold="0",
+        skip_plan=False,
+        plan_only=True,
+        np=None,
+        trainer="nnUNetTrainer",
+        plans="nnUNetPlans",
+    )
+    _cmd_train_nnunet(ns)
+    assert called["dataset_id"] == 999
+    assert called["kwargs"]["plan_only"] is True

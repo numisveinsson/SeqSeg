@@ -75,8 +75,12 @@ Other common commands:
 | -------- | ------- |
 | `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
 | `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg |
+| `seqseg train prepare` | Extract patches and create an nnU-Net Dataset (`pip install "seqseg[train]"`) |
+| `seqseg train nnunet` | Plan/preprocess and train with nnU-Net |
 | `seqseg doctor` | Check imports and optional trainer folder |
 | `seqseg simvascular init` | Create/refresh a SimVascular project layout under a case directory |
+
+Training a model on a new dataset is documented in [Training](training.md).
 
 ## Advanced Usage Examples
 

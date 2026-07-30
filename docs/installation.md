@@ -15,12 +15,22 @@ pip install seqseg
 seqseg --help  # Verify installation
 ```
 
+To prepare training data and train new nnU-Net models for SeqSeg:
+
+```bash
+pip install "seqseg[train]"   # adds vascular-segment-sampler
+seqseg doctor                # checks sampler + nnUNet_* env vars
+```
+
+See [Training](training.md).
+
 ## Option 2: Development Installation
 
 ```bash
 git clone https://github.com/numisveinsson/SeqSeg.git
 cd SeqSeg
 pip install -e .
+pip install -e ".[train]"   # optional: training-data tools
 ```
 
 ## Option 3: Conda Environment
