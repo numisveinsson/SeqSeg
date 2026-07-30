@@ -51,7 +51,7 @@ If the installation was successful, you should see subcommands (`run`, `post`, `
 For the aorta tutorial, run batch tracing from the cloned repo (see `seqseg/tutorial/tutorial.md`):
 
 ```powershell
-seqseg run batch -data_dir seqseg\tutorial\data\ -nnunet_results_path ..\nnUNet_results\ -outdir tutorial_output\ -img_ext .mha -config_name aorta_tutorial
+seqseg run batch -data_dir seqseg\tutorial\data\ -nnunet_results_path ..\nnUNet_results\ -outdir tutorial_output\ -img_ext .mha -config_name aorta_tutorial -simvascular 1
 ```
 
 ## 6. Git clone the SeqSeg repository 📂

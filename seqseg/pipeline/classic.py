@@ -14,7 +14,10 @@ from seqseg.modules import sitk_functions as sf
 from seqseg.modules import vtk_functions as vf
 from seqseg.modules.assembly import calc_centerline_global
 from seqseg.modules.capping import cap_surface
-from seqseg.modules.simvascular import write_simvascular_proj
+from seqseg.modules.simvascular import (
+    write_simvascular_model,
+    write_simvascular_proj,
+)
 from seqseg.modules.tracing import trace_centerline_from_context, TracingContext
 from seqseg.pipeline.directories import create_case_directories
 
@@ -50,9 +53,9 @@ def run_classic_batch(
     start_time_global: float,
 ) -> None:
     """Run classic tracing for ``testing_samples[start:stop]``."""
-    assembly_spacing_factor = global_config.get("ASSEMBLY_SPACING_FACTOR", 1.0)
-    if assembly_spacing_factor <= 0:
-        raise ValueError("assembly_spacing_factor must be > 0")
+    cent_max_spacing = global_config.get("CENT_MAX_SPACING", None)
+    if cent_max_spacing is not None and float(cent_max_spacing) <= 0:
+        raise ValueError("CENT_MAX_SPACING must be > 0 (mm)")
 
     for i, test_case in enumerate(testing_samples[start:stop]):
         print(
@@ -157,16 +160,22 @@ def run_classic_batch(
         if write_samples:
             n_udpates = assembly_obj.get_n_updates_image()
 
-        if assembly_spacing_factor != 1.0:
-            target_spacing = [
-                spacing * assembly_spacing_factor for spacing in assembly.GetSpacing()
-            ]
-            print(f"Resampling final assembly to spacing: {target_spacing}")
-            assembly = sf.resample_to_spacing(assembly, target_spacing, is_label=False)
-            if write_samples:
-                n_udpates = sf.resample_to_spacing(
-                    n_udpates, target_spacing, is_label=True
+        if cent_max_spacing is not None:
+            target_spacing = sf.capped_target_spacing(
+                assembly.GetSpacing(), cent_max_spacing, unit
+            )
+            if target_spacing is not None:
+                print(
+                    f"Resampling final assembly to spacing <= "
+                    f"{float(cent_max_spacing)} mm: {target_spacing}"
                 )
+                assembly = sf.resample_to_spacing(
+                    assembly, target_spacing, is_label=False
+                )
+                if write_samples:
+                    n_udpates = sf.resample_to_spacing(
+                        n_udpates, target_spacing, is_label=True
+                    )
 
         assembly_binary = sitk.BinaryThreshold(
             assembly,
@@ -222,6 +231,12 @@ def run_classic_batch(
             dir_output0 + "/" + case + "_surface_mesh_" + test_name + "_"
             + str(n_steps_taken) + "_steps" + ".vtp",
         )
+        if simvascular:
+            write_simvascular_model(
+                surface_smooth,
+                os.path.join(dir_output, "simvascular"),
+                case,
+            )
 
         if len(centerlines) > 0:
             final_surface = vf.appendPolyData(surfaces)

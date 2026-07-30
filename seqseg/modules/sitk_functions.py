@@ -87,6 +87,48 @@ def resample_to_spacing(image, new_spacing, is_label=False):
     return resample.Execute(image)
 
 
+def max_spacing_mm_to_image_units(max_spacing_mm, unit):
+    """
+    Convert a max spacing specified in mm to image coordinate units.
+
+    Parameters
+    ----------
+    max_spacing_mm : float
+        Maximum spacing in millimeters.
+    unit : str
+        Image units, ``'cm'`` or ``'mm'``.
+    """
+    unit_norm = str(unit).strip().lower()
+    max_spacing_mm = float(max_spacing_mm)
+    if max_spacing_mm <= 0:
+        raise ValueError("max_spacing_mm must be > 0")
+    if unit_norm == "cm":
+        return max_spacing_mm * 0.1
+    if unit_norm == "mm":
+        return max_spacing_mm
+    raise ValueError(f"Unsupported unit '{unit}'; expected 'cm' or 'mm'")
+
+
+def capped_target_spacing(spacing, max_spacing_mm, unit):
+    """
+    Cap each spacing component to at most ``max_spacing_mm``.
+
+    ``max_spacing_mm`` is in millimeters and converted to image units via
+    ``unit``. Dimensions already finer than the cap are left unchanged.
+
+    Returns
+    -------
+    list[float] | None
+        Target spacing if any dimension was capped, otherwise ``None``.
+    """
+    max_sp = max_spacing_mm_to_image_units(max_spacing_mm, unit)
+    orig = [float(s) for s in spacing]
+    target = [min(s, max_sp) for s in orig]
+    if any(t < s for t, s in zip(target, orig)):
+        return target
+    return None
+
+
 def parse_resample_spacing_arg(spacing_arg):
     """
     Convert CLI ``--resample_spacing`` values to an (sx, sy, sz) tuple.

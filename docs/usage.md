@@ -15,6 +15,12 @@ your_project/
 └── truths/              # Optional: ground truth segmentations
 ```
 
+You can scaffold this layout with:
+
+```bash
+seqseg init dataset --path your_project/
+```
+
 ### Supported Image Formats
 - **NIfTI**: `.nii`, `.nii.gz`
 - **MetaImage**: `.mha`, `.mhd`
@@ -48,8 +54,10 @@ Format: `[[start_point], [direction_point], radius_estimate]`
 
 ## Basic Usage
 
+Preferred entry point is `seqseg run batch` (legacy flat `seqseg -data_dir …` is rewritten automatically):
+
 ```bash
-seqseg \
+seqseg run batch \
     -data_dir /path/to/data/ \
     -nnunet_results_path /path/to/nnUNet_results/ \
     -nnunet_type 3d_fullres \
@@ -57,27 +65,44 @@ seqseg \
     -fold all \
     -img_ext .mha \
     -config_name aorta_tutorial \
-    -outdir results/
+    -outdir results/ \
+    -simvascular 1
 ```
+
+Other common commands:
+
+| Command | Purpose |
+| -------- | ------- |
+| `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
+| `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg |
+| `seqseg doctor` | Check imports and optional trainer folder |
+| `seqseg simvascular init` | Create/refresh a SimVascular project layout under a case directory |
 
 ## Advanced Usage Examples
 
+#### SimVascular project export:
+```bash
+seqseg run batch -data_dir data/ -outdir results/ -simvascular 1
+```
+
 #### Debugging mode (write out intermediate results):
 ```bash
-seqseg -data_dir data/ -max_n_steps 100 -max_n_branches 10 -write_steps 1
+seqseg run batch -data_dir data/ -max_n_steps 100 -max_n_branches 10 -write_steps 1
 ```
 
 #### Batch processing:
 ```bash
-seqseg -data_dir data/ -start 0 -stop 50  # Process cases 0-49
+seqseg run batch -data_dir data/ -start 0 -stop 50  # Process cases 0-49
 ```
 
 #### Scale adjustment:
 ```bash
-seqseg -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, data in mm
+seqseg run batch -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, data in mm
 ```
 
 ## Command Line Arguments
+
+Arguments for `seqseg run batch` (same flags as legacy flat CLI):
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -101,6 +126,7 @@ seqseg -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, data in mm
 | `cap_surface_cent` | int | `0` | Cap vessel surface ends (0/1) |
 | `pt_centerline` | int | `50` | Centerline point spacing for seed extraction |
 | `num_seeds_centerline` | int | `1` | Number of seeds for centerline initialization |
+| `simvascular` | int | `0` | Write SimVascular project under each case (`0`/`1`) |
 
 ## Output Files
 
@@ -113,7 +139,8 @@ SeqSeg generates several output files for each processed case. Filenames include
 | `{case}_centerline_{test_name}_{steps}_steps.vtp` | Extracted vessel centerlines (only when `extract_global_centerline=1`) |
 | `{case}_binary_seg_*.mha` | Raw binary segmentation |
 | `{case}_prob_seg_*.mha` | Probabilistic segmentation |
-| `simvascular/` | Directory with SimVascular-compatible files |
+
+Per-case working directory (e.g. `results/3d_fullres_{case}/`):
 
 **For debugging** (when `write_steps=1`):
 - `volumes/`: Local image patches
@@ -121,3 +148,22 @@ SeqSeg generates several output files for each processed case. Filenames include
 - `centerlines/`: Intermediate centerlines
 - `surfaces/`: Intermediate surfaces
 - `points/`: Tracking points
+
+### SimVascular project (`-simvascular 1`)
+
+When enabled, each case folder also contains a ready-to-open SimVascular project:
+
+```
+{test_name}_{case}/simvascular/
+├── simvascular.proj          # Open this in SimVascular
+├── Images/{case}.vti         # Volume (+ sidecars for SV)
+├── Paths/*.pth               # Pathlines per branch
+├── Segmentations/*.ctgr      # Contour groups per path
+└── Models/{case}.vtp         # Surface solid (+ companion .mdl)
+```
+
+Open `simvascular.proj` (or the `simvascular/` folder) in SimVascular to load the image, paths, contours, and model together. You can also scaffold or refresh a project layout later with:
+
+```bash
+seqseg simvascular init --case-dir results/3d_fullres_case_001/
+```

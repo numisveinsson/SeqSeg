@@ -62,6 +62,9 @@ dev = [
 viz = [
   "matplotlib>=3.5",
 ]
+train = [
+  "vascular-segment-sampler @ git+https://github.com/numisveinsson/vascular-segment-sampler.git",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["seqseg/tests"]

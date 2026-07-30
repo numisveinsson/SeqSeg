@@ -375,6 +375,52 @@ def write_simvascular_proj(simvascular_dir):
         f.write('<simvascular_project version="1.0"/>\n\n')
 
 
+def write_simvascular_model(polydata, simvascular_dir, model_name):
+    """Write a PolyData surface into ``simvascular/Models/{model_name}.vtp``.
+
+    Also writes a companion ``.mdl`` so SimVascular registers the solid when
+    the project is opened (same pairing as ``seqseg/tutorial/data/Models/``).
+    """
+    models_dir = os.path.join(simvascular_dir, "Models")
+    os.makedirs(models_dir, exist_ok=True)
+    base = os.path.join(models_dir, model_name)
+    vtp_path = base + ".vtp"
+    mdl_path = base + ".mdl"
+
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetFileName(vtp_path)
+    writer.SetInputData(polydata)
+    writer.Write()
+
+    with open(mdl_path, "w", encoding="utf-8") as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+        f.write('<model type="PolyData" version="1.0">\n')
+        f.write('    <timestep id="0">\n')
+        f.write(
+            '        <model_element type="PolyData" '
+            'num_sampling="0" use_uniform="0">\n'
+        )
+        f.write("            <segmentations/>\n")
+        f.write("            <faces>\n")
+        f.write(
+            '                <face id="1" name="wall" type="wall" '
+            'visible="true" opacity="1" '
+            'color1="1" color2="1" color3="1"/>\n'
+        )
+        f.write("            </faces>\n")
+        f.write("            <blend_radii/>\n")
+        f.write(
+            '            <blend_param blend_iters="2" sub_blend_iters="3" '
+            'cstr_smooth_iters="2" lap_smooth_iters="50" '
+            'subdivision_iters="1" decimation="0.01"/>\n'
+        )
+        f.write("        </model_element>\n")
+        f.write("    </timestep>\n")
+        f.write("</model>\n")
+
+    return vtp_path
+
+
 def _sitk_index_to_physical_jacobian(sitk_image):
     """Linear 3x3 part of ITK TransformIndexToPhysicalPoint (physical = origin + M @ index)."""
     direction = np.asarray(sitk_image.GetDirection(), dtype=np.float64).reshape(3, 3)

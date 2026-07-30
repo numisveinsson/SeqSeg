@@ -15,7 +15,10 @@ from seqseg.modules import vtk_functions as vf
 from seqseg.modules.assembly import calc_centerline_global
 from seqseg.modules.capping import cap_surface
 from seqseg.modules.datasets import get_testing_samples
-from seqseg.modules.simvascular import write_simvascular_proj
+from seqseg.modules.simvascular import (
+    write_simvascular_model,
+    write_simvascular_proj,
+)
 from seqseg.modules.sweep import run_global_segmentation
 from seqseg.modules.tracing import TracingContext, trace_centerline_from_context
 from seqseg.pipeline.directories import create_case_directories
@@ -52,6 +55,9 @@ def run_plus_batch(
     start_time_global: float,
 ) -> None:
     testing_samples, directory_data = get_testing_samples(seqseg_dataset, data_dir)
+    cent_max_spacing = global_config.get("CENT_MAX_SPACING", None)
+    if cent_max_spacing is not None and float(cent_max_spacing) <= 0:
+        raise ValueError("CENT_MAX_SPACING must be > 0 (mm)")
 
     for test_case in testing_samples[start:stop]:
         print(f"\n{test_case}\n")
@@ -177,6 +183,18 @@ def run_plus_batch(
         )
 
         assembly = assembly_org
+        if cent_max_spacing is not None:
+            target_spacing = sf.capped_target_spacing(
+                assembly.GetSpacing(), cent_max_spacing, unit
+            )
+            if target_spacing is not None:
+                print(
+                    f"Resampling final assembly to spacing <= "
+                    f"{float(cent_max_spacing)} mm: {target_spacing}"
+                )
+                assembly = sf.resample_to_spacing(
+                    assembly, target_spacing, is_label=False
+                )
 
         assembly_binary = sitk.BinaryThreshold(
             assembly,
@@ -204,6 +222,12 @@ def run_plus_batch(
             surface_smooth,
             dir_output0 + "/" + case + "_surface_" + str(n_steps_taken) + "_steps.vtp",
         )
+        if simvascular:
+            write_simvascular_model(
+                surface_smooth,
+                os.path.join(dir_output, "simvascular"),
+                case,
+            )
 
         final_surface = vf.appendPolyData(surfaces)
         final_centerline = vf.appendPolyData(centerlines)

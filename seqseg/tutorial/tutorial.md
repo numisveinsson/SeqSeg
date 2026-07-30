@@ -156,7 +156,8 @@ seqseg run batch \
     -outdir tutorial_output/ \
     -unit cm \
     -scale 1 \
-    -extract_global_centerline 1
+    -extract_global_centerline 1 \
+    -simvascular 1
 ```
 
 **Windows (PowerShell):**
@@ -175,7 +176,8 @@ seqseg run batch `
     -outdir tutorial_output\ `
     -unit cm `
     -scale 1 `
-    -extract_global_centerline 1
+    -extract_global_centerline 1 `
+    -simvascular 1
 ```
 
 **Windows (Command Prompt):** use the same flags with `^` line continuations and `seqseg run batch` instead of `seqseg` alone.
@@ -194,7 +196,8 @@ seqseg run single \
   --train-dataset Dataset005_SEQAORTANDFEMOMR \
   --config-name aorta_tutorial \
   --seed -2.07 -2.20 13.43 1.1 \
-  --max-n-steps 10 --max-n-branches 3 --max-n-steps-per-branch 5
+  --max-n-steps 10 --max-n-branches 3 --max-n-steps-per-branch 5 \
+  --simvascular 1
 ```
 
 Staging is created under `tutorial_output_single/_seqseg_single_staging/`.
@@ -209,6 +212,7 @@ Staging is created under `tutorial_output_single/_seqseg_single_staging/`.
 | `-max_n_branches` | Maximum branches to follow |
 | `-max_n_steps_per_branch` | Max steps per branch |
 | `-extract_global_centerline` | Write global centerline VTP when `1` |
+| `-simvascular` | Write a SimVascular project under the case folder when `1` |
 
 ### Expected Processing Time
 - **Initialization**: ~30 seconds
@@ -221,7 +225,7 @@ Staging is created under `tutorial_output_single/_seqseg_single_staging/`.
 
 ### Output files
 
-After a successful run (with `-max_n_steps 10` and `-nnunet_type 3d_fullres`), main artifacts are under `tutorial_output/`:
+After a successful run (with `-max_n_steps 10`, `-nnunet_type 3d_fullres`, and `-simvascular 1`), main artifacts are under `tutorial_output/`:
 
 ```
 tutorial_output/
@@ -230,11 +234,16 @@ tutorial_output/
 ├── 0110_0001_centerline_3d_fullres_10_steps.vtp     # Global centerline (if -extract_global_centerline 1)
 └── 3d_fullres_0110_0001/                            # Per-case working directory
     ├── out.txt
-    ├── simvascular/                                 # SimVascular project (paths, contours, …)
+    ├── simvascular/                                 # Ready-to-open SimVascular project
+    │   ├── simvascular.proj
+    │   ├── Images/0110_0001.vti
+    │   ├── Paths/*.pth
+    │   ├── Segmentations/*.ctgr
+    │   └── Models/0110_0001.vtp (+ .mdl)
     └── …                                            # Intermediate VTK/MHA if -write_steps 1
 ```
 
-Step counts in filenames match the actual number of tracing steps taken (here, 10 if the run completes as configured).
+Step counts in filenames match the actual number of tracing steps taken (here, 10 if the run completes as configured). Without `-simvascular 1`, the `simvascular/` tree is omitted.
 
 ### Quick quality check
 ```bash
@@ -297,21 +306,33 @@ Intermediate files appear under `tutorial_output/3d_fullres_0110_0001/` in `volu
 
 ### SimVascular Integration
 
-#### Step 1: Import SeqSeg Results
-1. **Open SimVascular**
-2. **Create New Project**: 
-   - File → New SV Project → Choose location
-   - Name: `SeqSeg_Aorta_Tutorial`
+With `-simvascular 1`, SeqSeg already wrote a project under
+`tutorial_output/3d_fullres_0110_0001/simvascular/`. Prefer opening that over
+manually importing the top-level `.vtp`.
 
-3. **Import Surface Model**:
-   - Right-click **Models** tab → **Import Solid Model**
-   - Select: `tutorial_output/0110_0001_surface_mesh_3d_fullres_10_steps.vtp`
-   - Name: `AortaModel_SeqSeg`
-   - Or open the generated project: `tutorial_output/3d_fullres_0110_0001/simvascular/`
-   - **Import** → Should see model in 3D view
+#### Step 1: Open the generated project
+1. **Open SimVascular**
+2. **File → Open SV Project** (or open the folder):
+   - Select: `tutorial_output/3d_fullres_0110_0001/simvascular/simvascular.proj`
+3. You should see:
+   - **Images**: volume `0110_0001`
+   - **Paths**: one `.pth` per traced branch
+   - **Segmentations**: matching `.ctgr` contour groups
+   - **Models**: surface solid `0110_0001` (`.vtp` + `.mdl`)
+
+If you ran without `-simvascular 1`, either re-run with the flag or scaffold the
+layout later:
+
+```bash
+seqseg simvascular init --case-dir tutorial_output/3d_fullres_0110_0001/
+```
+
+You can still import the top-level surface manually if needed:
+**Models** → **Import Solid Model** →
+`tutorial_output/0110_0001_surface_mesh_3d_fullres_10_steps.vtp`.
 
 #### Step 2: Model Preparation
-1. **Select Model**: Click `AortaModel_SeqSeg` in Models tab
+1. **Select Model**: Click `0110_0001` (or your imported model) in the Models tab
 
 2. **Extract Faces**:
    - **Face Ops** tab → **Extract Faces**
@@ -342,7 +363,7 @@ Intermediate files appear under `tutorial_output/3d_fullres_0110_0001/` in `volu
 #### Step 4: Mesh Generation
 1. **Create Mesh**:
    - **Meshes** tab → **Create Mesh**
-   - Select model: `AortaModel_SeqSeg`
+   - Select model: `0110_0001`
    - Mesh parameters:
      - Global Edge Size: `0.5` mm
      - Surface Mesh Flag: `1`
