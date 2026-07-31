@@ -92,10 +92,11 @@ def test_prepare_multi_modality_increments_ids(tmp_path):
     ]
 
 
-def test_run_nnunet_training_requires_env(monkeypatch):
+def test_run_nnunet_training_requires_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("SEQSEG_PATHS_FILE", str(tmp_path / "no_paths.yaml"))
     for key in ("nnUNet_raw", "nnUNet_preprocessed", "nnUNet_results"):
         monkeypatch.delenv(key, raising=False)
-    with pytest.raises(RuntimeError, match="nnUNet_raw"):
+    with pytest.raises(RuntimeError, match="nnU-Net paths"):
         run_nnunet_training(999, plan_only=True)
 
 

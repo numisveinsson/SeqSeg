@@ -165,6 +165,24 @@ def test_parser_train_prepare():
     assert ns.dataset_number == 999
 
 
+def test_parser_paths_init():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "paths",
+            "init",
+            "--data-dir",
+            "/tmp/data",
+            "--outdir",
+            "/tmp/out",
+        ]
+    )
+    assert ns.command == "paths"
+    assert ns.paths_cmd == "init"
+    assert ns.data_dir == "/tmp/data"
+    assert ns.outdir == "/tmp/out"
+
+
 def test_parser_train_nnunet():
     parser = _build_parser()
     ns = parser.parse_args(

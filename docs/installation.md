@@ -19,7 +19,8 @@ To prepare training data and train new nnU-Net models for SeqSeg:
 
 ```bash
 pip install "seqseg[train]"   # adds vascular-segment-sampler
-seqseg doctor                # checks sampler + nnUNet_* env vars
+seqseg paths init             # saves ~/nnunet_data/... in ~/.seqseg/paths.yaml
+seqseg doctor                 # checks sampler + saved/effective paths
 ```
 
 See [Training](training.md).
@@ -55,9 +56,12 @@ scipy                    # Scientific computing
 
 **Optional Dependencies:**
 ```
-matplotlib               # Plotting and visualization
-vmtk                     # Advanced vascular modeling tools
+matplotlib                       # Plotting and visualization (pip install "seqseg[viz]")
+vascular-segment-sampler         # Patch sampling + nnU-Net dataset prep (pip install "seqseg[train]")
+vmtk                             # Advanced vascular modeling tools
 ```
+
+`vascular-segment-sampler` is required for `seqseg train prepare`. See [Training](training.md).
 
 ## Model Weights
 

@@ -50,9 +50,10 @@ SeqSeg **2.0** refactors the package around a clearer CLI and a stable Python AP
 | **`seqseg run single`** | One volume + seeds: stages under `<outdir>/_seqseg_single_staging/`, then runs like batch |
 | **`seqseg run plus batch`** | Global nnU-Net sweep, then SeqSeg (replaces monolithic `seqseg_plus` script flow) |
 | **`seqseg init dataset`** | Scaffold `images/`, `centerlines/`, `truths/`, and template `seeds.json` |
+| **`seqseg paths init` / `set` / `show`** | Save default nnU-Net / data / out dirs in `~/.seqseg/paths.yaml` |
 | **`seqseg train prepare`** | Extract patches + build nnU-Net Dataset (needs `pip install "seqseg[train]"`) |
 | **`seqseg train nnunet`** | Run nnU-Net plan/preprocess and training |
-| **`seqseg doctor`** | Check imports (SimpleITK, vtk, nnunetv2, scipy, optional sampler) and nnU-Net paths |
+| **`seqseg doctor`** | Check imports (SimpleITK, vtk, nnunetv2, scipy, optional sampler) and paths |
 | **`seqseg config dump` / `fingerprint`** | Inspect or diff packaged YAML configs |
 | **`seqseg post global-centerline`** | Post-process segmentations into global centerlines |
 | **`seqseg simvascular init`** | Create or refresh SimVascular project layout under a case directory |
@@ -121,7 +122,7 @@ seqseg -data_dir your_data/ -nnunet_results_path path/to/weights/ -config_name a
 | [Algorithm Overview](docs/algorithm.md) | Methodology, workflow, and training strategy |
 | [Training](docs/training.md) | Train nnU-Net models on a new dataset for SeqSeg |
 | [Performance & Benchmarks](docs/benchmarks.md) | Accuracy, timing, and qualitative comparisons |
-| [Research & Development](docs/development.md) | Extending SeqSeg, custom models, and tool integrations |
+| [Research & Development](docs/development.md) | SimVascular / Slicer integrations and related tooling |
 
 ## Citation
 

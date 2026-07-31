@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence, Union
 
+from seqseg.user_paths import apply_nnunet_env, ensure_nnunet_dirs, resolve_path
+
 
 class TrainDependencyError(RuntimeError):
     """Raised when optional training dependencies are missing."""
@@ -55,8 +57,8 @@ class PrepareResult:
 
 
 def prepare_training_dataset(
-    data_dir: str,
-    outdir: str,
+    data_dir: Optional[str] = None,
+    outdir: Optional[str] = None,
     *,
     name: str,
     dataset_number: int,
@@ -86,9 +88,21 @@ def prepare_training_dataset(
     """
     extract_patches, write_nnunet_dataset = _require_sampler()
 
-    data_dir = os.path.abspath(os.path.expanduser(data_dir))
-    outdir = os.path.abspath(os.path.expanduser(outdir))
+    resolved_data = resolve_path("data_dir", data_dir)
+    resolved_out = resolve_path("outdir", outdir) or "./extracted_data/"
+    if not resolved_data:
+        raise ValueError(
+            "data_dir is required. Pass --data-dir or set it with:\n"
+            "  seqseg paths set --data-dir /path/to/cases"
+        )
+    data_dir = resolved_data
+    outdir = resolved_out
     os.makedirs(outdir, exist_ok=True)
+
+    if nnunet_raw is None:
+        nnunet_raw = resolve_path("nnunet_raw")
+    if nnunet_raw:
+        ensure_nnunet_dirs({"nnunet_raw": nnunet_raw})
 
     modalities = _parse_modalities(modality)
     modality_arg = ",".join(modalities)
@@ -162,8 +176,9 @@ def prepare_training_dataset(
 
 
 def _nnunet_env_or_raise() -> dict:
-    """Return env with required nnU-Net path variables, or raise a clear error."""
+    """Return env with nnU-Net paths from env vars and/or ``seqseg paths``."""
     env = os.environ.copy()
+    apply_nnunet_env(env, create_dirs=True)
     missing = [
         key
         for key in ("nnUNet_raw", "nnUNet_preprocessed", "nnUNet_results")
@@ -171,9 +186,12 @@ def _nnunet_env_or_raise() -> dict:
     ]
     if missing:
         raise RuntimeError(
-            "nnU-Net environment variables are not set: "
+            "nnU-Net paths are not set: "
             + ", ".join(missing)
-            + "\nExample:\n"
+            + "\nSet them once with:\n"
+            "  seqseg paths init\n"
+            "  # or: seqseg paths set --nnunet-root ~/nnunet_data\n"
+            "Or export:\n"
             "  export nnUNet_raw=/path/to/nnUNet_raw\n"
             "  export nnUNet_preprocessed=/path/to/nnUNet_preprocessed\n"
             "  export nnUNet_results=/path/to/nnUNet_results"

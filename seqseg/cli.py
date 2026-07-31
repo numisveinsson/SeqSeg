@@ -9,6 +9,7 @@ import shutil
 import sys
 import time
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import List, Optional, Sequence
 
 import faulthandler
@@ -33,6 +34,18 @@ from seqseg.pipeline.train import (
     prepare_training_dataset,
     run_nnunet_training,
 )
+from seqseg.user_paths import (
+    apply_nnunet_env,
+    clear_paths,
+    default_paths_file,
+    ensure_nnunet_dirs,
+    format_paths_report,
+    load_paths,
+    merge_path_updates,
+    resolve_path,
+    save_paths,
+    shell_exports,
+)
 
 _TOP_LEVEL_COMMANDS = frozenset(
     {
@@ -43,6 +56,7 @@ _TOP_LEVEL_COMMANDS = frozenset(
         "doctor",
         "init",
         "train",
+        "paths",
         "-h",
         "--help",
         "--version",
@@ -170,26 +184,34 @@ def _seqseg_version() -> str:
 
 
 def _validate_trace_batch(ns: argparse.Namespace) -> None:
+    # Fill from ``seqseg paths`` when CLI flags / env are omitted.
+    if not ns.data_directory:
+        ns.data_directory = resolve_path("data_dir")
+    if not ns.outdir:
+        ns.outdir = resolve_path("outdir")
+    if not ns.nnunet_results_path:
+        ns.nnunet_results_path = resolve_path("nnunet_results")
+
     missing = []
     if not ns.data_directory:
-        missing.append("-data_dir / --data_directory")
+        missing.append("-data_dir / --data_directory (or: seqseg paths set --data-dir …)")
     if not ns.outdir:
-        missing.append("-outdir / --outdir")
+        missing.append("-outdir / --outdir (or: seqseg paths set --outdir …)")
     if not ns.img_ext:
         missing.append("-img_ext / --img_ext")
     if not ns.nnunet_results_path:
-        missing.append("-nnunet_results_path / --nnunet_results_path")
+        missing.append(
+            "-nnunet_results_path (or: seqseg paths init / set --nnunet-root …)"
+        )
     if missing:
         print(
             "seqseg run batch: missing required arguments:\n  "
             + "\n  ".join(missing)
             + "\n\nMinimal example:\n"
-            "  seqseg run batch \\\n"
-            "    -data_dir /path/to/dataset/ \\\n"
-            "    -outdir /path/to/out/ \\\n"
-            "    -img_ext .nii.gz \\\n"
-            "    -nnunet_results_path /path/to/nnUNet_results \\\n"
-            "    -train_dataset Dataset010_SEQCOROASOCACT\n",
+            "  seqseg paths init\n"
+            "  seqseg paths set --data-dir /path/to/dataset --outdir /path/to/out\n"
+            "  seqseg run batch -img_ext .nii.gz "
+            "-train_dataset Dataset010_SEQCOROASOCACT\n",
             file=sys.stderr,
         )
         sys.exit(2)
@@ -384,8 +406,8 @@ def _cmd_init_dataset(ns: argparse.Namespace) -> None:
         "-nnunet_results_path ...\n"
         "\nNext (train a new model): also fill centerlines/ and truths/, then:\n"
         f'  pip install "seqseg[train]"\n'
-        f"  seqseg train prepare --data-dir {root}/ --outdir extracted/ "
-        "--name MYDATA --dataset-number 999 --modality CT\n"
+        f"  seqseg paths init --data-dir {root}/ --outdir ~/seqseg_train\n"
+        "  seqseg train prepare --name MYDATA --dataset-number 999 --modality CT\n"
     )
 
 
@@ -494,13 +516,7 @@ def _cmd_doctor(ns: argparse.Namespace) -> None:
         else:
             print(f"  {label}: OK")
 
-    for env_key in (
-        "nnUNet_results",
-        "nnUNet_raw",
-        "nnUNet_preprocessed",
-    ):
-        val = os.environ.get(env_key)
-        print(f"  {env_key}: {val if val else '(unset)'}")
+    print(format_paths_report())
 
     if getattr(ns, "model_folder", None):
         mf = os.path.expanduser(ns.model_folder)
@@ -508,6 +524,85 @@ def _cmd_doctor(ns: argparse.Namespace) -> None:
             print(f"  --model-folder: OK ({mf})")
         else:
             print(f"  --model-folder: NOT FOUND ({mf})")
+
+
+def _cmd_paths_show(_ns: argparse.Namespace) -> None:
+    print(format_paths_report())
+
+
+def _cmd_paths_init(ns: argparse.Namespace) -> None:
+    updated = merge_path_updates(
+        load_paths(),
+        nnunet_root=ns.nnunet_root,
+        data_dir=ns.data_dir,
+        outdir=ns.outdir,
+    )
+    pf = save_paths(updated)
+    created = ensure_nnunet_dirs(updated)
+    print(f"Wrote {pf}")
+    for p in created:
+        print(f"  ensured dir: {p}")
+    if updated.get("data_dir"):
+        print(f"  data_dir: {updated['data_dir']}")
+    if updated.get("outdir"):
+        print(f"  outdir: {updated['outdir']}")
+    print("\nEffective paths:")
+    print(format_paths_report())
+
+
+def _cmd_paths_set(ns: argparse.Namespace) -> None:
+    fields = (
+        ns.nnunet_root,
+        ns.nnunet_raw,
+        ns.nnunet_preprocessed,
+        ns.nnunet_results,
+        ns.data_dir,
+        ns.outdir,
+    )
+    if not any(f is not None for f in fields):
+        print(
+            "seqseg paths set: provide at least one of "
+            "--nnunet-root, --nnunet-raw, --nnunet-preprocessed, "
+            "--nnunet-results, --data-dir, --outdir",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    updated = merge_path_updates(
+        load_paths(),
+        nnunet_root=ns.nnunet_root,
+        nnunet_raw=ns.nnunet_raw,
+        nnunet_preprocessed=ns.nnunet_preprocessed,
+        nnunet_results=ns.nnunet_results,
+        data_dir=ns.data_dir,
+        outdir=ns.outdir,
+    )
+    pf = save_paths(updated)
+    if ns.mkdir:
+        for p in ensure_nnunet_dirs(updated):
+            print(f"  ensured dir: {p}")
+    print(f"Wrote {pf}")
+    print(format_paths_report())
+
+
+def _cmd_paths_clear(_ns: argparse.Namespace) -> None:
+    removed = clear_paths()
+    if removed:
+        print(f"Removed {removed}")
+    else:
+        print(f"No paths file at {default_paths_file()}")
+
+
+def _cmd_paths_export(_ns: argparse.Namespace) -> None:
+    apply_nnunet_env(create_dirs=False)
+    text = shell_exports()
+    if not text:
+        print(
+            "# No nnU-Net paths configured. Run: seqseg paths init",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(text)
 
 
 def _cmd_train_prepare(ns: argparse.Namespace) -> None:
@@ -554,8 +649,8 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         print(f"    path: {path}")
         print(
             "    next:\n"
-            f"      export nnUNet_raw=... nnUNet_preprocessed=... nnUNet_results=...\n"
-            f"      seqseg train nnunet --dataset-id {ds_id} --configuration 3d_fullres --fold 0"
+            f"      seqseg train nnunet --dataset-id {ds_id} "
+            "--configuration 3d_fullres --fold 0"
         )
 
 
@@ -838,16 +933,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_prep.add_argument(
         "--data-dir",
         "-data_dir",
-        required=True,
+        default=None,
         type=str,
-        help="Input cases: images/, truths/, centerlines/ (+ optional surfaces/)",
+        help="Input cases: images/, truths/, centerlines/ "
+        "(default: seqseg paths data_dir)",
     )
     p_prep.add_argument(
         "--outdir",
         "-outdir",
-        default="./extracted_data/",
+        default=None,
         type=str,
-        help="Directory for extracted patches",
+        help="Directory for extracted patches "
+        "(default: seqseg paths outdir, else ./extracted_data/)",
     )
     p_prep.add_argument(
         "--name",
@@ -881,7 +978,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--nnunet-raw",
         default=None,
         type=str,
-        help="If set, write DatasetXXX_* under this directory (else --outdir)",
+        help="Write DatasetXXX_* here "
+        "(default: seqseg paths nnunet_raw / $nnUNet_raw; else --outdir)",
     )
     p_prep.add_argument("--perc-dataset", default=1.0, type=float)
     p_prep.add_argument("--num-cores", default=1, type=int)
@@ -970,6 +1068,71 @@ def _build_parser() -> argparse.ArgumentParser:
     p_nn.add_argument("--trainer", default="nnUNetTrainer", type=str)
     p_nn.add_argument("--plans", default="nnUNetPlans", type=str)
     p_nn.set_defaults(_handler=_cmd_train_nnunet)
+
+    paths_p = sub.add_parser(
+        "paths",
+        help="Save default nnU-Net / data / output directories (stored in ~/.seqseg/paths.yaml)",
+    )
+    paths_sub = paths_p.add_subparsers(dest="paths_cmd", required=True)
+
+    p_show = paths_sub.add_parser(
+        "show",
+        help="Show saved and effective paths",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p_show.set_defaults(_handler=_cmd_paths_show)
+
+    p_init = paths_sub.add_parser(
+        "init",
+        help="Create ~/nnunet_data/{raw,preprocessed,results} and save paths",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p_init.add_argument(
+        "--nnunet-root",
+        default=str(Path.home() / "nnunet_data"),
+        type=str,
+        help="Parent directory for nnUNet_raw / preprocessed / results",
+    )
+    p_init.add_argument(
+        "--data-dir",
+        default=None,
+        type=str,
+        help="Optional default dataset directory",
+    )
+    p_init.add_argument(
+        "--outdir",
+        default=None,
+        type=str,
+        help="Optional default train/run output directory",
+    )
+    p_init.set_defaults(_handler=_cmd_paths_init)
+
+    p_set = paths_sub.add_parser(
+        "set",
+        help="Update one or more saved paths",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p_set.add_argument("--nnunet-root", default=None, type=str)
+    p_set.add_argument("--nnunet-raw", default=None, type=str)
+    p_set.add_argument("--nnunet-preprocessed", default=None, type=str)
+    p_set.add_argument("--nnunet-results", default=None, type=str)
+    p_set.add_argument("--data-dir", default=None, type=str)
+    p_set.add_argument("--outdir", default=None, type=str)
+    p_set.add_argument(
+        "--mkdir",
+        action="store_true",
+        help="Create nnU-Net directories if configured",
+    )
+    p_set.set_defaults(_handler=_cmd_paths_set)
+
+    p_clear = paths_sub.add_parser("clear", help="Remove ~/.seqseg/paths.yaml")
+    p_clear.set_defaults(_handler=_cmd_paths_clear)
+
+    p_export = paths_sub.add_parser(
+        "export",
+        help="Print export lines for eval \"$(seqseg paths export)\"",
+    )
+    p_export.set_defaults(_handler=_cmd_paths_export)
 
     return root
 

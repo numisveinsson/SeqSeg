@@ -4,19 +4,6 @@
 
 To train SeqSeg models on a new dataset, see [Training](training.md).
 
-## Extending SeqSeg
-
-### Custom Neural Networks
-```python
-# Replace nnUNet with custom segmentation model
-from seqseg.modules.prediction import CustomPredictor
-
-class MyPredictor(CustomPredictor):
-    def predict_patch(self, image_patch):
-        # Implement custom prediction logic
-        return segmentation_prediction
-```
-
 ## Integration with Other Tools
 
 ### SimVascular Integration
