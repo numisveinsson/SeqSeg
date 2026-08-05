@@ -106,8 +106,9 @@ def test_run_nnunet_training_plan_only(monkeypatch):
     monkeypatch.setenv("nnUNet_results", "/res")
 
     with patch("seqseg.pipeline.train.subprocess.run") as run:
-        run_nnunet_training(999, plan_only=True)
+        run_nnunet_training(999, plan_only=True, configuration="3d_fullres")
     assert run.call_count == 1
     cmd = run.call_args[0][0]
     assert "nnUNetv2_plan_and_preprocess" in cmd[0]
     assert cmd[cmd.index("-d") + 1] == "999"
+    assert cmd[cmd.index("-c") + 1] == "3d_fullres"

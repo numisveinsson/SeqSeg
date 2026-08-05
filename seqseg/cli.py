@@ -1041,7 +1041,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--configuration",
         default="3d_fullres",
         choices=["3d_fullres", "2d", "3d_lowres", "3d_cascade_fullres"],
-        help="nnU-Net configuration",
+        help="nnU-Net configuration for preprocessing (-c) and training",
     )
     p_nn.add_argument(
         "--fold",

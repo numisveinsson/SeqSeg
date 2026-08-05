@@ -231,6 +231,8 @@ def run_nnunet_training(
             _resolve_nnunet_cli("nnUNetv2_plan_and_preprocess"),
             "-d",
             str(dataset_id),
+            "-c",
+            configuration,
         ]
         if np is not None:
             plan_cmd.extend(["-np", str(np)])

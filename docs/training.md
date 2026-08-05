@@ -101,16 +101,18 @@ You can also call those APIs directly, or use the sampler CLIs `vss-sample` / `v
 
 ```bash
 seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --fold 0
-# plan only:
-seqseg train nnunet --dataset-id 999 --plan-only
+# plan/preprocess only for that configuration:
+seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --plan-only
 # train only (after planning):
 seqseg train nnunet --dataset-id 999 --skip-plan --fold all
 ```
 
+`--configuration` is passed to nnU-Net preprocessing as `-c` (default `3d_fullres`, instead of all of `2d 3d_fullres 3d_lowres`) and to training.
+
 Equivalent manual commands:
 
 ```bash
-nnUNetv2_plan_and_preprocess -d 999
+nnUNetv2_plan_and_preprocess -d 999 -c 3d_fullres
 nnUNetv2_train 999 3d_fullres 0
 ```
 
