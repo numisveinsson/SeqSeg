@@ -4,7 +4,7 @@ import numpy as np
 from .nnunet import initialize_predictor
 from .sitk_functions import copy_settings
 
-def run_global_segmentation(dir_image, model_folder, fold, scale=1):
+def run_global_segmentation(dir_image, model_folder, fold, scale=1, force_cpu=False):
     """ Run global segmentation on a single image
 
     Parameters
@@ -17,6 +17,8 @@ def run_global_segmentation(dir_image, model_folder, fold, scale=1):
         Fold number
     scale : float
         Scale factor
+    force_cpu : bool
+        If True, run nnU-Net inference on CPU even when a GPU is available.
 
     Returns
     -------
@@ -40,7 +42,7 @@ def run_global_segmentation(dir_image, model_folder, fold, scale=1):
     img_np = img_np[None]
     img_np = img_np.astype('float32')
 
-    predictor = initialize_predictor(model_folder, fold)
+    predictor = initialize_predictor(model_folder, fold, force_cpu=force_cpu)
 
     start_time_pred = time.time()
     prediction = predictor.predict_single_npy_array(img_np,

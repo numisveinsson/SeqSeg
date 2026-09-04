@@ -145,6 +145,13 @@ def _add_classic_trace_args(p: argparse.ArgumentParser) -> None:
         type=int,
         help="Write SimVascular project layout (simvascular/ dirs, .pth, .ctgr) (0/1)",
     )
+    p.add_argument(
+        "-cpu",
+        "--cpu",
+        dest="force_cpu",
+        action="store_true",
+        help="Force nnU-Net inference on CPU even if a GPU is available",
+    )
 
 
 def _add_plus_trace_args(p: argparse.ArgumentParser) -> None:
@@ -279,6 +286,7 @@ def _cmd_trace_batch(ns: argparse.Namespace) -> None:
         assembly_threshold=ns.assembly_threshold,
         resample_spacing=resample_spacing,
         simvascular=bool(ns.simvascular),
+        force_cpu=bool(ns.force_cpu),
         start_time_global=t0,
     )
     print("\nTotal calculation time for all cases is: ")
@@ -356,6 +364,7 @@ def _cmd_trace_plus_batch(ns: argparse.Namespace) -> None:
         start=ns.start,
         stop=stop,
         simvascular=bool(ns.simvascular),
+        force_cpu=bool(ns.force_cpu),
         start_time_global=t0,
     )
     print("\nTotal calculation time is: ")
@@ -488,6 +497,7 @@ def _cmd_trace_single(ns: argparse.Namespace) -> None:
         assembly_threshold=ns.assembly_threshold,
         resample_spacing=None,
         simvascular=bool(ns.simvascular),
+        force_cpu=bool(ns.force_cpu),
         start_time_global=t0,
     )
     print("\nTotal calculation time for run single: ")
@@ -810,6 +820,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0,
         type=int,
         help="Write SimVascular project layout (simvascular/ dirs, .pth, .ctgr) (0/1)",
+    )
+    p_single.add_argument(
+        "-cpu",
+        "--cpu",
+        dest="force_cpu",
+        action="store_true",
+        help="Force nnU-Net inference on CPU even if a GPU is available",
     )
     p_single.add_argument(
         "--seed",

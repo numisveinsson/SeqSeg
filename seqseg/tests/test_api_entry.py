@@ -65,6 +65,7 @@ def test_tracing_options_defaults():
     assert opts.disk_io is True
     assert opts.max_n_steps == 1000
     assert opts.fold == "all"
+    assert opts.force_cpu is False
 
 
 def test_run_tracing_builds_context_and_calls_tracing(monkeypatch):
@@ -83,7 +84,7 @@ def test_run_tracing_builds_context_and_calls_tracing(monkeypatch):
         "/fake/nnUNetTrainer",
         case="c1",
         config="global",
-        options=TracingOptions(disk_io=False, max_n_steps=50),
+        options=TracingOptions(disk_io=False, max_n_steps=50, force_cpu=True),
         output_folder="",
     )
     assert res is fake_result
@@ -92,6 +93,7 @@ def test_run_tracing_builds_context_and_calls_tracing(monkeypatch):
     assert ctx.disk_io is False
     assert ctx.max_step_size == 50
     assert ctx.model_folder == "/fake/nnUNetTrainer"
+    assert ctx.force_cpu is True
     assert len(ctx.potential_branches) == 1
 
 

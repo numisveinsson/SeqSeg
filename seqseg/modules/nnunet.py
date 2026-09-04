@@ -56,22 +56,31 @@ _CHECKPOINT_CANDIDATES = (
 )
 
 
-def initialize_predictor(model_folder, fold):
+def select_inference_device(model_folder, force_cpu=False):
+    """Pick torch device for nnU-Net inference.
 
+    ``force_cpu`` skips CUDA/MPS even when they are available (CLI ``-cpu``).
+    """
     import torch
-    from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
-    # check if GPU is available
+    if force_cpu:
+        print('Forcing CPU for nnU-Net inference')
+        return torch.device('cpu', 0)
     if torch.cuda.is_available():
         print('GPU available, using GPU')
-        device_use = torch.device('cuda', 0)
-    # check if mps is available (for Apple Silicon)
-    elif torch.backends.mps.is_available() and not '3d' in model_folder:
+        return torch.device('cuda', 0)
+    if torch.backends.mps.is_available() and '3d' not in model_folder:
         print('Using MPS backend for Apple Silicon, only available for 2D models')
-        device_use = torch.device('mps')
-    else:
-        print('GPU not available, using CPU')
-        device_use = torch.device('cpu', 0)
+        return torch.device('mps')
+    print('GPU not available, using CPU')
+    return torch.device('cpu', 0)
+
+
+def initialize_predictor(model_folder, fold, force_cpu=False):
+
+    from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
+
+    device_use = select_inference_device(model_folder, force_cpu=force_cpu)
     print('About to load predictor object')
 
     # instantiate the nnUNetPredictor

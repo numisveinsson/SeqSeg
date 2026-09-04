@@ -52,6 +52,7 @@ def run_plus_batch(
     start: int,
     stop: int,
     simvascular: bool = False,
+    force_cpu: bool = False,
     start_time_global: float,
 ) -> None:
     testing_samples, directory_data = get_testing_samples(seqseg_dataset, data_dir)
@@ -84,6 +85,7 @@ def run_plus_batch(
             model_folder=dir_model_weights_global,
             fold=global_fold,
             scale=global_scale,
+            force_cpu=force_cpu,
         )
         sitk.WriteImage(pred_sweep, dir_output0 + "/" + case + "_sweep_seg.mha")
         sweep_surface = vf.evaluate_surface(pred_sweep, 1)
@@ -153,6 +155,7 @@ def run_plus_batch(
             start_seg=prob_pred_sweep,
             write_samples=write_samples,
             simvascular=simvascular,
+            force_cpu=force_cpu,
         )
         tr = trace_centerline_from_context(ctx)
         centerlines = tr.centerlines

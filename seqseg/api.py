@@ -123,6 +123,7 @@ class TracingOptions:
     unit: str = "cm"
     scale: float = 1.0
     fold: str = "all"
+    force_cpu: bool = False
     seg_file: Optional[Union[str, sitk.Image]] = None
     start_seg: Optional[sitk.Image] = None
 
@@ -190,5 +191,6 @@ def run_tracing(
         write_samples=opts.write_samples,
         disk_io=opts.disk_io,
         simvascular=opts.simvascular,
+        force_cpu=opts.force_cpu,
     )
     return trace_centerline_from_context(ctx)

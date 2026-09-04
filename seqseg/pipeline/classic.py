@@ -50,6 +50,7 @@ def run_classic_batch(
     assembly_threshold: float,
     resample_spacing: Optional[Sequence[float]],
     simvascular: bool = False,
+    force_cpu: bool = False,
     start_time_global: float,
 ) -> None:
     """Run classic tracing for ``testing_samples[start:stop]``."""
@@ -132,6 +133,7 @@ def run_classic_batch(
             seg_file=dir_seg,
             write_samples=write_samples,
             simvascular=simvascular,
+            force_cpu=force_cpu,
         )
         tr = trace_centerline_from_context(ctx)
         centerlines = tr.centerlines

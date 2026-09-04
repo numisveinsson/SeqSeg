@@ -70,6 +70,67 @@ def test_parser_run_single_required_flags():
     assert ns.run_cmd == "single"
     assert ns.image == "/tmp/img.nii.gz"
     assert ns.model_folder == "/tmp/model"
+    assert ns.force_cpu is False
+
+
+def test_parser_run_batch_cpu_flag():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "run",
+            "batch",
+            "-data_dir",
+            "/tmp/data",
+            "-outdir",
+            "/tmp/out",
+            "-img_ext",
+            ".mha",
+            "-cpu",
+        ]
+    )
+    assert ns.force_cpu is True
+    ns_off = parser.parse_args(
+        [
+            "run",
+            "batch",
+            "-data_dir",
+            "/tmp/data",
+            "-outdir",
+            "/tmp/out",
+            "-img_ext",
+            ".mha",
+        ]
+    )
+    assert ns_off.force_cpu is False
+
+
+def test_parser_run_plus_batch_cpu_flag():
+    parser = _build_parser()
+    ns = parser.parse_args(["run", "plus", "batch", "--cpu"])
+    assert ns.force_cpu is True
+
+
+def test_parser_run_single_cpu_flag():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "run",
+            "single",
+            "--image",
+            "/tmp/img.nii.gz",
+            "--outdir",
+            "/tmp/out",
+            "--model-folder",
+            "/tmp/model",
+            "--seed",
+            "0",
+            "0",
+            "0",
+            "1",
+            "-cpu",
+        ]
+    )
+    assert ns.force_cpu is True
 
 
 def test_parser_init_dataset():

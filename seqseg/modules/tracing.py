@@ -59,6 +59,7 @@ class TracingContext:
     write_samples: bool = False
     disk_io: bool = True
     simvascular: bool = False
+    force_cpu: bool = False
 
 
 @dataclass
@@ -125,6 +126,7 @@ def trace_centerline_from_context(ctx: TracingContext) -> TracingResult:
         write_samples=ctx.write_samples,
         disk_io=ctx.disk_io,
         simvascular=ctx.simvascular,
+        force_cpu=ctx.force_cpu,
     )
     return TracingResult(*tup)
 
@@ -147,6 +149,7 @@ def trace_centerline(
     write_samples=False,
     disk_io=True,
     simvascular=False,
+    force_cpu=False,
 ):
     """
     Trace vessel centerlines using sequential segmentation and tracking.
@@ -202,6 +205,8 @@ def trace_centerline(
     simvascular : bool, optional
         When True (and ``disk_io`` is True), write SimVascular project files
         (``.pth``, ``.ctgr``) under ``output_folder/simvascular/``.
+    force_cpu : bool, optional
+        If True, run nnU-Net inference on CPU even when a GPU is available.
     Returns:
     --------
     tuple
@@ -325,7 +330,7 @@ def trace_centerline(
 
     # Load neural network model (nnU-Net) for vessel segmentation prediction
     if not (seg_file and trace_seg):
-        predictor = initialize_predictor(model_folder, fold)
+        predictor = initialize_predictor(model_folder, fold, force_cpu=force_cpu)
     else:
         print('No need to load model, we are using a given segmentation')
 
