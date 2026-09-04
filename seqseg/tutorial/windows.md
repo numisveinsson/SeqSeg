@@ -46,7 +46,7 @@ This might take a few minutes as it will download and install all necessary depe
 seqseg --help
 seqseg --version
 ```
-If the installation was successful, you should see subcommands (`run`, `post`, `config`, `doctor`, …) and version **2.0.0** or newer.
+If the installation was successful, you should see subcommands (`run`, `post`, `config`, `doctor`, …) and version **2.1.0** or newer.
 
 For the aorta tutorial, run batch tracing from the cloned repo (see `seqseg/tutorial/tutorial.md`):
 

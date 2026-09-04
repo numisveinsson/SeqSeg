@@ -38,7 +38,7 @@ pip install seqseg
 
 # Verify installation
 seqseg --help
-seqseg --version   # expect 2.0.0 or newer
+seqseg --version   # expect 2.1.0 or newer
 
 # Optional: verify nnU-Net trainer folder after downloading weights
 seqseg doctor --model-folder /path/to/nnUNet_results/Dataset005_SEQAORTANDFEMOMR/nnUNetTrainer__nnUNetPlans__3d_fullres

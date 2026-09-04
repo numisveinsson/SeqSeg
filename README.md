@@ -97,7 +97,7 @@ See [High-level API (`seqseg.api`)](#high-level-api-seqsegapi) for full detail.
 1. **CLI:** Prefer `seqseg run batch` (or keep legacy flags — they still work).
 2. **Plus workflow:** Use `seqseg run plus batch` instead of `python -m seqseg.seqseg_plus` with the same nnU-Net path flags.
 3. **Library:** Use `run_tracing` or `TracingContext` rather than calling `trace_centerline` with only file paths.
-4. **Version:** `pip install -U seqseg` and check with `seqseg --version` (expects **2.0.0**).
+4. **Version:** `pip install -U seqseg` and check with `seqseg --version` (expects **2.1.0**).
 
 ## Quick Start
 
