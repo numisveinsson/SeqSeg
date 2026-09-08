@@ -105,6 +105,12 @@ seqseg run batch -data_dir data/ -start 0 -stop 50  # Process cases 0-49
 seqseg run batch -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, data in mm
 ```
 
+#### Start from an existing segmentation:
+```bash
+seqseg run batch -data_dir data/ -start_seg /path/to/initial_seg.mha
+```
+Tracing is unchanged; the SeqSeg result is merged (union) into the initial mask.
+
 ## Command Line Arguments
 
 Arguments for `seqseg run batch` (same flags as legacy flat CLI):
@@ -131,6 +137,7 @@ Arguments for `seqseg run batch` (same flags as legacy flat CLI):
 | `cap_surface_cent` | int | `0` | Cap vessel surface ends (0/1) |
 | `pt_centerline` | int | `50` | Centerline point spacing for seed extraction |
 | `num_seeds_centerline` | int | `1` | Number of seeds for centerline initialization |
+| `start_seg` | str | - | Optional initial segmentation; SeqSeg output is merged into it |
 | `simvascular` | int | `0` | Write SimVascular project under each case (`0`/`1`) |
 
 ## Output Files

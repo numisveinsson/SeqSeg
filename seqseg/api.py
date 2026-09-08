@@ -15,6 +15,7 @@ import SimpleITK as sitk
 
 from seqseg.config_models import AlgorithmConfig
 from seqseg.modules.assembly import create_step_dict
+from seqseg.modules import sitk_functions as sf
 from seqseg.modules.tracing import (
     TracingContext,
     TracingResult,
@@ -125,7 +126,7 @@ class TracingOptions:
     fold: str = "all"
     force_cpu: bool = False
     seg_file: Optional[Union[str, sitk.Image]] = None
-    start_seg: Optional[sitk.Image] = None
+    start_seg: Optional[Union[str, sitk.Image]] = None
 
 
 def run_tracing(
@@ -172,6 +173,14 @@ def run_tracing(
     else:
         gc = AlgorithmConfig(dict(config))
 
+    start_seg = opts.start_seg
+    if isinstance(start_seg, str):
+        start_seg = sf.load_start_segmentation(start_seg, image)
+    elif start_seg is not None:
+        start_seg = sf.as_probability_image(
+            sf.resample_to_reference(start_seg, image, is_label=True)
+        )
+
     potential = seeds_to_potential_branches(seeds)
     ctx = TracingContext(
         output_folder=output_folder,
@@ -187,7 +196,7 @@ def run_tracing(
         unit=opts.unit,
         scale=opts.scale,
         seg_file=opts.seg_file,
-        start_seg=opts.start_seg,
+        start_seg=start_seg,
         write_samples=opts.write_samples,
         disk_io=opts.disk_io,
         simvascular=opts.simvascular,

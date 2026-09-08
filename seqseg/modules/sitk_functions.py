@@ -221,6 +221,103 @@ def maybe_resample_volume_paths(
     return out_image_path, out_seg_path
 
 
+def geometry_matches(image, reference, atol=1e-6):
+    """Return True if ``image`` and ``reference`` share size, spacing, origin, direction."""
+    if tuple(image.GetSize()) != tuple(reference.GetSize()):
+        return False
+    if not np.allclose(image.GetSpacing(), reference.GetSpacing(), atol=atol):
+        return False
+    if not np.allclose(image.GetOrigin(), reference.GetOrigin(), atol=atol):
+        return False
+    if not np.allclose(image.GetDirection(), reference.GetDirection(), atol=atol):
+        return False
+    return True
+
+
+def as_probability_image(seg):
+    """
+    Cast a segmentation to float32 in ``[0, 1]``.
+
+    Integer labels (e.g. 0/1 or 0/255) are divided by their max so they can
+    be used as an assembly prior.
+    """
+    arr = sitk.GetArrayFromImage(seg).astype(np.float32, copy=False)
+    vmax = float(np.max(arr)) if arr.size else 0.0
+    if vmax > 1.0:
+        arr = arr / vmax
+    arr = np.clip(arr, 0.0, 1.0)
+    out = sitk.GetImageFromArray(arr)
+    out.CopyInformation(seg)
+    return out
+
+
+def resample_to_reference(image, reference, is_label=True):
+    """Resample ``image`` onto ``reference``'s grid, or return a copy if already aligned."""
+    if geometry_matches(image, reference):
+        aligned = sitk.Image(image)
+        aligned.CopyInformation(reference)
+        return aligned
+    interpolator = sitk.sitkNearestNeighbor if is_label else sitk.sitkLinear
+    return sitk.Resample(
+        image,
+        reference,
+        sitk.Transform(),
+        interpolator,
+        0.0,
+        image.GetPixelID(),
+    )
+
+
+def load_start_segmentation(path, reference_image):
+    """
+    Load a starting segmentation and place it on ``reference_image``'s grid.
+
+    Values are normalized to probability ``[0, 1]`` so they can seed the
+    global assembly and be merged with SeqSeg's output.
+    """
+    path = os.path.abspath(os.path.expanduser(str(path)))
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Starting segmentation not found: {path}")
+    print(f"Loading starting segmentation: {path}")
+    seg = sitk.ReadImage(path)
+    if not geometry_matches(seg, reference_image):
+        print(
+            "Starting segmentation grid does not match the image; "
+            "resampling onto the image grid"
+        )
+        seg = resample_to_reference(seg, reference_image, is_label=True)
+    return as_probability_image(seg)
+
+
+def merge_binary_with_start(binary, start_prob, threshold=0.5):
+    """Union a SeqSeg binary mask with a starting probability / label image."""
+    if not geometry_matches(start_prob, binary):
+        start_prob = resample_to_reference(start_prob, binary, is_label=True)
+    start_bin = sitk.BinaryThreshold(
+        start_prob,
+        lowerThreshold=float(threshold),
+        upperThreshold=1.0,
+    )
+    merged = sitk.Or(
+        sitk.Cast(binary, sitk.sitkUInt8),
+        sitk.Cast(start_bin, sitk.sitkUInt8),
+    )
+    merged.CopyInformation(binary)
+    return merged
+
+
+def merge_probability_with_start(prob, start_prob):
+    """Voxel-wise maximum of SeqSeg probabilities and a starting segmentation."""
+    if not geometry_matches(start_prob, prob):
+        start_prob = resample_to_reference(start_prob, prob, is_label=False)
+    merged = sitk.Maximum(
+        sitk.Cast(prob, sitk.sitkFloat32),
+        sitk.Cast(start_prob, sitk.sitkFloat32),
+    )
+    merged.CopyInformation(prob)
+    return merged
+
+
 def write_image(image, outputImageFileName):
     """
     Write image to file

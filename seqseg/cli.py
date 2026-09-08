@@ -152,6 +152,15 @@ def _add_classic_trace_args(p: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Force nnU-Net inference on CPU even if a GPU is available",
     )
+    p.add_argument(
+        "-start_seg",
+        "--start_seg",
+        "--start-seg",
+        dest="start_seg",
+        default=None,
+        type=str,
+        help="Path to an initial segmentation; SeqSeg output is merged into it",
+    )
 
 
 def _add_plus_trace_args(p: argparse.ArgumentParser) -> None:
@@ -223,6 +232,16 @@ def _validate_trace_batch(ns: argparse.Namespace) -> None:
         )
         sys.exit(2)
 
+    if getattr(ns, "start_seg", None):
+        start_seg = os.path.abspath(os.path.expanduser(ns.start_seg))
+        if not os.path.isfile(start_seg):
+            print(
+                f"seqseg: starting segmentation not found: {start_seg}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        ns.start_seg = start_seg
+
 
 def _cmd_trace_batch(ns: argparse.Namespace) -> None:
     _validate_trace_batch(ns)
@@ -287,6 +306,7 @@ def _cmd_trace_batch(ns: argparse.Namespace) -> None:
         resample_spacing=resample_spacing,
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
+        start_seg_path=ns.start_seg,
         start_time_global=t0,
     )
     print("\nTotal calculation time for all cases is: ")
@@ -365,6 +385,7 @@ def _cmd_trace_plus_batch(ns: argparse.Namespace) -> None:
         stop=stop,
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
+        start_seg_path=ns.start_seg,
         start_time_global=t0,
     )
     print("\nTotal calculation time is: ")
@@ -432,6 +453,15 @@ def _cmd_trace_single(ns: argparse.Namespace) -> None:
     if not ns.image:
         print("seqseg run single: --image is required.", file=sys.stderr)
         sys.exit(2)
+    if getattr(ns, "start_seg", None):
+        start_seg = os.path.abspath(os.path.expanduser(ns.start_seg))
+        if not os.path.isfile(start_seg):
+            print(
+                f"seqseg run single: starting segmentation not found: {start_seg}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        ns.start_seg = start_seg
     if ns.seeds_json:
         if not os.path.isfile(ns.seeds_json):
             print(f"--seeds-json not found: {ns.seeds_json}", file=sys.stderr)
@@ -498,6 +528,7 @@ def _cmd_trace_single(ns: argparse.Namespace) -> None:
         resample_spacing=None,
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
+        start_seg_path=getattr(ns, "start_seg", None),
         start_time_global=t0,
     )
     print("\nTotal calculation time for run single: ")
@@ -827,6 +858,15 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="force_cpu",
         action="store_true",
         help="Force nnU-Net inference on CPU even if a GPU is available",
+    )
+    p_single.add_argument(
+        "-start_seg",
+        "--start_seg",
+        "--start-seg",
+        dest="start_seg",
+        default=None,
+        type=str,
+        help="Path to an initial segmentation; SeqSeg output is merged into it",
     )
     p_single.add_argument(
         "--seed",

@@ -51,6 +51,7 @@ def run_classic_batch(
     resample_spacing: Optional[Sequence[float]],
     simvascular: bool = False,
     force_cpu: bool = False,
+    start_seg_path: Optional[str] = None,
     start_time_global: float,
 ) -> None:
     """Run classic tracing for ``testing_samples[start:stop]``."""
@@ -104,6 +105,10 @@ def run_classic_batch(
             ref_image, potential_branches, case=case, image_path=dir_image
         )
 
+        start_seg = None
+        if start_seg_path:
+            start_seg = sf.load_start_segmentation(start_seg_path, ref_image)
+
         if not global_config["DEBUG"]:
             sys.stdout = open(dir_output + "/out.txt", "w")
         else:
@@ -131,6 +136,7 @@ def run_classic_batch(
             unit=unit,
             scale=scale,
             seg_file=dir_seg,
+            start_seg=start_seg,
             write_samples=write_samples,
             simvascular=simvascular,
             force_cpu=force_cpu,
@@ -158,6 +164,8 @@ def run_classic_batch(
             vessel_tree.plot_radius_distribution(dir_output)
 
         assembly = assembly_obj.assembly
+        if start_seg is not None:
+            assembly = sf.merge_probability_with_start(assembly, start_seg)
         n_udpates = None
         if write_samples:
             n_udpates = assembly_obj.get_n_updates_image()
@@ -202,6 +210,10 @@ def run_classic_batch(
         assembly_obj.calc_ratio_updates()
 
         assembly_binary = sf.keep_component_seeds(assembly_binary, initial_seeds)
+        if start_seg is not None:
+            assembly_binary = sf.merge_binary_with_start(
+                assembly_binary, start_seg, threshold=assembly_threshold
+            )
 
         sitk.WriteImage(
             assembly_binary,

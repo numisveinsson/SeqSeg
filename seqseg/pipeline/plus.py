@@ -53,6 +53,7 @@ def run_plus_batch(
     stop: int,
     simvascular: bool = False,
     force_cpu: bool = False,
+    start_seg_path: Optional[str] = None,
     start_time_global: float,
 ) -> None:
     testing_samples, directory_data = get_testing_samples(seqseg_dataset, data_dir)
@@ -129,6 +130,18 @@ def run_plus_batch(
             ref_image, potential_branches, case=case, image_path=dir_image
         )
 
+        user_start_seg = None
+        if start_seg_path:
+            user_start_seg = sf.load_start_segmentation(start_seg_path, ref_image)
+            sweep_prob = sf.as_probability_image(prob_pred_sweep)
+            if not sf.geometry_matches(sweep_prob, ref_image):
+                sweep_prob = sf.resample_to_reference(
+                    sweep_prob, ref_image, is_label=False
+                )
+            start_seg = sf.merge_probability_with_start(sweep_prob, user_start_seg)
+        else:
+            start_seg = prob_pred_sweep
+
         if not global_config.get("DEBUG", False):
             sys.stdout = open(dir_output + "/out.txt", "w")
         else:
@@ -152,7 +165,7 @@ def run_plus_batch(
             unit=unit,
             scale=seqseg_scale,
             seg_file=dir_seg,
-            start_seg=prob_pred_sweep,
+            start_seg=start_seg,
             write_samples=write_samples,
             simvascular=simvascular,
             force_cpu=force_cpu,
@@ -186,6 +199,8 @@ def run_plus_batch(
         )
 
         assembly = assembly_org
+        if user_start_seg is not None:
+            assembly = sf.merge_probability_with_start(assembly, user_start_seg)
         if cent_max_spacing is not None:
             target_spacing = sf.capped_target_spacing(
                 assembly.GetSpacing(), cent_max_spacing, unit
@@ -210,6 +225,10 @@ def run_plus_batch(
         )
 
         assembly_binary = sf.keep_component_seeds(assembly_binary, initial_seeds)
+        if user_start_seg is not None:
+            assembly_binary = sf.merge_binary_with_start(
+                assembly_binary, user_start_seg, threshold=assembly_threshold
+            )
         sitk.WriteImage(
             assembly_binary,
             dir_output0 + "/" + case + "_segmentation_" + str(n_steps_taken) + "_steps.mha",

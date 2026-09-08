@@ -104,6 +104,70 @@ def test_parser_run_batch_cpu_flag():
     assert ns_off.force_cpu is False
 
 
+def test_parser_run_batch_start_seg():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "run",
+            "batch",
+            "-data_dir",
+            "/tmp/data",
+            "-outdir",
+            "/tmp/out",
+            "-img_ext",
+            ".mha",
+            "-start_seg",
+            "/tmp/init.mha",
+        ]
+    )
+    assert ns.start_seg == "/tmp/init.mha"
+    ns_off = parser.parse_args(
+        [
+            "run",
+            "batch",
+            "-data_dir",
+            "/tmp/data",
+            "-outdir",
+            "/tmp/out",
+            "-img_ext",
+            ".mha",
+        ]
+    )
+    assert ns_off.start_seg is None
+
+
+def test_parser_run_single_start_seg():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "run",
+            "single",
+            "--image",
+            "/tmp/img.nii.gz",
+            "--outdir",
+            "/tmp/out",
+            "--model-folder",
+            "/tmp/model",
+            "--seed",
+            "0",
+            "0",
+            "0",
+            "1",
+            "--start-seg",
+            "/tmp/init.nii.gz",
+        ]
+    )
+    assert ns.start_seg == "/tmp/init.nii.gz"
+
+
+def test_parser_run_plus_batch_start_seg():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        ["run", "plus", "batch", "--start-seg", "/tmp/init.mha"]
+    )
+    assert ns.start_seg == "/tmp/init.mha"
+
+
 def test_parser_run_plus_batch_cpu_flag():
     parser = _build_parser()
     ns = parser.parse_args(["run", "plus", "batch", "--cpu"])
