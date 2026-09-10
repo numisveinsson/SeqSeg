@@ -362,6 +362,46 @@ def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
     assert "missing" in capsys.readouterr().err
 
 
+def test_cmd_train_prepare_getdatatype_hint(tmp_path, capsys):
+    ns = argparse.Namespace(
+        data_dir=str(tmp_path),
+        outdir=str(tmp_path / "out"),
+        name="MYDATA",
+        dataset_number=999,
+        modality="CT",
+        config_name="global",
+        nnunet_raw=None,
+        perc_dataset=1.0,
+        num_cores=1,
+        start_from=0,
+        end_at=-1,
+        testing=False,
+        validation_prop=None,
+        max_samples=None,
+        truth_from_surface=False,
+        truth_target_spacing=None,
+        truth_regenerate=False,
+        skip_sample=False,
+        skip_convert=False,
+        also_test=False,
+        yes=False,
+        verbose=False,
+        img_ext=None,
+    )
+    with patch(
+        "seqseg.cli.prepare_training_dataset",
+        side_effect=AttributeError(
+            "'NoneType' object has no attribute 'GetDataType'"
+        ),
+    ):
+        with pytest.raises(SystemExit) as exc:
+            _cmd_train_prepare(ns)
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "GetDataType" in err
+    assert "centerlines" in err
+
+
 def test_cmd_train_nnunet_resolves_name(monkeypatch):
     called = {}
 

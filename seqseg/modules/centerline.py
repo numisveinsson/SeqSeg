@@ -598,6 +598,25 @@ def gradient_matrix(x):
     return gradients
 
 
+def world_frame_gradient(grid_values, spacing, direction):
+    """
+    Convert a 3-D scalar field sampled on the image grid to a world-space
+    gradient (value per mm, components along the image direction axes).
+
+    ``np.gradient`` returns finite differences along array axes (per voxel).
+    Physical conversion is ``grad_world = D @ diag(1/spacing) @ grad_grid``.
+    Computation is in float64 so ITK FastMarching sentinels (~1e38 in
+    float32) do not overflow when scaled by ``1/spacing``.
+    """
+    values = np.asarray(grid_values, dtype=np.float64)
+    gradient = np.stack(np.gradient(values), axis=0)
+    spacing = np.asarray(spacing, dtype=np.float64).reshape(3)
+    inv_spacing = 1.0 / np.maximum(spacing, np.finfo(np.float64).tiny)
+    direction_matrix = np.asarray(direction, dtype=np.float64).reshape(3, 3)
+    gradient = gradient * inv_spacing[:, None, None, None]
+    return np.tensordot(direction_matrix, gradient, axes=([1], [0]))
+
+
 def hessian_matrix(x):
     """
     Calculate the hessian matrix with finite differences
@@ -1347,25 +1366,22 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         os.path.join(out_dir, 'masked_out_fmm.mha'))
         sitk.WriteImage(segmentation,
                         os.path.join(out_dir, 'segmentation_from_fmm.mha'))
-    # Get gradient of distance map. ``np.gradient`` returns finite
-    # differences along the array (image-grid) axes, in units of "value
-    # per voxel". To use this to step a *physical* point we need a
-    # gradient in world-space units (value per mm, components along
-    # world axes). The conversion is:
+    # Gradient of the *masked* arrival-time map. Unreached FastMarching
+    # voxels keep ITK's float32 LargeValue (~1e38); differentiating that
+    # field and scaling by 1/spacing overflows float32 (CI RuntimeWarning)
+    # and yields inf/NaN steps. Mask + clip keeps the gradient inside the
+    # vessel and finite. Conversion to world mm^-1 is:
     #     grad_world = D @ diag(1/spacing) @ grad_grid
-    # where D is the SimpleITK direction matrix. Doing the conversion
-    # here once means every consumer (``backtracking_gradient``,
-    # ``interpolate_gradient``) gets a geometrically correct gradient
-    # without having to know about the image direction.
-    gradient = gradient_matrix(
-        sitk.GetArrayFromImage(output).transpose(2, 1, 0))
-    inv_spacing = 1.0 / np.asarray(segmentation.GetSpacing(),
-                                   dtype=np.float64)
-    direction_matrix = np.asarray(segmentation.GetDirection(),
-                                  dtype=np.float64).reshape(3, 3)
-    gradient = gradient * inv_spacing[:, None, None, None]
-    gradient = np.tensordot(direction_matrix, gradient,
-                            axes=([1], [0]))
+    arrival = np.clip(
+        np.asarray(
+            sitk.GetArrayFromImage(output_mask).transpose(2, 1, 0),
+            dtype=np.float64,
+        ),
+        -1.0e6,
+        1.0e6,
+    )
+    gradient = world_frame_gradient(
+        arrival, segmentation.GetSpacing(), segmentation.GetDirection())
     if verbose:
         # Calculate and print gradient magnitude statistics
         gradient_magnitude = np.sqrt(np.sum(gradient**2, axis=0))

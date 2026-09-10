@@ -8,10 +8,13 @@ import os
 
 from pathlib import Path
 
+import numpy as np
+
 from seqseg.pipeline.train import (
     TrainDependencyError,
     _detect_img_ext,
     _dir_for_sampler,
+    _harden_sampler_vtk,
     _normalize_img_ext,
     _resolve_img_ext,
     dataset_id_from_name,
@@ -264,6 +267,62 @@ def test_prepare_missing_stats_csv_without_patches_is_actionable(tmp_path):
                 yes=True,
             )
     write.assert_not_called()
+
+
+def test_collect_arrays_skips_string_arrays():
+    import vtk
+    from vtk.util.numpy_support import numpy_to_vtk
+
+    from seqseg.modules.vtk_functions import collect_arrays
+
+    pts = vtk.vtkPoints()
+    pts.InsertNextPoint(0.0, 0.0, 0.0)
+    poly = vtk.vtkPolyData()
+    poly.SetPoints(pts)
+
+    rad = numpy_to_vtk(np.array([1.5], dtype=np.float64))
+    rad.SetName("MaximumInscribedSphereRadius")
+    poly.GetPointData().AddArray(rad)
+
+    names = vtk.vtkStringArray()
+    names.SetName("ModelName")
+    names.InsertNextValue("aorta")
+    poly.GetPointData().AddArray(names)
+
+    data = collect_arrays(poly.GetPointData())
+    assert "MaximumInscribedSphereRadius" in data
+    assert "ModelName" not in data
+    assert float(data["MaximumInscribedSphereRadius"][0]) == 1.5
+
+
+def test_convert_poly_to_image_without_scalars():
+    import vtk
+
+    from seqseg.modules.vtk_functions import convertPolyDataToImageData
+
+    sphere = vtk.vtkSphereSource()
+    sphere.SetCenter(4, 4, 4)
+    sphere.SetRadius(2.0)
+    sphere.Update()
+
+    ref = vtk.vtkImageData()
+    ref.SetDimensions(8, 8, 8)
+    ref.SetSpacing(1.0, 1.0, 1.0)
+    ref.SetOrigin(0, 0, 0)
+
+    out = convertPolyDataToImageData(sphere.GetOutput(), ref)
+    assert out.GetPointData().GetScalars() is not None
+    assert out.GetDimensions() == (8, 8, 8)
+
+
+def test_harden_sampler_vtk_patches_collect_arrays():
+    pytest.importorskip("vascular_segment_sampler")
+    import vascular_segment_sampler.sampling.functions as samp_fn
+
+    from seqseg.modules.vtk_functions import collect_arrays
+
+    _harden_sampler_vtk()
+    assert samp_fn.collect_arrays is collect_arrays
 
 
 def test_run_nnunet_training_requires_env(tmp_path, monkeypatch):

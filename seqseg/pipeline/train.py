@@ -31,7 +31,62 @@ def _require_sampler():
             "or:\n"
             "  pip install vascular-segment-sampler"
         ) from e
+    _harden_sampler_vtk()
     return extract_patches, write_nnunet_dataset
+
+
+def _harden_sampler_vtk() -> None:
+    """Skip non-numeric VTK arrays the sampler used to pass to vtk_to_numpy.
+
+    Centerline .vtp files from SimVascular/Slicer often include string/abstract
+    arrays. ``GetArray(i)`` is None for those, which became
+    ``'NoneType' object has no attribute 'GetDataType'``.
+    """
+    try:
+        import vascular_segment_sampler.sampling.extract as extract_mod
+        import vascular_segment_sampler.sampling.functions as samp_fn
+        import vascular_segment_sampler.vtk_functions as vf
+        from seqseg.modules.vtk_functions import (
+            collect_arrays,
+            convertPolyDataToImageData,
+        )
+    except ImportError:
+        return
+
+    vf.collect_arrays = collect_arrays
+    samp_fn.collect_arrays = collect_arrays
+    vf.convertPolyDataToImageData = convertPolyDataToImageData
+
+    orig_sort = getattr(samp_fn, "sort_centerline", None)
+    if orig_sort is not None and not getattr(orig_sort, "_seqseg_hardened", False):
+
+        def _sort_centerline(centerline, *args, **kwargs):
+            if centerline is None or centerline.GetNumberOfPoints() == 0:
+                raise RuntimeError(
+                    "Centerline has no points. Each case needs a non-empty .vtp "
+                    "in centerlines/ (VMTK/SimVascular)."
+                )
+            pts = centerline.GetPoints()
+            if pts is None or pts.GetData() is None:
+                raise RuntimeError(
+                    "Centerline vtkPoints are empty. Check centerlines/*.vtp."
+                )
+            try:
+                return orig_sort(centerline, *args, **kwargs)
+            except KeyError as e:
+                key = str(e).strip("'\"")
+                if key in ("f", "MaximumInscribedSphereRadius", "Radius"):
+                    raise RuntimeError(
+                        "Centerline has no MaximumInscribedSphereRadius (or "
+                        "Radius) point-data array. Export VMTK/SimVascular "
+                        "centerlines."
+                    ) from e
+                raise
+
+        _sort_centerline._seqseg_hardened = True
+        samp_fn.sort_centerline = _sort_centerline
+
+    extract_mod.sort_centerline = samp_fn.sort_centerline
 
 
 def _parse_modalities(modality: Optional[str]) -> List[str]:

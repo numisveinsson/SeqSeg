@@ -677,7 +677,18 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         print(str(e), file=sys.stderr)
         sys.exit(1)
     except Exception as e:  # noqa: BLE001
+        import traceback
+
+        traceback.print_exc()
         print(f"seqseg train prepare failed: {e}", file=sys.stderr)
+        if "GetDataType" in str(e):
+            print(
+                "A VTK array was None while reading centerlines/ (or "
+                "rasterizing surfaces/). Centerline .vtp files need points "
+                "and MaximumInscribedSphereRadius (VMTK/SimVascular). "
+                "Update SeqSeg and re-run with --num-cores 1.",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
     print("\nPrepare complete.")

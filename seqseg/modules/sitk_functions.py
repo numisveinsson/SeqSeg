@@ -55,7 +55,27 @@ def copy_settings(img, ref_img):
     return img
 
 
-def resample_to_spacing(image, new_spacing, is_label=False):
+# Refuse pathological upsampling (e.g. CENT_MAX_SPACING in mm applied with
+# ``-unit cm``) before SimpleITK tries to allocate a multi-billion-voxel grid
+# and the process is SIGKILL'd (exit 137) on CI runners.
+DEFAULT_MAX_RESAMPLE_VOXELS = 200_000_000
+
+
+def resampled_grid_size(orig_size, orig_spacing, new_spacing):
+    """Voxel size that :func:`resample_to_spacing` would produce."""
+    orig_size = np.asarray(orig_size, dtype=np.int64)
+    orig_spacing = np.asarray(orig_spacing, dtype=np.float64)
+    target_spacing = np.asarray(new_spacing, dtype=np.float64)
+    if np.any(target_spacing <= 0):
+        raise ValueError(f"new_spacing must be > 0, got {target_spacing.tolist()}")
+    return np.maximum(
+        1,
+        np.rint(orig_size * (orig_spacing / target_spacing)).astype(np.int64),
+    )
+
+
+def resample_to_spacing(image, new_spacing, is_label=False,
+                        max_voxels=DEFAULT_MAX_RESAMPLE_VOXELS):
     """
     Resample a SITK image to a target spacing while preserving physical extent.
 
@@ -63,15 +83,23 @@ def resample_to_spacing(image, new_spacing, is_label=False):
         image (sitk.Image): Input image.
         new_spacing (iterable): Target spacing [sx, sy, sz].
         is_label (bool): Use nearest-neighbor interpolation for labels.
+        max_voxels (int | None): If set, raise ``ValueError`` when the
+            output grid would exceed this many voxels instead of allocating.
     """
     orig_size = np.array(image.GetSize(), dtype=np.int64)
     orig_spacing = np.array(image.GetSpacing(), dtype=np.float64)
     target_spacing = np.array(new_spacing, dtype=np.float64)
 
-    new_size = np.maximum(
-        1,
-        np.rint(orig_size * (orig_spacing / target_spacing)).astype(np.int64)
-    ).tolist()
+    new_size_arr = resampled_grid_size(orig_size, orig_spacing, target_spacing)
+    n_vox = int(np.prod(new_size_arr))
+    if max_voxels is not None and n_vox > int(max_voxels):
+        raise ValueError(
+            f"Resampling to spacing {target_spacing.tolist()} would create "
+            f"{tuple(int(s) for s in new_size_arr)} voxels ({n_vox:,}), "
+            f"exceeding max_voxels={int(max_voxels):,}. Check CENT_MAX_SPACING "
+            f"and -unit (mm vs cm) before refining a full-volume assembly."
+        )
+    new_size = new_size_arr.tolist()
 
     resample = sitk.ResampleImageFilter()
     resample.SetOutputSpacing(target_spacing.tolist())
