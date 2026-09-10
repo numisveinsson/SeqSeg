@@ -4,13 +4,26 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import os
+
 from seqseg.pipeline.train import (
     TrainDependencyError,
+    _dir_for_sampler,
     dataset_id_from_name,
     expected_nnunet_dataset_name,
     prepare_training_dataset,
     run_nnunet_training,
 )
+
+
+def test_dir_for_sampler_adds_trailing_sep(tmp_path):
+    raw = str(tmp_path / "seqseg_train")
+    out = _dir_for_sampler(raw)
+    assert out.endswith(os.sep)
+    assert out.rstrip("/\\") == os.path.abspath(raw)
+    # Sampler concatenates outdir + "ct_train_Sample_stats.csv"
+    stats = out + "ct_train_Sample_stats.csv"
+    assert os.path.dirname(stats) == os.path.abspath(raw)
 
 
 def test_expected_nnunet_dataset_name_padding():
@@ -59,6 +72,9 @@ def test_prepare_calls_sampler_apis(tmp_path):
 
     extract.assert_called_once()
     write.assert_called_once()
+    outdir_arg = extract.call_args.kwargs["outdir"]
+    assert outdir_arg.endswith(os.sep)
+    assert os.path.basename(os.path.normpath(outdir_arg)) == "extracted"
     assert result.dataset_names == ["Dataset0999_MYDATACT"]
     assert result.modalities == ["CT"]
 

@@ -3434,25 +3434,56 @@ def test_centerline_fmm(directory, out_dir):
         write_geo(pfn, centerline)
 
 
+def _append_done(out_dir, name, success_info):
+    """Append a progress line to ``done.txt`` for resume support."""
+    num_successful = success_info.get('num_successful', 0)
+    num_components = success_info.get('num_components', 0)
+    success_ratio = (
+        num_successful / num_components if num_components > 0 else 0.0
+    )
+    component_details = []
+    for i, component_success in enumerate(success_info.get('component_successes', [])):
+        if ('component_target_counts' in success_info
+                and i < len(success_info['component_target_counts'])):
+            successful, total = success_info['component_target_counts'][i]
+            component_details.append(f"C{i+1}:{successful}/{total}")
+        else:
+            status = "✓" if component_success else "✗"
+            component_details.append(f"C{i+1}:{status}")
+    component_detail_str = " ".join(component_details)
+    with open(os.path.join(out_dir, 'done.txt'), 'a') as f:
+        f.write(
+            f"{name}: {num_successful}/{num_components} "
+            f"({success_ratio:.3f}) [{component_detail_str}]\n"
+        )
+    print(
+        f"Done with: {name} - Success ratio: {success_ratio:.3f} "
+        f"- Components: {component_detail_str}"
+    )
+
+
+def _empty_success_info():
+    return {
+        'overall_success': False,
+        'component_successes': [],
+        'num_components': 0,
+        'num_successful': 0,
+        'seeds_used': [],
+    }
+
+
 if __name__ == '__main__':
 
     # Path to segmentation
     # path_segs = '/Users/nsveinsson/Documents/datasets/vmr/vmr_coronaries/ct/truths/'
     path_segs = '/Users/nsveinsson/Documents/datasets/airRC_dataset/truths/'
-
-    # Output directory
-    # out_dir = path_segs + '/centerlines_fmm_only_successful/'
-    out_dir = path_segs.replace('truths','centerlines_fmm_test_airways')
-    os.makedirs(out_dir, exist_ok=True)
+    dataset_root = os.path.dirname(path_segs.rstrip('/'))
 
     # Image extension
     img_ext = '.mha'
 
     # If make binary
     make_binary = False
-
-    # Else choose label value to segment
-    label_value = 1
 
     # If keep largest component
     keep_largest_component = True
@@ -3463,7 +3494,7 @@ if __name__ == '__main__':
     # Verbose
     return_failed = False
     # Keep main output minimal: only write the final centerline file.
-    write_files = True
+    write_files = False
     verbose = True
 
     # Start index
@@ -3480,6 +3511,15 @@ if __name__ == '__main__':
     # Path to end points
     if_end_points = False
     end_points_dir = '/Users/numisveins/Documents/datasets/CAS_dataset/CAS2023_trainingdataset/end_points/'
+
+    # AirRC labels: 1=airway lumen, 3=pulmonary arteries, 4=pulmonary veins.
+    # Label 2 (airway wall) is skipped. Existing centerlines_fmm_* folders
+    # are left untouched.
+    label_jobs = [
+        (1, 'centerlines_fmm_airways_v2'),
+        (3, 'centerlines_fmm_arteries_v2'),
+        (4, 'centerlines_fmm_veins_v2'),
+    ]
 
     # List of segmentations
     segs = [f for f in os.listdir(path_segs) if f.endswith(img_ext)]
@@ -3498,152 +3538,134 @@ if __name__ == '__main__':
         # read as tuples
         spacing_values = [tuple(map(float, x[1:-1].split(','))) for x in spacing_values]
 
-    # Loop through all segmentations
-    for seg in segs[start:stop]:
+    for label_value, out_folder in label_jobs:
+        out_dir = os.path.join(dataset_root, out_folder)
+        os.makedirs(out_dir, exist_ok=True)
+        print(f"\n{'='*60}")
+        print(f"Label {label_value} -> {out_dir}")
+        print(f"{'='*60}")
 
-        print(f"\n\nCalculating centerline for: {seg}\n\n")
-        path_seg = os.path.join(path_segs, seg)
-        name = path_seg.split('/')[-1].split('.')[0]
+        # Loop through all segmentations
+        for seg in segs[start:stop]:
 
-        # skip if already done
-        if os.path.exists(os.path.join(out_dir, 'done.txt')):
-            with open(os.path.join(out_dir, 'done.txt'), 'r') as f:
-                done_lines = f.read().splitlines()
-                f.close()
-            # Extract case names from lines (format: "name: success_info")
-            done_names = [line.split(':')[0].strip() for line in done_lines if ':' in line]
-            if name in done_names:
-                print(f"Already done with: {seg}")
-                continue
-    
-        # Load segmentation
-        segmentation = sitk.ReadImage(path_seg)
+            print(f"\n\nCalculating centerline for: {seg} (label {label_value})\n\n")
+            path_seg = os.path.join(path_segs, seg)
+            name = path_seg.split('/')[-1].split('.')[0]
 
-        # Print img info
-        print(f"Segmentation info:")
-        print(f"  Size: {segmentation.GetSize()}")
-        print(f"  Spacing: {segmentation.GetSpacing()}")
-        print(f"  Origin: {segmentation.GetOrigin()}")
-        print(f"  Direction: {segmentation.GetDirection()}")
+            # skip if already done
+            if os.path.exists(os.path.join(out_dir, 'done.txt')):
+                with open(os.path.join(out_dir, 'done.txt'), 'r') as f:
+                    done_lines = f.read().splitlines()
+                # Extract case names from lines (format: "name: success_info")
+                done_names = [line.split(':')[0].strip() for line in done_lines if ':' in line]
+                if name in done_names:
+                    print(f"Already done with: {seg}")
+                    continue
 
-        # Direction is honored end-to-end (gradients are mapped to physical
-        # space inside ``calc_centerline_fmm``); no need to overwrite it.
+            # Load segmentation
+            segmentation = sitk.ReadImage(path_seg)
 
-        # Cast to uint8
-        segmentation = sitk.Cast(segmentation, sitk.sitkUInt8)
+            # Print img info
+            print(f"Segmentation info:")
+            print(f"  Size: {segmentation.GetSize()}")
+            print(f"  Spacing: {segmentation.GetSpacing()}")
+            print(f"  Origin: {segmentation.GetOrigin()}")
+            print(f"  Direction: {segmentation.GetDirection()}")
 
-        # Make binary
-        if make_binary:
-            max_value = int(sitk.GetArrayFromImage(segmentation).max())
-            print(f"Max value in segmentation: {max_value}")
-            segmentation = sitk.BinaryThreshold(segmentation,
-                                                lowerThreshold=1,
-                                                upperThreshold=max_value,
-                                                insideValue=1,
-                                                outsideValue=0)
-        else:
-            # Threshold to label value
-            segmentation = sitk.BinaryThreshold(segmentation,
-                                                lowerThreshold=label_value,
-                                                upperThreshold=label_value,
-                                                insideValue=1,
-                                                outsideValue=0)
-        # Fill holes
-        if fill_holes:
-            holes = sitk.BinaryFillholeImageFilter()
-            segmentation = holes.Execute(segmentation)
+            # Direction is honored end-to-end (gradients are mapped to physical
+            # space inside ``calc_centerline_fmm``); no need to overwrite it.
 
-        # Keep largest component
-        if keep_largest_component:
-            connected = sitk.ConnectedComponentImageFilter()
-            connected.SetFullyConnected(True)
-            seg_cc = connected.Execute(segmentation)
-            label_shape = sitk.LabelShapeStatisticsImageFilter()
-            label_shape.Execute(seg_cc)
-            largest_label = 0
-            largest_size = 0
-            for label in label_shape.GetLabels():
-                size = label_shape.GetNumberOfPixels(label)
-                if size > largest_size:
-                    largest_size = size
-                    largest_label = label
-            print(f"Largest component label: {largest_label}, size: {largest_size}")
-            segmentation = sitk.BinaryThreshold(seg_cc,
-                                                lowerThreshold=largest_label,
-                                                upperThreshold=largest_label,
-                                                insideValue=1,
-                                                outsideValue=0)
-        
-        if if_spacing_file:
-            # set the spacing
-            segmentation.SetSpacing(spacing_values[segs.index(seg)])
-        time_start = time.time()
-        # Get end points
-        if if_end_points:
-            end_points = np.load(os.path.join(end_points_dir, name+'.npy'))
-            targets = []
-            for i in range(len(end_points)):
-                targets.append(end_points[i])
-        else:
-            targets = None
-        # Calculate centerline
-        # centerline, success_overall, targets = calc_centerline_fmm(
-        #     segmentation,
-        #     out_dir=out_dir,
-        #     write_files=write_files,
-        #     seed=None,
-        #     targets=targets,
-        #     move_target_if_fail=False,
-        #     return_failed=True,
-        #     return_target_all=True,
-        #     return_target=False,
-        #     verbose=verbose,
-        #     # min_res=500,
-        #     )
-        
-        # Calculate multi-component centerlines
-        centerline_multi, success_info = calc_multi_component_centerlines(
-            segmentation,
-            nr_seeds=None,
-            min_res=700,
-            out_dir=out_dir,
-            write_files=write_files,
-            move_target_if_fail=False,
-            relax_factor=1,
-            verbose=verbose,
-            return_failed=return_failed,
-            post_process_kwargs={'merge_method': 'tree'}
-        )
+            # Cast to uint8
+            segmentation = sitk.Cast(segmentation, sitk.sitkUInt8)
 
-        print(f"Time in seconds: {time.time() - time_start:0.3f}")
-        # pfn = os.path.join(out_dir, name+'.vtp')
-        # write_geo(pfn, centerline)
-        # print(f"Centerline written to: {pfn}")
-        # print(f"Success: {success_overall}")
-
-        pfn = os.path.join(out_dir, name+'_multi.vtp')
-        write_geo(pfn, centerline_multi)
-        print(f"Multi-component centerline written to: {pfn}")
-        print(f"Success info: {success_info}")
-
-        # Calculate success ratio
-        success_ratio = success_info['num_successful'] / success_info['num_components'] if success_info['num_components'] > 0 else 0.0
-        
-        # Create component success info with ratios as fractions
-        component_details = []
-        for i, component_success in enumerate(success_info['component_successes']):
-            # Get component target counts if available
-            if 'component_target_counts' in success_info and i < len(success_info['component_target_counts']):
-                successful, total = success_info['component_target_counts'][i]
-                component_details.append(f"C{i+1}:{successful}/{total}")
+            # Make binary
+            if make_binary:
+                max_value = int(sitk.GetArrayFromImage(segmentation).max())
+                print(f"Max value in segmentation: {max_value}")
+                segmentation = sitk.BinaryThreshold(segmentation,
+                                                    lowerThreshold=1,
+                                                    upperThreshold=max_value,
+                                                    insideValue=1,
+                                                    outsideValue=0)
             else:
-                # Fallback to binary status
-                status = "✓" if component_success else "✗"
-                component_details.append(f"C{i+1}:{status}")
-        component_detail_str = " ".join(component_details)
-        
-        # write to done.txt with success ratio
-        with open(os.path.join(out_dir, 'done.txt'), 'a') as f:
-            f.write(f"{name}: {success_info['num_successful']}/{success_info['num_components']} ({success_ratio:.3f}) [{component_detail_str}]\n")
-            f.close()
-        print(f"Done with: {name} - Success ratio: {success_ratio:.3f} - Components: {component_detail_str}")
+                # Threshold to label value
+                segmentation = sitk.BinaryThreshold(segmentation,
+                                                    lowerThreshold=label_value,
+                                                    upperThreshold=label_value,
+                                                    insideValue=1,
+                                                    outsideValue=0)
+
+            # Skip empty labels so we do not invert the mask via largest_label=0.
+            stats = sitk.LabelShapeStatisticsImageFilter()
+            stats.Execute(segmentation)
+            if not stats.HasLabel(1):
+                print(f"No voxels for label {label_value} in {name}; skipping.")
+                _append_done(out_dir, name, _empty_success_info())
+                continue
+
+            # Fill holes
+            if fill_holes:
+                holes = sitk.BinaryFillholeImageFilter()
+                segmentation = holes.Execute(segmentation)
+
+            # Keep largest component
+            if keep_largest_component:
+                connected = sitk.ConnectedComponentImageFilter()
+                connected.SetFullyConnected(True)
+                seg_cc = connected.Execute(segmentation)
+                label_shape = sitk.LabelShapeStatisticsImageFilter()
+                label_shape.Execute(seg_cc)
+                labels = label_shape.GetLabels()
+                if not labels:
+                    print(f"No connected components for label {label_value} in {name}; skipping.")
+                    _append_done(out_dir, name, _empty_success_info())
+                    continue
+                largest_label = 0
+                largest_size = 0
+                for label in labels:
+                    size = label_shape.GetNumberOfPixels(label)
+                    if size > largest_size:
+                        largest_size = size
+                        largest_label = label
+                print(f"Largest component label: {largest_label}, size: {largest_size}")
+                segmentation = sitk.BinaryThreshold(seg_cc,
+                                                    lowerThreshold=largest_label,
+                                                    upperThreshold=largest_label,
+                                                    insideValue=1,
+                                                    outsideValue=0)
+
+            if if_spacing_file:
+                # set the spacing
+                segmentation.SetSpacing(spacing_values[segs.index(seg)])
+            time_start = time.time()
+            # Get end points
+            if if_end_points:
+                end_points = np.load(os.path.join(end_points_dir, name+'.npy'))
+                targets = []
+                for i in range(len(end_points)):
+                    targets.append(end_points[i])
+            else:
+                targets = None
+
+            # Calculate multi-component centerlines
+            centerline_multi, success_info = calc_multi_component_centerlines(
+                segmentation,
+                nr_seeds=None,
+                min_res=700,
+                out_dir=out_dir,
+                write_files=write_files,
+                move_target_if_fail=False,
+                relax_factor=1,
+                verbose=verbose,
+                return_failed=return_failed,
+                post_process_kwargs={'merge_method': 'tree'}
+            )
+
+            print(f"Time in seconds: {time.time() - time_start:0.3f}")
+
+            pfn = os.path.join(out_dir, name+'_multi.vtp')
+            write_geo(pfn, centerline_multi)
+            print(f"Multi-component centerline written to: {pfn}")
+            print(f"Success info: {success_info}")
+
+            _append_done(out_dir, name, success_info)

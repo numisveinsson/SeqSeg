@@ -37,6 +37,17 @@ def _parse_modalities(modality: Optional[str]) -> List[str]:
     return [m.strip().upper() for m in str(modality).split(",") if m.strip()]
 
 
+def _dir_for_sampler(path: str) -> str:
+    """Return an absolute directory path with a trailing separator.
+
+    ``vascular-segment-sampler`` concatenates ``outdir`` with names such as
+    ``ct_train_Sample_stats.csv`` instead of using ``os.path.join``. A
+    resolved path like ``/scratch/.../seqseg_train`` otherwise becomes
+    ``.../seqseg_trainct_train_Sample_stats.csv``.
+    """
+    return os.path.join(os.path.abspath(os.path.expanduser(path)), "")
+
+
 def expected_nnunet_dataset_name(name: str, dataset_number: int, modality: str) -> str:
     """Match vascular-segment-sampler naming for DatasetXXX_* folders."""
     if dataset_number < 10:
@@ -96,7 +107,7 @@ def prepare_training_dataset(
             "  seqseg paths set --data-dir /path/to/cases"
         )
     data_dir = resolved_data
-    outdir = resolved_out
+    outdir = _dir_for_sampler(resolved_out)
     os.makedirs(outdir, exist_ok=True)
 
     if nnunet_raw is None:
