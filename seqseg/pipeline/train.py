@@ -5,11 +5,14 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, Union
+from typing import Iterator, List, Optional, Sequence, Union
 
 from seqseg.user_paths import apply_nnunet_env, ensure_nnunet_dirs, resolve_path
+
+_VOLUME_EXTS = (".nii.gz", ".nrrd", ".nii", ".mha", ".mhd")
 
 
 class TrainDependencyError(RuntimeError):
@@ -46,6 +49,250 @@ def _dir_for_sampler(path: str) -> str:
     ``.../seqseg_trainct_train_Sample_stats.csv``.
     """
     return os.path.join(os.path.abspath(os.path.expanduser(path)), "")
+
+
+def _is_missing_stats_csv(exc: BaseException) -> bool:
+    return isinstance(exc, FileNotFoundError) and "Sample_stats.csv" in str(exc)
+
+
+def _normalize_img_ext(ext: str) -> str:
+    ext = str(ext).strip()
+    if not ext.startswith("."):
+        ext = "." + ext
+    return ext
+
+
+def _volume_ext_of(name: str) -> Optional[str]:
+    lower = name.lower()
+    for ext in _VOLUME_EXTS:
+        if lower.endswith(ext):
+            return ext
+    return None
+
+
+def _detect_img_ext(images_dir: Path) -> Optional[str]:
+    """Pick the most common volume suffix under ``images/`` (``.nii.gz`` first)."""
+    if not images_dir.is_dir():
+        return None
+    counts: dict[str, int] = {}
+    for name in os.listdir(images_dir):
+        if name.startswith("."):
+            continue
+        ext = _volume_ext_of(name)
+        if ext:
+            counts[ext] = counts.get(ext, 0) + 1
+    if not counts:
+        return None
+    best = max(counts.values())
+    for ext in _VOLUME_EXTS:
+        if counts.get(ext) == best:
+            return ext
+    return None
+
+
+def _load_sampler_config(config: Union[str, dict]) -> dict:
+    if isinstance(config, dict):
+        return dict(config)
+    try:
+        from vascular_segment_sampler.sampling.extract import _load_config
+
+        return dict(_load_config(config))
+    except Exception:  # noqa: BLE001 — tests and missing sampler YAML
+        return {"IMG_EXT": ".nrrd"}
+
+
+def _resolve_img_ext(
+    data_dir: str,
+    config: dict,
+    img_ext: Optional[str] = None,
+) -> str:
+    if img_ext:
+        return _normalize_img_ext(img_ext)
+    detected = _detect_img_ext(Path(data_dir) / "images")
+    if detected:
+        return detected
+    return _normalize_img_ext(str(config.get("IMG_EXT") or ".nrrd"))
+
+
+def _stems_with_suffix(directory: Path, suffix: str) -> List[str]:
+    if not directory.is_dir():
+        return []
+    stems: List[str] = []
+    for name in os.listdir(directory):
+        if name.startswith("."):
+            continue
+        if name.endswith(suffix):
+            stems.append(name[: -len(suffix)])
+    return sorted(stems)
+
+
+def _count_volume_files(directory: str) -> int:
+    if not os.path.isdir(directory):
+        return 0
+    n = 0
+    for name in os.listdir(directory):
+        if name.startswith("."):
+            continue
+        if name.endswith(".nii.gz") or name.endswith(_VOLUME_EXTS[1:]):
+            n += 1
+    return n
+
+
+def _preflight_training_data(
+    data_dir: str,
+    *,
+    img_ext: str,
+    truth_from_surface: bool,
+) -> None:
+    """Fail fast when the sampler would iterate zero usable cases."""
+    root = Path(data_dir)
+    images = root / "images"
+    centerlines = root / "centerlines"
+    missing = [
+        str(p)
+        for p, label in ((images, "images"), (centerlines, "centerlines"))
+        if not p.is_dir()
+    ]
+    if missing:
+        raise FileNotFoundError(
+            "Training data_dir must contain images/ and centerlines/.\n"
+            f"  data_dir: {root}\n"
+            "  missing: " + ", ".join(missing)
+        )
+
+    img_stems = _stems_with_suffix(images, img_ext)
+    if not img_stems:
+        present = sorted(
+            {
+                name
+                for name in os.listdir(images)
+                if not name.startswith(".")
+            }
+        )
+        preview = ", ".join(present[:8]) if present else "(empty)"
+        raise FileNotFoundError(
+            f"No images with IMG_EXT={img_ext!r} in {images}.\n"
+            f"  files found: {preview}\n"
+            "Pass --img-ext (e.g. .nii.gz or .mha) or convert images."
+        )
+
+    cent_stems = _stems_with_suffix(centerlines, ".vtp")
+    if not cent_stems:
+        raise FileNotFoundError(
+            f"No .vtp centerlines in {centerlines}."
+        )
+
+    overlap = sorted(set(img_stems) & set(cent_stems))
+    if not overlap:
+        raise FileNotFoundError(
+            "No case has both an image and a matching centerline stem.\n"
+            f"  image stems ({img_ext}): {img_stems[:8]}\n"
+            f"  centerline stems (.vtp): {cent_stems[:8]}"
+        )
+
+    if truth_from_surface:
+        surfaces = root / "surfaces"
+        if not surfaces.is_dir():
+            raise FileNotFoundError(
+                "--truth-from-surface requires a surfaces/ folder under "
+                f"{root}."
+            )
+        surf_stems = _stems_with_suffix(surfaces, ".vtp") + _stems_with_suffix(
+            surfaces, ".stl"
+        )
+        if not surf_stems:
+            raise FileNotFoundError(
+                f"No .vtp/.stl surfaces in {surfaces}."
+            )
+        surf_overlap = sorted(set(overlap) & set(surf_stems))
+        if not surf_overlap:
+            raise FileNotFoundError(
+                "No case has an image, centerline, and surface with the same stem.\n"
+                f"  usable image+centerline stems: {overlap[:8]}\n"
+                f"  surface stems: {sorted(set(surf_stems))[:8]}"
+            )
+
+
+def _missing_patches_error(outdir: str, modalities: Sequence[str]) -> RuntimeError:
+    lines = [
+        "Patch extraction finished without writing any samples.",
+        f"  outdir: {os.path.abspath(outdir)}",
+    ]
+    for mod in modalities:
+        img_dir = os.path.join(outdir, f"{mod.lower()}_train")
+        mask_dir = os.path.join(outdir, f"{mod.lower()}_train_masks")
+        lines.append(
+            f"  {mod}: {_count_volume_files(img_dir)} images in {img_dir}, "
+            f"{_count_volume_files(mask_dir)} masks in {mask_dir}"
+        )
+    lines.extend(
+        [
+            "",
+            "vascular-segment-sampler always opens "
+            "{modality}_train_Sample_stats.csv at the end, even when no case "
+            "completed (so that FileNotFoundError is a symptom, not the cause).",
+            "Typical causes:",
+            "  - Worker crashes with --num-cores > 1 (exceptions are not re-raised).",
+            "    Re-run with --num-cores 1 to see the real error.",
+            "  - Image extension mismatch (pass --img-ext, e.g. .nii.gz).",
+            "  - Missing truths/ (or surfaces/ when using --truth-from-surface).",
+            "  - All cases listed in outdir/done.txt, so they were skipped.",
+        ]
+    )
+    return RuntimeError("\n".join(lines))
+
+
+def _assert_patches_extracted(outdir: str, modalities: Sequence[str]) -> None:
+    for mod in modalities:
+        img_dir = os.path.join(outdir, f"{mod.lower()}_train")
+        mask_dir = os.path.join(outdir, f"{mod.lower()}_train_masks")
+        if _count_volume_files(img_dir) == 0 or _count_volume_files(mask_dir) == 0:
+            raise _missing_patches_error(outdir, modalities)
+
+
+@contextmanager
+def _tolerate_missing_sampler_stats() -> Iterator[None]:
+    """Skip the sampler's end-of-run CSV summary when no case wrote it."""
+    try:
+        import vascular_segment_sampler.sampling.extract as extract_mod
+    except ImportError:
+        yield
+        return
+
+    orig = getattr(extract_mod, "print_csv_stats", None)
+    if orig is None:
+        yield
+        return
+
+    def _safe(out_dir, global_config, modality):
+        suffix = global_config.get("OUTPUT_SUFFIX", "") or ""
+        if global_config.get("TESTING"):
+            csv_file = f"{modality}_test{suffix}_Sample_stats.csv"
+        else:
+            csv_file = f"{modality}_train{suffix}_Sample_stats.csv"
+        path = out_dir + csv_file
+        if not os.path.isfile(path):
+            print(
+                f"Warning: no sampler stats file at {path}; continuing."
+            )
+            return
+        orig(out_dir, global_config, modality)
+
+    extract_mod.print_csv_stats = _safe
+    try:
+        yield
+    finally:
+        extract_mod.print_csv_stats = orig
+
+
+def _run_extract_patches(extract_patches, **kwargs) -> None:
+    try:
+        with _tolerate_missing_sampler_stats():
+            extract_patches(**kwargs)
+    except FileNotFoundError as e:
+        if not _is_missing_stats_csv(e):
+            raise
+        print(f"Warning: {e}")
 
 
 def expected_nnunet_dataset_name(name: str, dataset_number: int, modality: str) -> str:
@@ -91,6 +338,7 @@ def prepare_training_dataset(
     also_test: bool = False,
     yes: bool = False,
     verbose: bool = False,
+    img_ext: Optional[str] = None,
 ) -> PrepareResult:
     """
     Extract SeqSeg-style patches and convert them to nnU-Net raw datasets.
@@ -118,14 +366,27 @@ def prepare_training_dataset(
     modalities = _parse_modalities(modality)
     modality_arg = ",".join(modalities)
 
+    sampler_config = _load_sampler_config(config)
+    resolved_img_ext = _resolve_img_ext(data_dir, sampler_config, img_ext)
+    sampler_config["IMG_EXT"] = resolved_img_ext
+
     if not skip_sample:
+        _preflight_training_data(
+            data_dir,
+            img_ext=resolved_img_ext,
+            truth_from_surface=truth_from_surface,
+        )
         print("=" * 72)
         print("Extracting vascular segment patches")
+        print(f"  data_dir: {data_dir}")
+        print(f"  outdir:   {outdir}")
+        print(f"  IMG_EXT:  {resolved_img_ext}")
         print("=" * 72)
-        extract_patches(
+        _run_extract_patches(
+            extract_patches,
             data_dir=data_dir,
             outdir=outdir,
-            config=config,
+            config=sampler_config,
             perc_dataset=perc_dataset,
             num_cores=num_cores,
             start_from=start_from,
@@ -142,6 +403,7 @@ def prepare_training_dataset(
             yes=yes,
             verbose=verbose,
         )
+        _assert_patches_extracted(outdir, modalities)
     else:
         print("Skipping patch extraction (--skip-sample)")
 

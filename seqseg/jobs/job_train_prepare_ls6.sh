@@ -6,7 +6,8 @@
 #   sbatch seqseg/jobs/job_train_prepare_ls6.sh
 #
 # Edit ACCOUNT, MAIL_USER, DATA_DIR, and OUTDIR below.
-# Lonestar6 charges by the node (128 cores). Raise NUM_CORES if you want.
+# Image suffix is auto-detected from $DATA_DIR/images/ (.nii.gz, .mha, .nrrd, …).
+# Override with --img-ext if needed.
 #----------------------------------------------------
 
 #SBATCH -J seqseg_prep
@@ -23,7 +24,7 @@
 set -euo pipefail
 
 # --- edit these ---
-NUM_CORES=4
+NUM_CORES=1
 SEQSEG_ENV="${SEQSEG_ENV:-/scratch/11178/numi/python-envs/seqseg}"
 DATA_DIR="${DATA_DIR:-$SCRATCH/seqseg_data}"
 OUTDIR="${OUTDIR:-$SCRATCH/seqseg_train}"
@@ -49,6 +50,7 @@ seqseg paths init \
 seqseg doctor || true
 
 # Do not use ibrun for this (not MPI).
+# Add --img-ext .nii.gz (or .mha) if auto-detect picks the wrong suffix.
 seqseg train prepare \
     --name MYDATA \
     --dataset-number 999 \

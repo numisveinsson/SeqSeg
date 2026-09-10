@@ -671,6 +671,7 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
             also_test=ns.also_test,
             yes=ns.yes,
             verbose=ns.verbose,
+            img_ext=ns.img_ext,
         )
     except TrainDependencyError as e:
         print(str(e), file=sys.stderr)
@@ -1038,6 +1039,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Write DatasetXXX_* here "
         "(default: seqseg paths nnunet_raw / $nnUNet_raw; else --outdir)",
     )
+    p_prep.add_argument(
+        "--img-ext",
+        "-img_ext",
+        default=None,
+        type=str,
+        help="Image/label suffix (.nii.gz, .mha, .nrrd, …). "
+        "Default: detect from data_dir/images/; else sampler YAML IMG_EXT",
+    )
     p_prep.add_argument("--perc-dataset", default=1.0, type=float)
     p_prep.add_argument("--num-cores", default=1, type=int)
     p_prep.add_argument("--start-from", default=0, type=int)
@@ -1075,7 +1084,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_prep.add_argument("--yes", action="store_true", help="Non-interactive confirms")
     p_prep.add_argument("--verbose", action="store_true")
-    p_prep.set_defaults(_handler=_cmd_train_prepare)
+    p_prep.set_defaults(_handler=_cmd_train_prepare, img_ext=None)
 
     p_nn = train_sub.add_parser(
         "nnunet",

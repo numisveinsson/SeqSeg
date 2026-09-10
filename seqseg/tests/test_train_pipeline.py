@@ -6,14 +6,41 @@ import pytest
 
 import os
 
+from pathlib import Path
+
 from seqseg.pipeline.train import (
     TrainDependencyError,
+    _detect_img_ext,
     _dir_for_sampler,
+    _normalize_img_ext,
+    _resolve_img_ext,
     dataset_id_from_name,
     expected_nnunet_dataset_name,
     prepare_training_dataset,
     run_nnunet_training,
 )
+
+
+def _make_training_data(tmp_path, *, surfaces=False, img_ext=".nrrd"):
+    data = tmp_path / "data"
+    (data / "images").mkdir(parents=True)
+    (data / "centerlines").mkdir()
+    (data / "images" / f"case1{img_ext}").write_bytes(b"x")
+    (data / "centerlines" / "case1.vtp").write_bytes(b"x")
+    if surfaces:
+        (data / "surfaces").mkdir()
+        (data / "surfaces" / "case1.vtp").write_bytes(b"x")
+    return str(data)
+
+
+def _make_patch_dirs(extracted, modality="ct"):
+    img_dir = extracted / f"{modality}_train"
+    mask_dir = extracted / f"{modality}_train_masks"
+    img_dir.mkdir(parents=True)
+    mask_dir.mkdir()
+    (img_dir / "a.nrrd").write_bytes(b"x")
+    (mask_dir / "a.nrrd").write_bytes(b"x")
+    return img_dir, mask_dir
 
 
 def test_dir_for_sampler_adds_trailing_sep(tmp_path):
@@ -56,14 +83,17 @@ def test_prepare_requires_sampler():
 def test_prepare_calls_sampler_apis(tmp_path):
     extract = MagicMock()
     write = MagicMock(return_value=str(tmp_path / "Dataset0999_MYDATACT"))
+    data = _make_training_data(tmp_path)
+    extracted = tmp_path / "extracted"
+    _make_patch_dirs(extracted)
 
     with patch(
         "seqseg.pipeline.train._require_sampler",
         return_value=(extract, write),
     ):
         result = prepare_training_dataset(
-            str(tmp_path / "data"),
-            str(tmp_path / "extracted"),
+            data,
+            str(extracted),
             name="MYDATA",
             dataset_number=999,
             modality="CT",
@@ -75,8 +105,65 @@ def test_prepare_calls_sampler_apis(tmp_path):
     outdir_arg = extract.call_args.kwargs["outdir"]
     assert outdir_arg.endswith(os.sep)
     assert os.path.basename(os.path.normpath(outdir_arg)) == "extracted"
+    assert extract.call_args.kwargs["config"]["IMG_EXT"] == ".nrrd"
     assert result.dataset_names == ["Dataset0999_MYDATACT"]
     assert result.modalities == ["CT"]
+
+
+def test_detect_img_ext_prefers_nii_gz(tmp_path):
+    images = tmp_path / "images"
+    images.mkdir()
+    (images / "716.nii.gz").write_bytes(b"x")
+    (images / "notes.txt").write_text("nope")
+    assert _detect_img_ext(images) == ".nii.gz"
+    assert _normalize_img_ext("nii.gz") == ".nii.gz"
+    assert _resolve_img_ext(str(tmp_path), {"IMG_EXT": ".nrrd"}) == ".nii.gz"
+
+
+def test_prepare_detects_nii_gz_and_sets_sampler_config(tmp_path):
+    extract = MagicMock()
+    write = MagicMock(return_value=str(tmp_path / "Dataset0999_MYDATACT"))
+    data = _make_training_data(tmp_path, img_ext=".nii.gz")
+    extracted = tmp_path / "extracted"
+    _make_patch_dirs(extracted)
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ):
+        prepare_training_dataset(
+            data,
+            str(extracted),
+            name="MYDATA",
+            dataset_number=999,
+            yes=True,
+        )
+
+    assert extract.call_args.kwargs["config"]["IMG_EXT"] == ".nii.gz"
+
+
+def test_prepare_explicit_img_ext_overrides_detection(tmp_path):
+    extract = MagicMock()
+    write = MagicMock(return_value=str(tmp_path / "Dataset0999_MYDATACT"))
+    data = Path(_make_training_data(tmp_path, img_ext=".nii.gz"))
+    (data / "images" / "case1.mha").write_bytes(b"x")
+    extracted = tmp_path / "extracted"
+    _make_patch_dirs(extracted)
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ):
+        prepare_training_dataset(
+            str(data),
+            str(extracted),
+            name="MYDATA",
+            dataset_number=999,
+            img_ext="mha",
+            yes=True,
+        )
+
+    assert extract.call_args.kwargs["config"]["IMG_EXT"] == ".mha"
 
 
 def test_prepare_multi_modality_increments_ids(tmp_path):
@@ -106,6 +193,77 @@ def test_prepare_multi_modality_increments_ids(tmp_path):
         "Dataset0999_MYDATACT",
         "Dataset01000_MYDATAMR",
     ]
+
+
+def test_prepare_preflight_rejects_missing_images(tmp_path):
+    extract = MagicMock()
+    write = MagicMock()
+    empty = tmp_path / "data"
+    empty.mkdir()
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ):
+        with pytest.raises(FileNotFoundError, match="images/ and centerlines"):
+            prepare_training_dataset(
+                str(empty),
+                str(tmp_path / "extracted"),
+                name="MYDATA",
+                dataset_number=999,
+                yes=True,
+            )
+    extract.assert_not_called()
+
+
+def test_prepare_continues_if_stats_csv_missing_but_patches_exist(tmp_path):
+    extracted = tmp_path / "extracted"
+    _make_patch_dirs(extracted)
+    extract = MagicMock(
+        side_effect=FileNotFoundError(
+            f"[Errno 2] No such file or directory: "
+            f"'{extracted}/ct_train_Sample_stats.csv'"
+        )
+    )
+    write = MagicMock(return_value=str(tmp_path / "Dataset0999_MYDATACT"))
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ):
+        result = prepare_training_dataset(
+            _make_training_data(tmp_path),
+            str(extracted),
+            name="MYDATA",
+            dataset_number=999,
+            yes=True,
+        )
+
+    write.assert_called_once()
+    assert result.dataset_names == ["Dataset0999_MYDATACT"]
+
+
+def test_prepare_missing_stats_csv_without_patches_is_actionable(tmp_path):
+    extract = MagicMock(
+        side_effect=FileNotFoundError(
+            "[Errno 2] No such file or directory: "
+            "'/scratch/11178/numi/seqseg_train/ct_train_Sample_stats.csv'"
+        )
+    )
+    write = MagicMock()
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ):
+        with pytest.raises(RuntimeError, match="--num-cores 1"):
+            prepare_training_dataset(
+                _make_training_data(tmp_path),
+                str(tmp_path / "extracted"),
+                name="MYDATA",
+                dataset_number=999,
+                yes=True,
+            )
+    write.assert_not_called()
 
 
 def test_run_nnunet_training_requires_env(tmp_path, monkeypatch):

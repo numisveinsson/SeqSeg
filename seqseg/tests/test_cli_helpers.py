@@ -288,6 +288,7 @@ def test_parser_train_prepare():
     assert ns.data_dir == "/tmp/data"
     assert ns.name == "MYDATA"
     assert ns.dataset_number == 999
+    assert ns.img_ext is None
 
 
 def test_parser_paths_init():
@@ -349,6 +350,7 @@ def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
         also_test=False,
         yes=False,
         verbose=False,
+        img_ext=None,
     )
     with patch(
         "seqseg.cli.prepare_training_dataset",
