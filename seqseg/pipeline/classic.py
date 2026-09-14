@@ -175,17 +175,38 @@ def run_classic_batch(
                 assembly.GetSpacing(), cent_max_spacing, unit
             )
             if target_spacing is not None:
-                print(
-                    f"Resampling final assembly to spacing <= "
-                    f"{float(cent_max_spacing)} mm: {target_spacing}"
+                fitted = sf.fit_spacing_to_max_voxels(
+                    assembly.GetSize(),
+                    assembly.GetSpacing(),
+                    target_spacing,
                 )
-                assembly = sf.resample_to_spacing(
-                    assembly, target_spacing, is_label=False
-                )
-                if write_samples:
-                    n_udpates = sf.resample_to_spacing(
-                        n_udpates, target_spacing, is_label=True
+                if fitted is None:
+                    print(
+                        "Skipping assembly upsample: even a coarsened grid "
+                        f"would exceed {sf.DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
                     )
+                else:
+                    if any(
+                        abs(a - b) > 1e-12
+                        for a, b in zip(fitted, target_spacing)
+                    ):
+                        print(
+                            "Relaxed assembly spacing from "
+                            f"{target_spacing} to {fitted} to stay <= "
+                            f"{sf.DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
+                        )
+                    target_spacing = fitted
+                    print(
+                        f"Resampling final assembly to spacing <= "
+                        f"{float(cent_max_spacing)} mm: {target_spacing}"
+                    )
+                    assembly = sf.resample_to_spacing(
+                        assembly, target_spacing, is_label=False
+                    )
+                    if write_samples:
+                        n_udpates = sf.resample_to_spacing(
+                            n_udpates, target_spacing, is_label=True
+                        )
 
         assembly_binary = sitk.BinaryThreshold(
             assembly,

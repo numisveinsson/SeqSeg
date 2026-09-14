@@ -6,7 +6,9 @@ import SimpleITK as sitk
 
 from seqseg.config_models import AlgorithmConfig
 from seqseg.modules.sitk_functions import (
+    DEFAULT_MAX_RESAMPLE_VOXELS,
     capped_target_spacing,
+    fit_spacing_to_max_voxels,
     resample_to_spacing,
     resampled_grid_size,
 )
@@ -28,8 +30,8 @@ def test_capped_target_spacing_cm_is_tenfold_finer():
     n_vox = int(np.prod(resampled_grid_size(
         (512, 512, 258), (0.65, 0.65, 1.0), target
     )))
-    # ~1e9 voxels — this is what SIGKILL'd the macos CI job.
-    assert n_vox > 200_000_000
+    # ~1e12 voxels — this is what SIGKILL'd the macos CI job.
+    assert n_vox > DEFAULT_MAX_RESAMPLE_VOXELS
 
 
 def test_resampled_grid_size_identity():
@@ -55,3 +57,35 @@ def test_resample_to_spacing_small_grid_runs():
     out = resample_to_spacing(img, (1.0, 1.0, 1.0))
     assert tuple(out.GetSize()) == (8, 8, 8)
     assert out.GetSpacing() == pytest.approx((1.0, 1.0, 1.0))
+
+
+def test_fit_spacing_keeps_target_when_under_limit():
+    orig_size = (64, 256, 256)
+    orig_spacing = (0.15, 0.117188, 0.117188)
+    target = [0.03, 0.03, 0.03]
+    n_vox = int(np.prod(resampled_grid_size(orig_size, orig_spacing, target)))
+    assert n_vox == 320_000_000
+    fitted = fit_spacing_to_max_voxels(orig_size, orig_spacing, target)
+    assert fitted == pytest.approx(target)
+
+
+def test_fit_spacing_coarsens_to_voxel_budget():
+    orig_size = (512, 512, 258)
+    orig_spacing = (0.65, 0.65, 1.0)
+    target = [0.03, 0.03, 0.03]
+    fitted = fit_spacing_to_max_voxels(orig_size, orig_spacing, target)
+    assert fitted is not None
+    n_vox = int(np.prod(resampled_grid_size(orig_size, orig_spacing, fitted)))
+    assert n_vox <= DEFAULT_MAX_RESAMPLE_VOXELS
+    assert all(f <= s for f, s in zip(fitted, orig_spacing))
+    assert any(f < s for f, s in zip(fitted, orig_spacing))
+
+
+def test_fit_spacing_returns_none_if_original_already_over_budget():
+    fitted = fit_spacing_to_max_voxels(
+        (100, 100, 100),
+        (1.0, 1.0, 1.0),
+        (0.01, 0.01, 0.01),
+        max_voxels=1_000,
+    )
+    assert fitted is None

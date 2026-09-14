@@ -55,10 +55,10 @@ def copy_settings(img, ref_img):
     return img
 
 
-# Refuse pathological upsampling (e.g. CENT_MAX_SPACING in mm applied with
-# ``-unit cm``) before SimpleITK tries to allocate a multi-billion-voxel grid
-# and the process is SIGKILL'd (exit 137) on CI runners.
-DEFAULT_MAX_RESAMPLE_VOXELS = 200_000_000
+# Cap assembly upsampling (e.g. CENT_MAX_SPACING in mm applied with ``-unit cm``)
+# before SimpleITK tries to allocate a multi-billion-voxel grid and the process
+# is SIGKILL'd (exit 137). 500M float32 voxels is ~2 GB for one volume.
+DEFAULT_MAX_RESAMPLE_VOXELS = 500_000_000
 
 
 def resampled_grid_size(orig_size, orig_spacing, new_spacing):
@@ -72,6 +72,64 @@ def resampled_grid_size(orig_size, orig_spacing, new_spacing):
         1,
         np.rint(orig_size * (orig_spacing / target_spacing)).astype(np.int64),
     )
+
+
+def fit_spacing_to_max_voxels(
+    orig_size,
+    orig_spacing,
+    target_spacing,
+    max_voxels=DEFAULT_MAX_RESAMPLE_VOXELS,
+):
+    """
+    Coarsen ``target_spacing`` so the resampled grid has at most ``max_voxels``.
+
+    Axes that are already at ``orig_spacing`` are left unchanged. Remaining
+    (finer) axes are scaled uniformly. Never coarsens past ``orig_spacing``.
+
+    Returns
+    -------
+    list[float] | None
+        Spacing to resample to, or ``None`` if no axis can be refined without
+        exceeding ``max_voxels`` (caller should skip resampling).
+    """
+    if max_voxels is None:
+        return [float(s) for s in target_spacing]
+
+    orig_size = np.asarray(orig_size, dtype=np.float64).reshape(3)
+    orig_spacing = np.asarray(orig_spacing, dtype=np.float64).reshape(3)
+    target = np.asarray(target_spacing, dtype=np.float64).reshape(3)
+    max_voxels = int(max_voxels)
+    if max_voxels <= 0:
+        raise ValueError("max_voxels must be > 0")
+
+    def n_vox_for(spacing):
+        return int(np.prod(resampled_grid_size(orig_size, orig_spacing, spacing)))
+
+    n_vox = n_vox_for(target)
+    if n_vox <= max_voxels:
+        return target.tolist()
+
+    for _ in range(32):
+        finer = target < orig_spacing * (1.0 - 1e-12)
+        n_fine = int(np.count_nonzero(finer))
+        if n_fine == 0:
+            return None
+        k = (n_vox / float(max_voxels)) ** (1.0 / n_fine)
+        new_target = target.copy()
+        new_target[finer] = np.minimum(orig_spacing[finer], target[finer] * k)
+        if np.allclose(new_target, target):
+            new_target[finer] = np.minimum(
+                orig_spacing[finer], target[finer] * 1.001
+            )
+            if np.allclose(new_target, target):
+                return None
+        target = new_target
+        n_vox = n_vox_for(target)
+        if n_vox <= max_voxels:
+            if not np.any(target < orig_spacing):
+                return None
+            return target.tolist()
+    return None
 
 
 def resample_to_spacing(image, new_spacing, is_label=False,

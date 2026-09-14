@@ -16,7 +16,10 @@ from seqseg.pipeline.train import (
     _dir_for_sampler,
     _harden_sampler_vtk,
     _normalize_img_ext,
+    _reduction_or_nan,
     _resolve_img_ext,
+    _safe_add_image_stats,
+    _safe_add_local_stats,
     dataset_id_from_name,
     expected_nnunet_dataset_name,
     prepare_training_dataset,
@@ -323,6 +326,58 @@ def test_harden_sampler_vtk_patches_collect_arrays():
 
     _harden_sampler_vtk()
     assert samp_fn.collect_arrays is collect_arrays
+    assert samp_fn.add_local_stats is _safe_add_local_stats
+    assert samp_fn.add_image_stats is _safe_add_image_stats
+
+
+def test_safe_add_local_stats_empty_blood_does_not_raise():
+    stats, extra = _safe_add_local_stats(
+        {},
+        np.array([1.0, 2.0, 3.0]),
+        0.0,
+        np.array([]),
+        np.zeros((2, 2, 2)),
+        [1],
+        None,
+        np.ones((2, 2, 2)),
+        0,
+    )
+    assert extra == 0
+    assert np.isnan(stats["BLOOD_MIN"])
+    assert np.isnan(stats["BLOOD_MEAN"])
+    assert stats["GT_MIN"] == 0.0
+    assert stats["POINT_CENT"] == [1.0, 2.0, 3.0]
+
+
+def test_safe_add_local_stats_empty_largest_component():
+    sitk = pytest.importorskip("SimpleITK")
+    empty = sitk.Image(2, 2, 2, sitk.sitkUInt8)
+    im = np.arange(8, dtype=float).reshape(2, 2, 2)
+    stats, extra = _safe_add_local_stats(
+        {},
+        [0, 0, 0],
+        0.0,
+        im.ravel(),
+        np.ones((2, 2, 2)),
+        [1, 2],
+        empty,
+        im,
+        0,
+    )
+    assert extra == 1
+    assert np.isnan(stats["LARGEST_MIN"])
+    assert np.isnan(stats["LARGEST_MEAN"])
+
+
+def test_safe_add_image_stats_empty_volume():
+    stats = _safe_add_image_stats({}, np.array([]))
+    assert np.isnan(stats["IM_MIN"])
+    assert np.isnan(stats["IM_MAX"])
+
+
+def test_reduction_or_nan_nonempty():
+    assert _reduction_or_nan(np.array([3.0, 1.0, 2.0]), np.amin) == 1.0
+    assert np.isnan(_reduction_or_nan(np.array([]), np.amin))
 
 
 def test_run_nnunet_training_requires_env(tmp_path, monkeypatch):

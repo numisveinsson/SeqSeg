@@ -8,7 +8,9 @@ import subprocess
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Optional, Sequence, Union
+from typing import Any, Callable, Iterator, List, Optional, Sequence, Union
+
+import numpy as np
 
 from seqseg.user_paths import apply_nnunet_env, ensure_nnunet_dirs, resolve_path
 
@@ -35,12 +37,84 @@ def _require_sampler():
     return extract_patches, write_nnunet_dataset
 
 
+def _reduction_or_nan(arr: Any, fn: Callable[[Any], Any]) -> float:
+    """``np.amin``/``mean`` on an empty crop raise; treat that as missing."""
+    arr = np.asarray(arr)
+    if arr.size == 0:
+        return float("nan")
+    return float(fn(arr))
+
+
+def _point_list(location: Any) -> list:
+    if hasattr(location, "tolist"):
+        return location.tolist()
+    return list(location)
+
+
+def _safe_add_image_stats(stats: dict, im_np: Any) -> dict:
+    stats.update(
+        {
+            "IM_MEAN": _reduction_or_nan(im_np, np.mean),
+            "IM_MIN": _reduction_or_nan(im_np, np.amin),
+            "IM_STD": _reduction_or_nan(im_np, np.std),
+            "IM_MAX": _reduction_or_nan(im_np, np.amax),
+        }
+    )
+    return stats
+
+
+def _safe_add_local_stats(
+    stats: dict,
+    location: Any,
+    diff_cent: Any,
+    blood_np: Any,
+    ground_truth: Any,
+    means: Sequence,
+    removed_seg: Any,
+    im_np: Any,
+    O: int,
+) -> tuple[dict, int]:
+    """Same stats as the sampler, but empty labeled crops become NaN not errors."""
+    stats.update(
+        {
+            "DIFF_CENT": diff_cent,
+            "POINT_CENT": _point_list(location),
+            "BLOOD_MEAN": _reduction_or_nan(blood_np, np.mean),
+            "BLOOD_MIN": _reduction_or_nan(blood_np, np.amin),
+            "BLOOD_STD": _reduction_or_nan(blood_np, np.std),
+            "BLOOD_MAX": _reduction_or_nan(blood_np, np.amax),
+            "GT_MEAN": _reduction_or_nan(ground_truth, np.mean),
+            "GT_STD": _reduction_or_nan(ground_truth, np.std),
+            "GT_MAX": _reduction_or_nan(ground_truth, np.amax),
+            "GT_MIN": _reduction_or_nan(ground_truth, np.amin),
+        }
+    )
+    if len(means) != 1:
+        import SimpleITK as sitk
+
+        larg_np = sitk.GetArrayFromImage(removed_seg)
+        rem_np = np.asarray(im_np)[np.asarray(larg_np) > 0.1]
+        stats.update(
+            {
+                "LARGEST_MEAN": _reduction_or_nan(rem_np, np.mean),
+                "LARGEST_STD": _reduction_or_nan(rem_np, np.std),
+                "LARGEST_MAX": _reduction_or_nan(rem_np, np.amax),
+                "LARGEST_MIN": _reduction_or_nan(rem_np, np.amin),
+            }
+        )
+        O += 1
+    return stats, O
+
+
 def _harden_sampler_vtk() -> None:
-    """Skip non-numeric VTK arrays the sampler used to pass to vtk_to_numpy.
+    """Patch sampler helpers that break on common SeqSeg datasets.
 
     Centerline .vtp files from SimVascular/Slicer often include string/abstract
     arrays. ``GetArray(i)`` is None for those, which became
     ``'NoneType' object has no attribute 'GetDataType'``.
+
+    Crops with no labeled voxels used to raise
+    ``zero-size array to reduction operation minimum`` in ``add_local_stats``.
     """
     try:
         import vascular_segment_sampler.sampling.extract as extract_mod
@@ -56,6 +130,13 @@ def _harden_sampler_vtk() -> None:
     vf.collect_arrays = collect_arrays
     samp_fn.collect_arrays = collect_arrays
     vf.convertPolyDataToImageData = convertPolyDataToImageData
+
+    if not getattr(samp_fn.add_local_stats, "_seqseg_hardened", False):
+        _safe_add_local_stats._seqseg_hardened = True  # type: ignore[attr-defined]
+        samp_fn.add_local_stats = _safe_add_local_stats
+    if not getattr(samp_fn.add_image_stats, "_seqseg_hardened", False):
+        _safe_add_image_stats._seqseg_hardened = True  # type: ignore[attr-defined]
+        samp_fn.add_image_stats = _safe_add_image_stats
 
     orig_sort = getattr(samp_fn, "sort_centerline", None)
     if orig_sort is not None and not getattr(orig_sort, "_seqseg_hardened", False):

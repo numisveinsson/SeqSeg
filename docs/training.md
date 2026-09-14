@@ -44,6 +44,16 @@ your_project/
 
 Scaffold folders with `seqseg init dataset --path your_project/`, then add centerlines and labels.
 
+ImageCAS / CAS-X coronary data (nested `{id}.img.nii.gz`, left/right VTK centerlines, Y-flipped NIfTI direction) can be converted in place with:
+
+```bash
+python -m seqseg.scripts.prepare_casx_dataset --path /path/to/CAS_X_coronary_dataset
+# if volumes already exist but still have dirY=-1:
+python -m seqseg.scripts.prepare_casx_dataset --path /path/to/CAS_X_coronary_dataset --fix-direction
+```
+
+That writes SeqSeg `images/`, `truths/`, `centerlines/`, `surfaces/`, and `seeds.json` in millimetres with identity image direction so vascular-segment-sampler's `(point-origin)/spacing` mapping stays in-bounds.
+
 ## 2. Extract patches and build an nnU-Net dataset
 
 After `seqseg paths init` / `set`, you can omit the path flags:
