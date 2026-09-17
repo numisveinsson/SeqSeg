@@ -289,6 +289,35 @@ def test_parser_train_prepare():
     assert ns.name == "MYDATA"
     assert ns.dataset_number == 999
     assert ns.img_ext is None
+    assert ns.global_volumes is False
+
+
+def test_parser_train_prepare_global_volumes():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--name",
+            "MYDATA",
+            "--dataset-number",
+            "999",
+            "--global-volumes",
+        ]
+    )
+    assert ns.global_volumes is True
+    ns_alias = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--name",
+            "MYDATA",
+            "--dataset-number",
+            "999",
+            "--whole-volumes",
+        ]
+    )
+    assert ns_alias.global_volumes is True
 
 
 def test_parser_paths_init():
@@ -351,6 +380,7 @@ def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
         yes=False,
         verbose=False,
         img_ext=None,
+        global_volumes=False,
     )
     with patch(
         "seqseg.cli.prepare_training_dataset",
@@ -387,6 +417,7 @@ def test_cmd_train_prepare_getdatatype_hint(tmp_path, capsys):
         yes=False,
         verbose=False,
         img_ext=None,
+        global_volumes=False,
     )
     with patch(
         "seqseg.cli.prepare_training_dataset",

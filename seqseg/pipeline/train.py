@@ -37,6 +37,21 @@ def _require_sampler():
     return extract_patches, write_nnunet_dataset
 
 
+def _require_gather_global_volumes():
+    try:
+        from vascular_segment_sampler.sampling import gather_global_volumes
+    except ImportError as e:
+        raise TrainDependencyError(
+            "Whole-volume dataset construction requires gather_global_volumes "
+            "from a recent vascular-segment-sampler.\n"
+            "Upgrade with:\n"
+            '  pip install -U "seqseg[train]"\n'
+            "or:\n"
+            "  pip install -U vascular-segment-sampler"
+        ) from e
+    return gather_global_volumes
+
+
 def _reduction_or_nan(arr: Any, fn: Callable[[Any], Any]) -> float:
     """``np.amin``/``mean`` on an empty crop raise; treat that as missing."""
     arr = np.asarray(arr)
@@ -349,11 +364,22 @@ def _preflight_training_data(
             )
 
 
-def _missing_patches_error(outdir: str, modalities: Sequence[str]) -> RuntimeError:
-    lines = [
-        "Patch extraction finished without writing any samples.",
-        f"  outdir: {os.path.abspath(outdir)}",
-    ]
+def _missing_volumes_error(
+    outdir: str,
+    modalities: Sequence[str],
+    *,
+    global_volumes: bool = False,
+) -> RuntimeError:
+    if global_volumes:
+        lines = [
+            "Whole-volume gathering finished without writing any cases.",
+            f"  outdir: {os.path.abspath(outdir)}",
+        ]
+    else:
+        lines = [
+            "Patch extraction finished without writing any samples.",
+            f"  outdir: {os.path.abspath(outdir)}",
+        ]
     for mod in modalities:
         img_dir = os.path.join(outdir, f"{mod.lower()}_train")
         mask_dir = os.path.join(outdir, f"{mod.lower()}_train_masks")
@@ -361,29 +387,47 @@ def _missing_patches_error(outdir: str, modalities: Sequence[str]) -> RuntimeErr
             f"  {mod}: {_count_volume_files(img_dir)} images in {img_dir}, "
             f"{_count_volume_files(mask_dir)} masks in {mask_dir}"
         )
-    lines.extend(
-        [
-            "",
-            "vascular-segment-sampler always opens "
-            "{modality}_train_Sample_stats.csv at the end, even when no case "
-            "completed (so that FileNotFoundError is a symptom, not the cause).",
-            "Typical causes:",
-            "  - Worker crashes with --num-cores > 1 (exceptions are not re-raised).",
-            "    Re-run with --num-cores 1 to see the real error.",
-            "  - Image extension mismatch (pass --img-ext, e.g. .nii.gz).",
-            "  - Missing truths/ (or surfaces/ when using --truth-from-surface).",
-            "  - All cases listed in outdir/done.txt, so they were skipped.",
-        ]
-    )
+    if global_volumes:
+        lines.extend(
+            [
+                "",
+                "Typical causes:",
+                "  - Image extension mismatch (pass --img-ext, e.g. .nii.gz).",
+                "  - Missing truths/ (or surfaces/ when using --truth-from-surface).",
+                "  - All cases listed in outdir/done.txt, so they were skipped.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "vascular-segment-sampler always opens "
+                "{modality}_train_Sample_stats.csv at the end, even when no case "
+                "completed (so that FileNotFoundError is a symptom, not the cause).",
+                "Typical causes:",
+                "  - Worker crashes with --num-cores > 1 (exceptions are not re-raised).",
+                "    Re-run with --num-cores 1 to see the real error.",
+                "  - Image extension mismatch (pass --img-ext, e.g. .nii.gz).",
+                "  - Missing truths/ (or surfaces/ when using --truth-from-surface).",
+                "  - All cases listed in outdir/done.txt, so they were skipped.",
+            ]
+        )
     return RuntimeError("\n".join(lines))
 
 
-def _assert_patches_extracted(outdir: str, modalities: Sequence[str]) -> None:
+def _assert_volumes_written(
+    outdir: str,
+    modalities: Sequence[str],
+    *,
+    global_volumes: bool = False,
+) -> None:
     for mod in modalities:
         img_dir = os.path.join(outdir, f"{mod.lower()}_train")
         mask_dir = os.path.join(outdir, f"{mod.lower()}_train_masks")
         if _count_volume_files(img_dir) == 0 or _count_volume_files(mask_dir) == 0:
-            raise _missing_patches_error(outdir, modalities)
+            raise _missing_volumes_error(
+                outdir, modalities, global_volumes=global_volumes
+            )
 
 
 @contextmanager
@@ -475,9 +519,13 @@ def prepare_training_dataset(
     yes: bool = False,
     verbose: bool = False,
     img_ext: Optional[str] = None,
+    global_volumes: bool = False,
 ) -> PrepareResult:
     """
-    Extract SeqSeg-style patches and convert them to nnU-Net raw datasets.
+    Prepare training volumes and convert them to nnU-Net raw datasets.
+
+    By default extracts SeqSeg-style patches. With ``global_volumes=True``,
+    copies each case's full image and label instead (``gather_global_volumes``).
 
     Uses ``vascular-segment-sampler`` (``pip install seqseg[train]``).
     """
@@ -513,35 +561,70 @@ def prepare_training_dataset(
             truth_from_surface=truth_from_surface,
         )
         print("=" * 72)
-        print("Extracting vascular segment patches")
+        if global_volumes:
+            print("Gathering whole-case volumes (no patch sampling)")
+        else:
+            print("Extracting vascular segment patches")
         print(f"  data_dir: {data_dir}")
         print(f"  outdir:   {outdir}")
         print(f"  IMG_EXT:  {resolved_img_ext}")
         print("=" * 72)
-        _run_extract_patches(
-            extract_patches,
-            data_dir=data_dir,
-            outdir=outdir,
-            config=sampler_config,
-            perc_dataset=perc_dataset,
-            num_cores=num_cores,
-            start_from=start_from,
-            end_at=end_at,
-            testing=testing,
-            validation_prop=validation_prop,
-            max_samples=max_samples,
-            modality=modality_arg,
-            truth_from_surface=truth_from_surface,
-            truth_target_spacing=(
-                list(truth_target_spacing) if truth_target_spacing is not None else None
-            ),
-            truth_regenerate=truth_regenerate,
-            yes=yes,
-            verbose=verbose,
+        if global_volumes:
+            gather_global_volumes = _require_gather_global_volumes()
+            gather_global_volumes(
+                data_dir=data_dir,
+                outdir=outdir,
+                config=sampler_config,
+                perc_dataset=perc_dataset,
+                num_cores=num_cores,
+                start_from=start_from,
+                end_at=end_at,
+                testing=testing,
+                validation_prop=validation_prop,
+                modality=modality_arg,
+                truth_from_surface=truth_from_surface,
+                truth_target_spacing=(
+                    list(truth_target_spacing)
+                    if truth_target_spacing is not None
+                    else None
+                ),
+                truth_regenerate=truth_regenerate,
+                yes=yes,
+                verbose=verbose,
+            )
+        else:
+            _run_extract_patches(
+                extract_patches,
+                data_dir=data_dir,
+                outdir=outdir,
+                config=sampler_config,
+                perc_dataset=perc_dataset,
+                num_cores=num_cores,
+                start_from=start_from,
+                end_at=end_at,
+                testing=testing,
+                validation_prop=validation_prop,
+                max_samples=max_samples,
+                modality=modality_arg,
+                truth_from_surface=truth_from_surface,
+                truth_target_spacing=(
+                    list(truth_target_spacing)
+                    if truth_target_spacing is not None
+                    else None
+                ),
+                truth_regenerate=truth_regenerate,
+                yes=yes,
+                verbose=verbose,
+            )
+        _assert_volumes_written(
+            outdir, modalities, global_volumes=global_volumes
         )
-        _assert_patches_extracted(outdir, modalities)
     else:
-        print("Skipping patch extraction (--skip-sample)")
+        print(
+            "Skipping volume gathering (--skip-sample)"
+            if global_volumes
+            else "Skipping patch extraction (--skip-sample)"
+        )
 
     dataset_dirs: List[str] = []
     dataset_names: List[str] = []
@@ -555,7 +638,10 @@ def prepare_training_dataset(
         os.makedirs(convert_outdir, exist_ok=True)
 
         print("=" * 72)
-        print(f"Converting patches to nnU-Net format under {convert_outdir}")
+        print(
+            f"Converting {'volumes' if global_volumes else 'patches'} "
+            f"to nnU-Net format under {convert_outdir}"
+        )
         print("=" * 72)
 
         # Dataset numbers must be unique per modality when converting several.

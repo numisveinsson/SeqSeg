@@ -116,6 +116,98 @@ def test_prepare_calls_sampler_apis(tmp_path):
     assert result.modalities == ["CT"]
 
 
+def test_prepare_global_volumes_calls_gather_not_extract(tmp_path):
+    extract = MagicMock()
+    write = MagicMock(return_value=str(tmp_path / "Dataset0999_MYDATACT"))
+    gather = MagicMock()
+    data = _make_training_data(tmp_path)
+    extracted = tmp_path / "extracted"
+    _make_patch_dirs(extracted)
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ), patch(
+        "seqseg.pipeline.train._require_gather_global_volumes",
+        return_value=gather,
+    ):
+        result = prepare_training_dataset(
+            data,
+            str(extracted),
+            name="MYDATA",
+            dataset_number=999,
+            modality="CT",
+            yes=True,
+            global_volumes=True,
+        )
+
+    extract.assert_not_called()
+    gather.assert_called_once()
+    write.assert_called_once()
+    kwargs = gather.call_args.kwargs
+    assert kwargs["config"]["IMG_EXT"] == ".nrrd"
+    assert kwargs["modality"] == "CT"
+    assert kwargs["yes"] is True
+    assert "max_samples" not in kwargs
+    write_kwargs = write.call_args.kwargs
+    assert write_kwargs["name"] == "MYDATA"
+    assert write_kwargs["dataset_number"] == 999
+    assert write_kwargs["modality"] == "ct"
+    assert result.dataset_names == ["Dataset0999_MYDATACT"]
+    assert result.modalities == ["CT"]
+
+
+def test_prepare_global_volumes_requires_recent_sampler(tmp_path):
+    extract = MagicMock()
+    write = MagicMock()
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ), patch(
+        "seqseg.pipeline.train._require_gather_global_volumes",
+        side_effect=TrainDependencyError("upgrade sampler"),
+    ):
+        with pytest.raises(TrainDependencyError, match="upgrade sampler"):
+            prepare_training_dataset(
+                _make_training_data(tmp_path),
+                str(tmp_path / "extracted"),
+                name="MYDATA",
+                dataset_number=999,
+                yes=True,
+                global_volumes=True,
+            )
+    extract.assert_not_called()
+    write.assert_not_called()
+
+
+def test_prepare_global_volumes_skip_sample_converts_only(tmp_path):
+    extract = MagicMock()
+    write = MagicMock(return_value=str(tmp_path / "Dataset0999_MYDATACT"))
+    gather = MagicMock()
+    extracted = tmp_path / "extracted"
+    _make_patch_dirs(extracted)
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ), patch(
+        "seqseg.pipeline.train._require_gather_global_volumes",
+        return_value=gather,
+    ):
+        prepare_training_dataset(
+            str(tmp_path / "data"),
+            str(extracted),
+            name="MYDATA",
+            dataset_number=999,
+            skip_sample=True,
+            global_volumes=True,
+        )
+
+    extract.assert_not_called()
+    gather.assert_not_called()
+    write.assert_called_once()
+
+
 def test_detect_img_ext_prefers_nii_gz(tmp_path):
     images = tmp_path / "images"
     images.mkdir()

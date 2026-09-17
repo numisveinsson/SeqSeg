@@ -672,6 +672,7 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
             yes=ns.yes,
             verbose=ns.verbose,
             img_ext=ns.img_ext,
+            global_volumes=ns.global_volumes,
         )
     except TrainDependencyError as e:
         print(str(e), file=sys.stderr)
@@ -692,7 +693,8 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         sys.exit(1)
 
     print("\nPrepare complete.")
-    print(f"  Patches: {result.extracted_dir}")
+    kind = "Whole volumes" if ns.global_volumes else "Patches"
+    print(f"  {kind}: {result.extracted_dir}")
     for name, path in zip(result.dataset_names, result.dataset_dirs):
         try:
             ds_id = dataset_id_from_name(name)
@@ -990,13 +992,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     train_p = sub.add_parser(
         "train",
-        help="Prepare patch datasets and train nnU-Net models for SeqSeg",
+        help="Prepare patch or whole-volume datasets and train nnU-Net models",
     )
     train_sub = train_p.add_subparsers(dest="train_cmd", required=True)
 
     p_prep = train_sub.add_parser(
         "prepare",
-        help="Extract vascular patches and convert to nnU-Net DatasetXXX format",
+        help="Prepare patches or whole volumes and convert to nnU-Net DatasetXXX format",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p_prep.add_argument(
@@ -1012,7 +1014,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "-outdir",
         default=None,
         type=str,
-        help="Directory for extracted patches "
+        help="Directory for extracted patches or whole volumes "
         "(default: seqseg paths outdir, else ./extracted_data/)",
     )
     p_prep.add_argument(
@@ -1079,14 +1081,20 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_prep.add_argument("--truth-regenerate", action="store_true")
     p_prep.add_argument(
+        "--global-volumes",
+        "--whole-volumes",
+        action="store_true",
+        help="Copy each case's full image and label instead of sampling patches",
+    )
+    p_prep.add_argument(
         "--skip-sample",
         action="store_true",
-        help="Only convert existing patches in --outdir",
+        help="Only convert existing volumes in --outdir",
     )
     p_prep.add_argument(
         "--skip-convert",
         action="store_true",
-        help="Only extract patches; skip nnU-Net Dataset conversion",
+        help="Only write volumes; skip nnU-Net Dataset conversion",
     )
     p_prep.add_argument(
         "--also-test",

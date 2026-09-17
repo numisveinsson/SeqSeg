@@ -51,7 +51,7 @@ SeqSeg **2.0** refactors the package around a clearer CLI and a stable Python AP
 | **`seqseg run plus batch`** | Global nnU-Net sweep, then SeqSeg (replaces monolithic `seqseg_plus` script flow) |
 | **`seqseg init dataset`** | Scaffold `images/`, `centerlines/`, `truths/`, and template `seeds.json` |
 | **`seqseg paths init` / `set` / `show`** | Save default nnU-Net / data / out dirs in `~/.seqseg/paths.yaml` |
-| **`seqseg train prepare`** | Extract patches + build nnU-Net Dataset (needs `pip install "seqseg[train]"`) |
+| **`seqseg train prepare`** | Extract patches or whole volumes + build nnU-Net Dataset (needs `pip install "seqseg[train]"`) |
 | **`seqseg train nnunet`** | Run nnU-Net plan/preprocess and training |
 | **`seqseg doctor`** | Check imports (SimpleITK, vtk, nnunetv2, scipy, optional sampler) and paths |
 | **`seqseg config dump` / `fingerprint`** | Inspect or diff packaged YAML configs |

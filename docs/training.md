@@ -54,7 +54,7 @@ python -m seqseg.scripts.prepare_casx_dataset --path /path/to/CAS_X_coronary_dat
 
 That writes SeqSeg `images/`, `truths/`, `centerlines/`, `surfaces/`, and `seeds.json` in millimetres with identity image direction so vascular-segment-sampler's `(point-origin)/spacing` mapping stays in-bounds.
 
-## 2. Extract patches and build an nnU-Net dataset
+## 2. Extract patches or whole volumes and build an nnU-Net dataset
 
 After `seqseg paths init` / `set`, you can omit the path flags:
 
@@ -79,6 +79,22 @@ seqseg train prepare \
     --modality CT
 ```
 
+### Whole volumes (no patch sampling)
+
+To train nnU-Net on each case's full image and label instead of SeqSeg-style patches:
+
+```bash
+seqseg train prepare \
+    --name MYDATA \
+    --dataset-number 999 \
+    --modality CT \
+    --config-name global \
+    --global-volumes \
+    --yes
+```
+
+`--whole-volumes` is an alias for `--global-volumes`. Centerlines are still used to list training cases (same as patch sampling). `--num-cores` and `--max-samples` are ignored in this mode.
+
 ### Resample to a target spacing
 
 If cases should be sampled at a fixed voxel spacing, regenerate truths from `surfaces/` and resample images to match:
@@ -98,14 +114,15 @@ seqseg train prepare \
 - `--truth-regenerate` — overwrite existing `truths/`
 - `--truth-target-spacing SX SY SZ` — spacing used for the new truths (and matching image resample)
 
-Requires `surfaces/` in the project. If you already have `truths/` and only want resampling, preprocess images/labels separately (e.g. sampler `change_img_resample`) before `seqseg train prepare`.
+Requires `surfaces/` in the project. If you already have `truths/` and only want resampling, preprocess images/labels separately (e.g. sampler `change_img_resample`) before `seqseg train prepare`. These flags also apply with `--global-volumes`.
 
 This wraps:
 
-- `vascular_segment_sampler.sampling.extract_patches`
+- `vascular_segment_sampler.sampling.extract_patches` (default)
+- `vascular_segment_sampler.sampling.gather_global_volumes` (`--global-volumes`)
 - `vascular_segment_sampler.nnunet.write_nnunet_dataset`
 
-You can also call those APIs directly, or use the sampler CLIs `vss-sample` / `vss-to-nnunet`.
+You can also call those APIs directly, or use the sampler CLIs `vss-sample` / `vss-gather-global` / `vss-to-nnunet`.
 
 ## 3. Train with nnU-Net
 
