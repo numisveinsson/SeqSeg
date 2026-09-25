@@ -63,7 +63,7 @@ viz = [
   "matplotlib>=3.5",
 ]
 train = [
-  "vascular-segment-sampler>=0.1.0",
+  "vascular-segment-sampler>=0.4.0",
 ]
 
 [tool.pytest.ini_options]

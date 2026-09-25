@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://rdcu.be/dU0wy"><img src="https://img.shields.io/badge/Paper-Annals%20of%20BME-blue" alt="Paper"/></a>
   <a href="https://github.com/numisveinsson/SeqSeg/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-green.svg" alt="License"/></a>
-  <a href="https://python.org"><img src="https://img.shields.io/badge/Python-3.11-blue.svg" alt="Python"/></a>
+  <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.9%2B-blue.svg" alt="Python 3.9+"/></a>
 </p>
 
 > **News:** SeqSeg now outputs a full SimVascular project in the `simvascular/` subdirectory — open it directly in SimVascular with automatic pathlines and contours for every segmented branch.
@@ -83,8 +83,6 @@ result = run_tracing(
 )
 prob_seg = result.assembly.assembly  # sitk.Image; threshold for binary masks
 ```
-
-See [High-level API (`seqseg.api`)](#high-level-api-seqsegapi) for full detail.
 
 ### Internal structure (for contributors)
 
