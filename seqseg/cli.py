@@ -225,7 +225,8 @@ def _validate_trace_batch(ns: argparse.Namespace) -> None:
             + "\n  ".join(missing)
             + "\n\nMinimal example:\n"
             "  seqseg paths init\n"
-            "  seqseg paths set --data-dir /path/to/dataset --outdir /path/to/out\n"
+            "  seqseg paths set --nnunet-root ~/nnunet_data "
+            "--data-dir /path/to/dataset --outdir /path/to/out\n"
             "  seqseg run batch -img_ext .nii.gz "
             "-train_dataset Dataset010_SEQCOROASOCACT\n",
             file=sys.stderr,
@@ -592,19 +593,9 @@ def _cmd_paths_init(ns: argparse.Namespace) -> None:
 
 
 def _cmd_paths_set(ns: argparse.Namespace) -> None:
-    fields = (
-        ns.nnunet_root,
-        ns.nnunet_raw,
-        ns.nnunet_preprocessed,
-        ns.nnunet_results,
-        ns.data_dir,
-        ns.outdir,
-    )
-    if not any(f is not None for f in fields):
+    if not ns.nnunet_root:
         print(
-            "seqseg paths set: provide at least one of "
-            "--nnunet-root, --nnunet-raw, --nnunet-preprocessed, "
-            "--nnunet-results, --data-dir, --outdir",
+            "seqseg paths set: --nnunet-root is required",
             file=sys.stderr,
         )
         sys.exit(2)
@@ -1194,10 +1185,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_set = paths_sub.add_parser(
         "set",
-        help="Update one or more saved paths",
+        help="Update saved paths (requires --nnunet-root)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p_set.add_argument("--nnunet-root", default=None, type=str)
+    p_set.add_argument(
+        "--nnunet-root",
+        required=True,
+        type=str,
+        help="Parent directory for nnUNet_raw / preprocessed / results",
+    )
     p_set.add_argument("--nnunet-raw", default=None, type=str)
     p_set.add_argument("--nnunet-preprocessed", default=None, type=str)
     p_set.add_argument("--nnunet-results", default=None, type=str)

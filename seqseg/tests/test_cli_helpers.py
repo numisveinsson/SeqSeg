@@ -338,6 +338,24 @@ def test_parser_paths_init():
     assert ns.outdir == "/tmp/out"
 
 
+def test_parser_paths_set_requires_nnunet_root():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "paths",
+            "set",
+            "--nnunet-root",
+            "/tmp/nnunet",
+            "--data-dir",
+            "/tmp/data",
+        ]
+    )
+    assert ns.paths_cmd == "set"
+    assert ns.nnunet_root == "/tmp/nnunet"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["paths", "set", "--data-dir", "/tmp/data"])
+
+
 def test_parser_train_nnunet():
     parser = _build_parser()
     ns = parser.parse_args(

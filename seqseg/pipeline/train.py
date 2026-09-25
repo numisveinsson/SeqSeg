@@ -536,7 +536,7 @@ def prepare_training_dataset(
     if not resolved_data:
         raise ValueError(
             "data_dir is required. Pass --data-dir or set it with:\n"
-            "  seqseg paths set --data-dir /path/to/cases"
+            "  seqseg paths set --nnunet-root ~/nnunet_data --data-dir /path/to/cases"
         )
     data_dir = resolved_data
     outdir = _dir_for_sampler(resolved_out)

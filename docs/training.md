@@ -17,12 +17,15 @@ seqseg paths init \
   --data-dir /path/to/your_project/ \
   --outdir ~/seqseg_train
 
-# or update later:
-seqseg paths set --data-dir /path/to/your_project --outdir ~/seqseg_train
+# or update later (--nnunet-root is required):
+seqseg paths set \
+  --nnunet-root ~/nnunet_data \
+  --data-dir /path/to/your_project \
+  --outdir ~/seqseg_train
 seqseg paths show
 ```
 
-`seqseg paths init` creates `~/nnunet_data/nnUNet_{raw,preprocessed,results}` by default (override with `--nnunet-root`).
+`seqseg paths init` creates `~/nnunet_data/nnUNet_{raw,preprocessed,results}` by default (override with `--nnunet-root`). `seqseg paths set` always requires `--nnunet-root` and rewrites the three nnU-Net directories under that root.
 
 Optional: still export into the current shell with:
 
@@ -43,16 +46,6 @@ your_project/
 ```
 
 Scaffold folders with `seqseg init dataset --path your_project/`, then add centerlines and labels.
-
-ImageCAS / CAS-X coronary data (nested `{id}.img.nii.gz`, left/right VTK centerlines, Y-flipped NIfTI direction) can be converted in place with:
-
-```bash
-python -m seqseg.scripts.prepare_casx_dataset --path /path/to/CAS_X_coronary_dataset
-# if volumes already exist but still have dirY=-1:
-python -m seqseg.scripts.prepare_casx_dataset --path /path/to/CAS_X_coronary_dataset --fix-direction
-```
-
-That writes SeqSeg `images/`, `truths/`, `centerlines/`, `surfaces/`, and `seeds.json` in millimetres with identity image direction so vascular-segment-sampler's `(point-origin)/spacing` mapping stays in-bounds.
 
 ## 2. Extract patches or whole volumes and build an nnU-Net dataset
 
