@@ -2,39 +2,35 @@
 
 [← Back to README](../README.md)
 
-To train SeqSeg models on a new dataset, see [Training](training.md).
+Training a model on a new dataset is [Training](training.md). Tracking parameters are [Configuration](configuration.md).
 
-## Integration with Other Tools
+## SimVascular
 
-### SimVascular Integration
-With `-simvascular 1`, SeqSeg writes a full [SimVascular](http://simvascular.github.io/) project under each case:
+`seqseg run batch -simvascular 1` writes a [SimVascular](http://simvascular.github.io/) project under each case directory. Open `simvascular.proj` in that `simvascular/` folder.
 
-```bash
-seqseg run batch -data_dir data/ -outdir results/ -simvascular 1
-# Open: results/{test_name}_{case}/simvascular/simvascular.proj
-```
+The file layout is in [Usage](usage.md#simvascular-project--simvascular-1). The tutorial walks through opening the project and preparing it for CFD: [tutorial, SimVascular section](../seqseg/tutorial/tutorial.md#simvascular-integration).
 
-Layout:
-
-| Path | Contents |
-|------|----------|
-| `simvascular.proj` | Project root file for SimVascular |
-| `Images/` | Volume (`.vti`) and SV image sidecars |
-| `Paths/` | Per-branch pathlines (`.pth`) |
-| `Segmentations/` | Contour groups (`.ctgr`) paired with paths |
-| `Models/` | Surface solid (`.vtp`) and companion (`.mdl`) |
-
-To create or refresh the folder layout without re-running tracing:
+To create or refresh the folder layout after a run that omitted the flag:
 
 ```bash
 seqseg simvascular init --case-dir results/3d_fullres_case_001/
 ```
 
-See [Usage](usage.md#simvascular-project--simvascular-1) and the [tutorial](../seqseg/tutorial/tutorial.md#simvascular-integration) for the end-to-end CFD workflow.
+## 3D Slicer
 
-### 3D Slicer Integration
-```python
-# Load SeqSeg results in 3D Slicer for visualization
-import slicer
-segmentation = slicer.util.loadSegmentation("result.mha")
-```
+Load the written files from the Slicer GUI:
+
+1. **File → Add Data** and select the segmentation `.mha` (the volume named `{case}_segmentation_…`).
+2. Add the surface `{case}_surface_mesh_….vtp` the same way.
+3. In the Volumes or Models module, set the segmentation window/level or model visibility so the surface sits on the image.
+
+## Repository layout
+
+| Path | What it is |
+|------|------------|
+| `seqseg/cli.py` | Subcommands (`run`, `train`, `paths`, `doctor`, …) |
+| `seqseg/pipeline/` | Batch tracing, the plus workflow, training, and post steps the CLI calls |
+| `seqseg/modules/` | Patch extraction, nnU-Net prediction, centerlines, assembly |
+| `seqseg/config/` | Packaged YAML tracking configs |
+| `seqseg/tutorial/` | Sample aorta data and the tutorial |
+| `docs/` | These guides |

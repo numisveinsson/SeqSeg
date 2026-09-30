@@ -4,9 +4,9 @@
 
 ## System Requirements
 
-- **OS**: Linux, macOS, Windows
-- **Python**: ≥3.9 (3.11 recommended)
-- **GPU**: CUDA-compatible GPU with ≥8GB VRAM (recommended for faster inference; can also run on CPU only)
+- **OS**: Linux, macOS, Windows ([Windows install steps](../seqseg/tutorial/windows.md))
+- **Python**: 3.9 or newer (3.11 recommended; that is the version in the tutorial)
+- **GPU**: CUDA-compatible GPU with ≥8GB VRAM (faster inference). CPU-only runs are supported.
 
 ## Option 1: pip Installation (Recommended)
 
@@ -65,16 +65,33 @@ vmtk                             # Advanced vascular modeling tools
 
 ## Model Weights
 
-Pre-trained weights are required for inference:
+Inference needs a downloaded nnU-Net results folder:
 
-1. **Download**:
-   - Aortic and femoral (MR/CT): [Pre-trained models](https://zenodo.org/records/15020477) (nnUNet_results folder)
-   - Coronary CT (CCTA): [SeqSeg nnU-Net weights — CT coronary segmentation](https://zenodo.org/records/19547894) (`nnUNet_results_coronary.zip`, `Dataset010_SEQCOROASOCACT`)
-2. **Extract**: Unzip to desired location
-3. **Reference**: Use `-nnunet_results_path` to specify path
+```bash
+curl -L -o nnUNet_results.zip https://zenodo.org/records/15020477/files/nnUNet_results.zip
+unzip nnUNet_results.zip
+```
 
-**Available Models:**
-- `Dataset005_SEQAORTANDFEMOMR`: Aortic and femoral vessels (MR)
-- `Dataset006_SEQAORTANDFEMOCT`: Aortic and femoral vessels (CT)
-- `Dataset010_SEQCOROASOCACT`: Coronary lumen (CT angiography) — [nnU-Net weights on Zenodo](https://zenodo.org/records/19547894)
-- Additional models for cerebral and pulmonary vessels available upon request
+After unzip, the layout looks like this:
+
+```
+nnUNet_results/
+└── Dataset005_SEQAORTANDFEMOMR/
+    └── nnUNetTrainer__nnUNetPlans__3d_fullres/    # weights live here
+```
+
+`seqseg run batch -nnunet_results_path` points at `nnUNet_results/`. `seqseg run single --model-folder` and `seqseg doctor --model-folder` point at the inner `nnUNetTrainer__nnUNetPlans__3d_fullres` directory.
+
+| Weights | Anatomy | Pass to `seqseg run batch` |
+|---------|---------|----------------------------|
+| [Zenodo 15020477](https://zenodo.org/records/15020477) `Dataset005_SEQAORTANDFEMOMR` | Aorta and femoral, MR | `-train_dataset Dataset005_SEQAORTANDFEMOMR -config_name global_aorta` |
+| [Zenodo 15020477](https://zenodo.org/records/15020477) `Dataset006_SEQAORTANDFEMOCT` | Aorta and femoral, CT | `-train_dataset Dataset006_SEQAORTANDFEMOCT -config_name global_aorta` |
+| [Zenodo 19547894](https://zenodo.org/records/19547894) `Dataset010_SEQCOROASOCACT` (`nnUNet_results_coronary.zip`) | Coronary lumen, CT angiography | `-train_dataset Dataset010_SEQCOROASOCACT -config_name global_coro` |
+
+The [tutorial](../seqseg/tutorial/tutorial.md) uses `Dataset005_SEQAORTANDFEMOMR` with `-config_name aorta_tutorial` on its sample MR scan. Cerebral and pulmonary weights are available on request; their configs are `global_cereb` and `global_pulm`.
+
+Check a trainer folder after download:
+
+```bash
+seqseg doctor --model-folder nnUNet_results/Dataset005_SEQAORTANDFEMOMR/nnUNetTrainer__nnUNetPlans__3d_fullres
+```

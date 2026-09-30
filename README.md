@@ -18,7 +18,7 @@
   <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.9%2B-blue.svg" alt="Python 3.9+"/></a>
 </p>
 
-> **News:** SeqSeg now outputs a full SimVascular project in the `simvascular/` subdirectory — open it directly in SimVascular with automatic pathlines and contours for every segmented branch.
+> **News:** SeqSeg writes a full SimVascular project in the `simvascular/` subdirectory — open it directly in SimVascular with pathlines and contours for every segmented branch.
 
 ---
 
@@ -31,7 +31,7 @@ SeqSeg segments vessels **sequentially**, taking steps along vessel centerlines 
 - 🩻 **Multi-modal** — works with CT and MR 3D medical images
 - 📏 **Scalable** — vessels from ~1mm coronaries to ~30mm aortas
 - ✅ **Clinically validated** — coronary, aortic, cerebral, and pulmonary anatomies (pre-trained weights for aorta CT/MR and coronary CT)
-- ⚡ **Fast** — ~2–10 min per case, Dice > 0.9 on validation, runs on CPU or GPU
+- ⚡ **Fast** — on CPU, about 2–5 minutes for an aorta, 5–15 for a coronary tree, and 10–30 for a cerebral tree. GPU is faster. Details in [Benchmarks](docs/benchmarks.md).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/mr_model_tracing_fast_shorter.gif" alt="SeqSeg Demo"/><br/>
@@ -40,87 +40,82 @@ SeqSeg segments vessels **sequentially**, taking steps along vessel centerlines 
 
 ## What's new in 2.x
 
-SeqSeg **2.0** refactors the package around a clearer CLI and a stable Python API. Existing batch workflows still work; legacy invocations without a subcommand (e.g. `seqseg -data_dir ...`) are rewritten to `seqseg run batch` automatically.
+SeqSeg **2.0** uses subcommands. A command from 1.x that starts with a flag, such as `seqseg -data_dir ...`, still runs: it is rewritten to `seqseg run batch` automatically.
 
-### Command-line interface
+### Commands
 
-| Feature | Description |
+| Command | Description |
 | -------- | ----------- |
-| **`seqseg run batch`** | Classic dataset batch tracing (preferred entry point) |
-| **`seqseg run single`** | One volume + seeds: stages under `<outdir>/_seqseg_single_staging/`, then runs like batch |
-| **`seqseg run plus batch`** | Global nnU-Net sweep, then SeqSeg (replaces monolithic `seqseg_plus` script flow) |
-| **`seqseg init dataset`** | Scaffold `images/`, `centerlines/`, `truths/`, and template `seeds.json` |
-| **`seqseg paths init` / `set` / `show`** | Save default nnU-Net / data / out dirs in `~/.seqseg/paths.yaml` |
-| **`seqseg train prepare`** | Extract patches or whole volumes + build nnU-Net Dataset (needs `pip install "seqseg[train]"`) |
-| **`seqseg train nnunet`** | Run nnU-Net plan/preprocess and training |
+| **`seqseg run batch`** | Dataset batch tracing |
+| **`seqseg run single`** | One volume and seeds. Stages files under `<outdir>/_seqseg_single_staging/`, then traces |
+| **`seqseg run plus batch`** | Global nnU-Net sweep, then SeqSeg |
+| **`seqseg init dataset`** | Create `images/`, `centerlines/`, `truths/`, and a template `seeds.json` |
+| **`seqseg paths init` / `set` / `show`** | Save default nnU-Net, data, and output directories in `~/.seqseg/paths.yaml` |
+| **`seqseg train prepare`** | Extract patches or whole volumes and build an nnU-Net dataset (`pip install "seqseg[train]"`) |
+| **`seqseg train nnunet`** | Run nnU-Net planning, preprocessing, and training |
 | **`seqseg doctor`** | Check imports (SimpleITK, vtk, nnunetv2, scipy, optional sampler) and paths |
-| **`seqseg config dump` / `fingerprint`** | Inspect or diff packaged YAML configs |
-| **`seqseg post global-centerline`** | Post-process segmentations into global centerlines |
-| **`seqseg simvascular init`** | Create or refresh SimVascular project layout under a case directory |
-| **`seqseg --version`** | Print installed package version |
+| **`seqseg config dump` / `fingerprint`** | Print a packaged YAML config, or list keys that differ from another |
+| **`seqseg post global-centerline`** | Build global centerlines from existing segmentations |
+| **`seqseg simvascular init`** | Create or refresh a SimVascular project under a case directory |
+| **`seqseg --version`** | Print the installed version |
 
-### Python library API
-
-Embed tracing in other Python code without writing SeqSeg output files:
-
-- **`seqseg.api.run_tracing`** — pass a `sitk.Image`, seed definitions, and an nnU-Net trainer folder; get a `TracingResult` with global probability segmentation at `result.assembly.assembly`
-- **`TracingOptions(disk_io=False)`** — skip VTK/MHA debug trees on disk (nnU-Net weights still load from `model_folder`)
-- **`BranchSeed`**, **`branch_seed_at_point`**, **`seeds_to_potential_branches`** — simple seed formats instead of hand-built step dicts
-- **`TracingContext`** / **`trace_centerline_from_context`** — lower-level control with the same in-memory image support
-- Lazy re-exports from **`import seqseg`** (see `seqseg/__init__.py`)
-
-Quick example (seeds and config known):
-
-```python
-from seqseg.api import TracingOptions, branch_seed_at_point, run_tracing
-
-result = run_tracing(
-    my_sitk_image,
-    [branch_seed_at_point([x, y, z], radius)],
-    "/path/to/nnUNetTrainer__nnUNetPlans__3d_fullres",
-    config="global",
-    options=TracingOptions(disk_io=False),
-)
-prob_seg = result.assembly.assembly  # sitk.Image; threshold for binary masks
-```
-
-### Internal structure (for contributors)
-
-- Pipeline modules: `seqseg.pipeline.classic`, `plus`, `post`, `single_trace`
-- Typed config helpers: `AlgorithmConfig`, `NnUNetModelSpec` in `seqseg.config_models`
-- Tracing core accepts **`sitk.Image`** or file paths for the reference volume and optional prior segmentation
+`seqseg run batch` flags use underscores (`-outdir` / `--outdir`). The data folder is `-data_dir` or `--data_directory`. `seqseg run single`, `seqseg train`, and `seqseg paths` use hyphens (`--image`, `--data-dir`).
 
 ### Migrating from 1.x
 
-1. **CLI:** Prefer `seqseg run batch` (or keep legacy flags — they still work).
-2. **Plus workflow:** Use `seqseg run plus batch` instead of `python -m seqseg.seqseg_plus` with the same nnU-Net path flags.
-3. **Library:** Use `run_tracing` or `TracingContext` rather than calling `trace_centerline` with only file paths.
-4. **Version:** `pip install -U seqseg` and check with `seqseg --version` (expects **2.1.0**).
+1. Prefer `seqseg run batch`. The old flag-only form still works.
+2. Use `seqseg run plus batch` in place of `python -m seqseg.seqseg_plus`. The nnU-Net path flags are unchanged.
+3. Check the install with `seqseg --version` after `pip install -U seqseg`.
 
 ## Quick Start
 
+Python 3.9 or newer. 3.11 is the version used in the tutorial and conda example.
+
 ```bash
-# Install
 pip install seqseg
 
-# Download pre-trained weights (see Installation docs for links)
-# Run segmentation
-seqseg -data_dir your_data/ -nnunet_results_path path/to/weights/ -config_name aorta_tutorial
+# Aorta and femoral weights (MR and CT). Coronary weights are a separate zip; see Installation.
+curl -L -o nnUNet_results.zip https://zenodo.org/records/15020477/files/nnUNet_results.zip
+unzip nnUNet_results.zip
 ```
 
-**📖 New here? Follow the [step-by-step tutorial](seqseg/tutorial/tutorial.md)** with example data and detailed instructions.
+`-nnunet_results_path` is the folder that contains `Dataset005_SEQAORTANDFEMOMR` (and the other dataset folders in that zip).
+
+**First run:** follow the [step-by-step tutorial](seqseg/tutorial/tutorial.md). It includes an abdominal-aorta MR scan, seed points, and Windows notes. The tutorial caps the number of steps so the example finishes in a few minutes; a real case should use the defaults.
+
+**Your own data** needs `images/` and `seeds.json` (see [Usage](docs/usage.md)). This command is an aorta MR case. Change `-train_dataset`, `-config_name`, and `-img_ext` to match your images and weights:
+
+```bash
+seqseg run batch \
+    -data_dir your_data/ \
+    -nnunet_results_path nnUNet_results/ \
+    -train_dataset Dataset005_SEQAORTANDFEMOMR \
+    -config_name global_aorta \
+    -img_ext .mha \
+    -outdir results/
+```
+
+| Anatomy | `-train_dataset` | `-config_name` |
+|---------|------------------|----------------|
+| Aorta / femoral MR | `Dataset005_SEQAORTANDFEMOMR` | `global_aorta` |
+| Aorta / femoral CT | `Dataset006_SEQAORTANDFEMOCT` | `global_aorta` |
+| Coronary CT | `Dataset010_SEQCOROASOCACT` | `global_coro` |
+
+The tutorial uses `-config_name aorta_tutorial` for its sample scan. Download links and the trainer-folder layout are in [Installation](docs/installation.md).
 
 ## Documentation
 
 | Guide | Description |
 |-------|-------------|
 | [Installation](docs/installation.md) | Setup, dependencies, and pre-trained model weights |
-| [Usage](docs/usage.md) | Data preparation, CLI arguments, and output files |
-| [Configuration](docs/configuration.md) | YAML configs and key tracking parameters |
+| [Tutorial](seqseg/tutorial/tutorial.md) | End-to-end aorta example with sample data |
+| [Usage](docs/usage.md) | Data layout, seeds, CLI arguments, and output files |
+| [Configuration](docs/configuration.md) | YAML configs and tracking parameters |
 | [Algorithm Overview](docs/algorithm.md) | Methodology, workflow, and training strategy |
-| [Training](docs/training.md) | Train nnU-Net models on a new dataset for SeqSeg |
+| [Training](docs/training.md) | Train nnU-Net models on a new dataset |
 | [Performance & Benchmarks](docs/benchmarks.md) | Accuracy, timing, and qualitative comparisons |
-| [Research & Development](docs/development.md) | SimVascular / Slicer integrations and related tooling |
+| [API](docs/api.md) | Call tracing from Python |
+| [Research & Development](docs/development.md) | SimVascular, 3D Slicer, and repository layout |
 
 ## Citation
 

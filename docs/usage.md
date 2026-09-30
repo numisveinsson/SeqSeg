@@ -2,7 +2,33 @@
 
 [← Back to README](../README.md)
 
-For a complete walkthrough with example data, see the [step-by-step tutorial](../seqseg/tutorial/tutorial.md).
+For a complete walkthrough with example data, see the [step-by-step tutorial](../seqseg/tutorial/tutorial.md). Weight downloads and which dataset pairs with which config are in [Installation](installation.md).
+
+## Commands and flag spelling
+
+`seqseg run batch` and `seqseg run plus batch` take underscore flags (`-outdir` / `--outdir`). The data folder is `-data_dir` or `--data_directory`. `seqseg run single`, `seqseg train`, and `seqseg paths` take hyphen flags (`--image`, `--data-dir`). `seqseg train prepare` also accepts `-data_dir`.
+
+A 1.x command that starts with a flag (`seqseg -data_dir ...`) still runs. It is rewritten to `seqseg run batch`.
+
+`-img_ext` is required on every batch command. These three can be omitted when they are saved with `seqseg paths`:
+
+| Flag | Role |
+|------|------|
+| `-data_dir` / `--data_directory` | Folder with `images/` and `seeds.json` |
+| `-outdir` | Where results are written |
+| `-nnunet_results_path` | Folder that contains `Dataset00…/` (see [Installation](installation.md)) |
+
+`-train_dataset` defaults to `Dataset010_SEQCOROASOCACT` and `-config_name` defaults to `global`. Set both to the pair for your anatomy:
+
+| Anatomy | `-train_dataset` | `-config_name` |
+|---------|------------------|----------------|
+| Aorta / femoral MR | `Dataset005_SEQAORTANDFEMOMR` | `global_aorta` |
+| Aorta / femoral CT | `Dataset006_SEQAORTANDFEMOCT` | `global_aorta` |
+| Coronary CT | `Dataset010_SEQCOROASOCACT` | `global_coro` |
+| Cerebral | weights on request | `global_cereb` |
+| Pulmonary | weights on request | `global_pulm` |
+
+The tutorial sample uses `-config_name aorta_tutorial` with the aorta MR weights.
 
 ## Data Preparation
 
@@ -28,15 +54,18 @@ seqseg init dataset --path your_project/
 - **DICOM**: Via SimpleITK readers
 - **Others**: Any [SimpleITK-supported format](https://simpleitk.readthedocs.io/en/master/IO.html)
 
-### Seed Point Specification
+### Seed points
 
-Seeds can be provided via:
+`seeds.json` sits next to `images/`. The case `name` plus `-img_ext` is the filename: `case_001` with `-img_ext .mha` loads `images/case_001.mha`, and the same name with `-img_ext .nii.gz` loads `images/case_001.nii.gz`.
 
-Typical seed point radius estimates:
-- Coronary vessels: `0.2 cm` (`2 mm`)
-- Aortic root: `1.1 cm` (`11 mm`)
+Each seed is three values:
 
-1. **JSON file** (recommended):
+1. **Start point** — `[x, y, z]` where tracing begins
+2. **Direction point** — a second point further along the vessel, so SeqSeg knows which way to walk
+3. **Radius** — approximate lumen radius at the start
+
+Coordinates and that radius use `-unit` (default `cm`). They are physical coordinates, the same space as the image header.
+
 ```json
 [
     {
@@ -47,14 +76,28 @@ Typical seed point radius estimates:
     }
 ]
 ```
-Format: `[[start_point], [direction_point], radius_estimate]`
 
-2. **Existing centerlines**: Automatic initialization from first points
-3. **Cardiac meshes**: Aortic valve (Region 8) and LV (Region 7) labels
+Reading the inner list: start `[-2.07, -2.20, 13.43]`, direction `[-1.17, -1.34, 12.24]`, radius `1.1` cm. Add another three-item list inside `"seeds"` for a second branch (for example the other coronary ostium).
+
+Radius guesses that work as a starting point, in the default centimeter unit:
+
+- Coronary lumen: `0.2` (2 mm)
+- Aortic root: `1.1` (11 mm)
+
+YAML tracking thresholds such as `MIN_RADIUS` and `STOP_RADIUS` stay in millimeters even when `-unit cm`. See [Configuration](configuration.md).
+
+Other ways to initialize:
+
+- **Existing centerlines** in `centerlines/`: tracing can start from the first points (`-num_seeds_centerline`, `-pt_centerline`)
+- **Cardiac meshes**: aortic valve (region 8) and LV (region 7) labels
+
+### Units
+
+`-unit` (`cm` or `mm`) is the unit of the seed coordinates and the seed radius. It should match the image header. `-scale` multiplies the voxel spacing passed to nnU-Net. Use `-scale 0.1` with `-unit mm` when the image spacing is in millimeters and the model was trained with spacing in centimeters.
 
 ## Basic Usage
 
-Preferred entry point is `seqseg run batch` (legacy flat `seqseg -data_dir …` is rewritten automatically):
+`seqseg run batch` on an aorta MR case:
 
 ```bash
 seqseg run batch \
@@ -64,7 +107,7 @@ seqseg run batch \
     -train_dataset Dataset005_SEQAORTANDFEMOMR \
     -fold all \
     -img_ext .mha \
-    -config_name aorta_tutorial \
+    -config_name global_aorta \
     -outdir results/ \
     -simvascular 1
 ```
@@ -117,17 +160,17 @@ Arguments for `seqseg run batch` (same flags as legacy flat CLI):
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `data_dir` | str | - | Path to data directory containing images and seeds.json |
-| `nnunet_results_path` | str | - | Path to nnUNet model weights directory |
+| `data_dir` | str | required | Path to data directory containing images and seeds.json. Saved `seqseg paths` value is used when omitted |
+| `nnunet_results_path` | str | required | Folder that contains `Dataset00…/` weight directories. Saved `seqseg paths` value is used when omitted |
 | `nnunet_type` | str | `3d_fullres` | nnUNet model architecture (`3d_fullres`, `2d`) |
-| `train_dataset` | str | `Dataset010_SEQCOROASOCACT` | Dataset name used for training (e.g., `Dataset005_SEQAORTANDFEMOMR`) |
+| `train_dataset` | str | `Dataset010_SEQCOROASOCACT` | Weight folder name. Change this to match the anatomy (see the table above) |
 | `fold` | str | `all` | Cross-validation fold (`all`, `0`, `1`, `2`, `3`, `4`) |
-| `img_ext` | str | - | Image file extension (`.nii.gz`, `.mha`, `.nrrd`) |
-| `config_name` | str | `global` | Configuration file name |
-| `outdir` | str | - | Output directory for results |
+| `img_ext` | str | required | Image file extension (`.nii.gz`, `.mha`, `.nrrd`) |
+| `config_name` | str | `global` | Packaged YAML name without `.yaml`. Pair it with `train_dataset` |
+| `outdir` | str | required | Output directory for results. Saved `seqseg paths` value is used when omitted |
 | `unit` | str | `cm` | Image coordinate units (`mm`, `cm`) |
-| `scale` | float | `1.0` | Scaling factor for unit conversion |
-| `max_n_steps` | int | `1000` | Maximum tracking steps |
+| `scale` | float | `1.0` | Multiplies voxel spacing passed to nnU-Net. `0.1` converts mm spacing to cm |
+| `max_n_steps` | int | `1000` | Maximum tracking steps. The tutorial sets this to `10` so the demo finishes quickly |
 | `max_n_steps_per_branch` | int | `100` | Maximum steps per vessel branch |
 | `max_n_branches` | int | `100` | Maximum number of branches to follow |
 | `start` | int | `0` | Starting case index for batch processing |

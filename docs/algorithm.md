@@ -22,11 +22,16 @@ SeqSeg employs a **sequential tracking approach** that combines:
 5. **Bifurcation Detection**: Identify and queue branch points
 6. **Iteration**: Repeat until vessel termination or max steps reached
 
+Patch size follows the local radius (`VOLUME_SIZE_RATIO` in the YAML config, about 4.9 for aortas and 5.5 for coronaries). Stopping radius and retrace limits are the other YAML knobs; they are listed in [Configuration](configuration.md). Seed coordinates tell the trace where to start and which way to walk ([Usage](usage.md)).
+
+The command-line caps `-max_n_steps` (default 1000), `-max_n_branches` (default 100), and `-max_n_steps_per_branch` (default 100) end the run even if the vessel continues. The [tutorial](../seqseg/tutorial/tutorial.md) sets these much lower so the example finishes in a few minutes.
+
 ## Training Strategy
 
 ![Training Pipeline](https://raw.githubusercontent.com/numisveinsson/SeqSeg/main/seqseg/assets/seqseg_training.png)
 
-The neural network is trained on **local subvolume patches** extracted from annotated vessel datasets, enabling:
+The neural network is trained on **local subvolume patches** extracted from annotated vessel datasets. `seqseg train prepare` builds those patches; see [Training](training.md). That design gives:
+
 - **Generalization** across different vessel scales and orientations
 - **Efficient training** with limited annotated data
 - **Real-time inference** on standard GPUs

@@ -16,15 +16,16 @@
 
 ## Performance Metrics
 
-**Processing Times** (Local CPU, typical cases):
-- Simple vessel (aorta): ~2-5 minutes
-- Complex tree (coronary): ~5-15 minutes
-- Full cerebral vasculature: ~10-30 minutes
+Times below are typical **CPU** runs. A GPU is faster. The same ranges are summarized on the README.
 
-**Accuracy** (validation on held-out test sets):
-- Dice Similarity Coefficient: >0.9
-- Hausdorff Distance: <35 pixels
-- Centerline accuracy: >0.9
+**Processing times:**
+- Aorta: about 2–5 minutes
+- Coronary tree: about 5–15 minutes
+- Cerebral vasculature: about 10–30 minutes
+
+**Accuracy** on the held-out sets reported in [Sveinsson Cepero & Shadden, *Annals of Biomedical Engineering* (2024)](https://doi.org/10.1007/s10439-024-03611-z):
+- Dice similarity coefficient above 0.9
+- Centerline overlap above 0.9
 
 **Scalability**:
 - Tested on images up to 512³ voxels

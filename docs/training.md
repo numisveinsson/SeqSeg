@@ -2,39 +2,74 @@
 
 [← Back to README](../README.md)
 
-SeqSeg inference needs an nnU-Net trainer folder. To train on a **new dataset**, use the optional [vascular-segment-sampler](https://pypi.org/project/vascular-segment-sampler/) integration:
+Inference needs an nnU-Net trainer folder. To train one on a new dataset, install the optional [vascular-segment-sampler](https://pypi.org/project/vascular-segment-sampler/) extra:
 
 ```bash
 pip install "seqseg[train]"
 ```
 
-## 0. Set paths once
+`seqseg train` and `seqseg paths` use hyphen flags (`--data-dir`). `seqseg run batch` uses underscore flags (`-data_dir`). Both forms are in the examples below.
 
-Training uses one directory: the nnU-Net root. Models land in `nnUNet_results` under that root. Avoid exporting `nnUNet_*` in every shell. Save defaults under `~/.seqseg/paths.yaml`:
+## Minimum path
+
+1. Save directories once.
+2. Put images, labels, and centerlines in one project folder.
+3. Build an nnU-Net dataset from local patches.
+4. Train.
+5. Point `seqseg run batch` at the new weight folder.
 
 ```bash
 seqseg paths init \
   --nnunet-root ~/nnunet_data \
   --data-dir /path/to/your_project/
 
-# or update later (--nnunet-root is required):
-seqseg paths set \
+seqseg train prepare \
+  --name MYDATA \
+  --dataset-number 999 \
+  --modality CT \
+  --num-cores 4
+
+seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --fold 0
+
+seqseg run batch \
+  -train_dataset Dataset0999_MYDATACT \
+  -fold 0 \
+  -img_ext .nrrd
+```
+
+The last command uses `data_dir`, `outdir`, and `nnunet_results` from `seqseg paths`. Details for each step follow.
+
+## 0. Set paths once
+
+Training uses one nnU-Net root. Models land in `nnUNet_results` under that root. Save the root in `~/.seqseg/paths.yaml` so later commands can omit the path flags:
+
+```bash
+seqseg paths init \
   --nnunet-root ~/nnunet_data \
-  --data-dir /path/to/your_project
+  --data-dir /path/to/your_project/
+
 seqseg paths show
 ```
 
-`seqseg paths init` creates `~/nnunet_data/nnUNet_{raw,preprocessed,results}` (override with `--nnunet-root`). `seqseg paths set` always requires `--nnunet-root` and rewrites the three nnU-Net directories under that root.
+`seqseg paths init` creates `~/nnunet_data/nnUNet_raw`, `nnUNet_preprocessed`, and `nnUNet_results`. Another root is `--nnunet-root`.
 
-`--outdir` on `seqseg paths` is the inference results folder (`seqseg run`), not the training scratch space. `seqseg train prepare` writes temporary extracts to `<nnunet-root>/_seqseg_extracted` and removes that folder after it has linked them into `nnUNet_raw`.
+Change them later with `seqseg paths set`. That command requires `--nnunet-root` and rewrites the three nnU-Net directories under that root:
 
-Optional: still export into the current shell with:
+```bash
+seqseg paths set \
+  --nnunet-root ~/nnunet_data \
+  --data-dir /path/to/your_project
+```
+
+`--outdir` on `seqseg paths` is where `seqseg run` writes results. `seqseg train prepare` writes temporary extracts to `<nnunet-root>/_seqseg_extracted` and removes that folder after linking them into `nnUNet_raw`.
+
+To export the saved paths into the current shell:
 
 ```bash
 eval "$(seqseg paths export)"
 ```
 
-CLI flags and environment variables always override the saved file.
+CLI flags and environment variables override the saved file.
 
 ## 1. Prepare cases
 
@@ -42,15 +77,15 @@ CLI flags and environment variables always override the saved file.
 your_project/
 ├── images/         # volumes (.nrrd, .nii.gz, …)
 ├── truths/         # vessel segmentations
-├── centerlines/    # .vtp centerlines (required for patch sampling)
-└── surfaces/       # optional; can rasterize to truths with --truth-from-surface
+├── centerlines/    # .vtp centerlines (required to list cases, including whole-volume mode)
+└── surfaces/       # optional; rasterize to truths with --truth-from-surface
 ```
 
-Scaffold folders with `seqseg init dataset --path your_project/`, then add centerlines and labels.
+Scaffold the folders with `seqseg init dataset --path your_project/`, then add images, centerlines, and labels.
 
-## 2. Extract patches or whole volumes and build an nnU-Net dataset
+## 2. Build the nnU-Net dataset
 
-After `seqseg paths init` / `set`, you can omit the path flags:
+After `seqseg paths init` or `seqseg paths set`, omit the path flags:
 
 ```bash
 seqseg train prepare \
@@ -61,7 +96,9 @@ seqseg train prepare \
     --num-cores 4
 ```
 
-Or pass the nnU-Net raw directory explicitly:
+`--config-name` here is the sampler YAML from vascular-segment-sampler (default `global`). It is a different file from the SeqSeg tracking config you pass to `seqseg run batch -config_name`.
+
+Or pass the raw directory yourself:
 
 ```bash
 seqseg train prepare \
@@ -72,27 +109,99 @@ seqseg train prepare \
     --modality CT
 ```
 
-Extracted patches (or whole volumes) are staged in `<parent of nnUNet_raw>/_seqseg_extracted`, hardlinked into `nnUNet_raw/DatasetXXX_*`, then deleted. Pass `--keep-extracted` to leave that folder, or `--outdir` to stage somewhere else and keep it (needed to resume with `--skip-sample`). `--outdir` is not deleted.
+Extracted patches (or whole volumes) are staged in `<parent of nnUNet_raw>/_seqseg_extracted`, hardlinked into `nnUNet_raw/DatasetXXX_*`, then deleted.
 
-### Whole volumes (no patch sampling)
+### Dataset folder name
 
-To train nnU-Net on each case's full image and label instead of SeqSeg-style patches:
+Ids below 10 are written as two digits (`5` → `05`). The folder is `Dataset0`, then that id, then `_`, the name, and the modality in uppercase:
+
+| `--dataset-number` | `--name` | `--modality` | Folder |
+|--------------------|----------|--------------|--------|
+| `5` | `MYDATA` | `CT` | `Dataset005_MYDATACT` |
+| `10` | `MYDATA` | `MR` | `Dataset010_MYDATAMR` |
+| `999` | `MYDATA` | `CT` | `Dataset0999_MYDATACT` |
+
+Pass that folder name as `-train_dataset` when you run SeqSeg. A comma-separated `--modality` writes one folder per modality and increments the id: `--modality CT,MR --dataset-number 999` produces `Dataset0999_MYDATACT` and `Dataset01000_MYDATAMR`.
+
+This step wraps:
+
+- `vascular_segment_sampler.sampling.extract_patches` (default)
+- `vascular_segment_sampler.sampling.gather_global_volumes` (`--global-volumes`)
+- `vascular_segment_sampler.nnunet.write_nnunet_dataset`
+
+You can call those yourself, or use the sampler commands `vss-sample`, `vss-gather-global`, and `vss-to-nnunet`.
+
+## 3. Train
+
+```bash
+seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --fold 0
+```
+
+`--configuration` is passed to nnU-Net preprocessing as `-c` (default `3d_fullres`) and to training.
+
+The same thing, run by hand:
+
+```bash
+nnUNetv2_plan_and_preprocess -d 999 -c 3d_fullres
+nnUNetv2_train 999 3d_fullres 0
+```
+
+`nnUNet_preprocessed` is a second copy nnU-Net uses while training. The weight folder you need afterward is under `nnUNet_results`.
+
+## 4. Run SeqSeg with the new weights
+
+With `data_dir`, `outdir`, and `nnunet_results` saved:
+
+```bash
+seqseg run batch \
+    -train_dataset Dataset0999_MYDATACT \
+    -fold 0 \
+    -img_ext .nrrd \
+    -config_name global
+```
+
+Or pass paths on the command:
+
+```bash
+seqseg run batch \
+    -train_dataset Dataset0999_MYDATACT \
+    -fold 0 \
+    -data_dir /path/to/inference_data/ \
+    -nnunet_results_path /path/to/nnUNet_results/ \
+    -img_ext .nrrd \
+    -outdir results/
+```
+
+`-config_name global` is a starting tracking config. Switch to `global_aorta`, `global_coro`, or your own file when the vessel size matches one of those. See [Configuration](configuration.md).
+
+`seqseg doctor` reports whether the sampler is installed and which paths are saved.
+
+## Options
+
+Skip these on a first training run.
+
+### Keep the extracted patches
+
+`--keep-extracted` leaves `<nnunet-root>/_seqseg_extracted` in place. `--outdir` stages somewhere else and is kept (use it to resume with `--skip-sample`). `--outdir` is not deleted.
+
+### Whole volumes
+
+Train on each case's full image and label:
 
 ```bash
 seqseg train prepare \
     --name MYDATA \
     --dataset-number 999 \
     --modality CT \
-    --config-name global \
     --global-volumes \
     --yes
 ```
 
-`--whole-volumes` is an alias for `--global-volumes`. Centerlines are still used to list training cases (same as patch sampling). `--num-cores` and `--max-samples` are ignored in this mode.
+`--whole-volumes` is an alias for `--global-volumes`. Centerlines still decide which cases are included. `--num-cores` and `--max-samples` are ignored in this mode.
 
 ### Resample to a target spacing
 
-If cases should be sampled at a fixed voxel spacing, regenerate truths from `surfaces/` and resample images to match:
+Regenerate truths from `surfaces/` and resample images to match:
 
 ```bash
 seqseg train prepare \
@@ -105,64 +214,21 @@ seqseg train prepare \
     --num-cores 4
 ```
 
-- `--truth-from-surface` — rasterize `surfaces/` into `truths/` when needed
-- `--truth-regenerate` — overwrite existing `truths/`
-- `--truth-target-spacing SX SY SZ` — spacing used for the new truths (and matching image resample)
+- `--truth-from-surface` rasterizes `surfaces/` into `truths/` when needed
+- `--truth-regenerate` overwrites existing `truths/`
+- `--truth-target-spacing SX SY SZ` is the spacing of the new truths and of the resampled images
 
-Requires `surfaces/` in the project. If you already have `truths/` and only want resampling, preprocess images/labels separately (e.g. sampler `change_img_resample`) before `seqseg train prepare`. These flags also apply with `--global-volumes`.
+This requires `surfaces/` in the project. If `truths/` already exist and you only want resampling, resample images and labels before `seqseg train prepare` (the sampler command `change_img_resample` does this). These flags also apply with `--global-volumes`.
 
-This wraps:
-
-- `vascular_segment_sampler.sampling.extract_patches` (default)
-- `vascular_segment_sampler.sampling.gather_global_volumes` (`--global-volumes`)
-- `vascular_segment_sampler.nnunet.write_nnunet_dataset`
-
-You can also call those APIs directly, or use the sampler CLIs `vss-sample` / `vss-gather-global` / `vss-to-nnunet`.
-
-## 3. Train with nnU-Net
+### Plan and train separately
 
 ```bash
-seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --fold 0
-# plan/preprocess only for that configuration:
 seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --plan-only
-# train only (after planning):
 seqseg train nnunet --dataset-id 999 --skip-plan --fold all
-# after training succeeds, drop this dataset's raw and preprocessed copies:
+```
+
+`--cleanup` deletes that dataset under `nnUNet_raw` and `nnUNet_preprocessed` after training succeeds, and leaves `nnUNet_results`. It is ignored with `--plan-only`, so later folds can reuse the preprocessed data.
+
+```bash
 seqseg train nnunet --dataset-id 999 --skip-plan --fold all --cleanup
 ```
-
-`--configuration` is passed to nnU-Net preprocessing as `-c` (default `3d_fullres`, instead of all of `2d 3d_fullres 3d_lowres`) and to training.
-
-`nnUNet_preprocessed` is a second copy nnU-Net needs while training. `--cleanup` deletes that dataset under `nnUNet_raw` and `nnUNet_preprocessed` only after training succeeds, and leaves `nnUNet_results`. It is ignored with `--plan-only`, so later folds can reuse preprocessed data.
-
-Equivalent manual commands:
-
-```bash
-nnUNetv2_plan_and_preprocess -d 999 -c 3d_fullres
-nnUNetv2_train 999 3d_fullres 0
-```
-
-## 4. Run SeqSeg with the new weights
-
-If `data_dir`, `outdir`, and `nnunet_results` are saved via `seqseg paths`, you only need:
-
-```bash
-seqseg run batch \
-    -train_dataset Dataset0999_MYDATACT \
-    -fold 0 \
-    -img_ext .nrrd
-```
-
-Or pass paths explicitly:
-
-```bash
-seqseg run batch \
-    -train_dataset Dataset0999_MYDATACT \
-    -fold 0 \
-    -data_dir /path/to/inference_data/ \
-    -nnunet_results_path /path/to/nnUNet_results/ \
-    -img_ext .nrrd \
-    -outdir results/
-```
-
-Check the environment with `seqseg doctor` (reports sampler install status and saved/effective paths).

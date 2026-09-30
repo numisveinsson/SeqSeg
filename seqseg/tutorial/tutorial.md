@@ -2,7 +2,7 @@
 
 A practical guide for automatic vessel segmentation using SeqSeg on medical images.
 
-**SeqSeg 2.x:** This tutorial uses the structured CLI (`seqseg run batch`, etc.). Legacy invocations without a subcommand still work. For API and migration notes, see [What's new in 2.x](https://github.com/numisveinsson/SeqSeg#whats-new-in-2x) in the main README.
+**SeqSeg 2.x:** This tutorial uses `seqseg run batch`. A command that starts with a flag and omits `run batch` still runs. Windows setup is in [windows.md](windows.md).
 
 **Tutorial Dataset**: Abdominal aorta MR scan from SimVascular demo project  
 **Expected Time**: 15-20 minutes  
@@ -10,7 +10,7 @@ A practical guide for automatic vessel segmentation using SeqSeg on medical imag
 
 ## Quick Start Checklist
 
-- [ ] Python 3.11+ installed
+- [ ] Python 3.9+ installed (3.11 recommended)
 - [ ] SeqSeg package installed  
 - [ ] Model weights downloaded (~0.2GB)
 - [ ] Tutorial data available
@@ -21,9 +21,9 @@ A practical guide for automatic vessel segmentation using SeqSeg on medical imag
 ## 1. Installation
 
 ### Prerequisites
-Ensure you have Python 3.11+ and Git installed:
+Ensure you have Python 3.9+ and Git installed. The commands below use 3.11, which is the recommended version:
 ```bash
-python --version  # Should show 3.11+
+python --version  # 3.9 or newer; 3.11 matches this tutorial
 git --version
 ```
 
@@ -38,32 +38,26 @@ pip install seqseg
 
 # Verify installation
 seqseg --help
-seqseg --version   # expect 2.1.0 or newer
+seqseg --version   # installed package version
 
 # Optional: verify nnU-Net trainer folder after downloading weights
 seqseg doctor --model-folder /path/to/nnUNet_results/Dataset005_SEQAORTANDFEMOMR/nnUNetTrainer__nnUNetPlans__3d_fullres
 ```
 
-**✅ Checkpoint**: `seqseg --help` shows subcommands (`run`, `post`, `config`, `doctor`, `init`, …)
+**Checkpoint**: `seqseg --help` shows subcommands (`run`, `post`, `config`, `doctor`, `init`, …)
 
-### Other useful 2.x commands (optional)
+### Other commands (optional)
+
+You do not need these to finish the tutorial:
 
 | Command | Purpose |
 | -------- | ------- |
-| `seqseg init dataset --path DIR` | Scaffold `images/`, `centerlines/`, `truths/`, template `seeds.json` |
-| `seqseg run single` | One volume + seeds without hand-building the dataset tree |
-| `seqseg config fingerprint --name global --baseline global_default` | Diff two packaged YAML configs |
-| `from seqseg.api import run_tracing, …` | In-memory `sitk.Image` tracing (`disk_io=False`); see README |
+| `seqseg init dataset --path DIR` | Create `images/`, `centerlines/`, `truths/`, and a template `seeds.json` |
+| `seqseg run single --image … --outdir … --model-folder …` | One volume. Repeat `--seed X Y Z R`, or pass `--seeds-json`. Stages files under `<outdir>/_seqseg_single_staging/` |
+| `seqseg config fingerprint --name global --baseline global_default` | List packaged YAML keys that differ from another config |
+| `seqseg doctor --model-folder …/nnUNetTrainer__nnUNetPlans__3d_fullres` | Check imports and that the trainer directory exists |
 
-### Newer CLI shortcuts (optional)
-
-These commands complement the batch workflow in the rest of this tutorial:
-
-- **`seqseg init dataset --path /path/to/dataset/`** — Creates `images/`, `centerlines/`, `truths/`, and a template `seeds.json` so you can drop volumes in and edit seeds before running `seqseg run batch`.
-- **`seqseg run single`** — Runs one volume without manually building the full tree: it stages data under `<outdir>/_seqseg_single_staging/`. Use `--image`, `--outdir`, `--model-folder`, and either repeated **`--seed X Y Z R`** or **`--seeds-json`** (see `seqseg --help` after install).
-- **`seqseg config fingerprint --name global --baseline global_default`** — Lists packaged YAML keys that differ from another config (useful after copying or editing configs).
-- **`seqseg doctor --model-folder …/nnUNetTrainer__nnUNetPlans__3d_fullres`** — Checks imports and optionally verifies that the trainer directory exists.
-- **Python:** high-level **`from seqseg.api import run_tracing, TracingOptions, branch_seed_at_point`** for in-memory `sitk.Image` workflows (see the main repository `README.md`).
+Details for each flag are in [Usage](../../docs/usage.md).
 
 ## 2. Download Required Files
 
@@ -136,7 +130,9 @@ paraview seqseg/tutorial/data/images/0110_0001.mha
 
 ## 4. Run Segmentation
 
-### Basic command (recommended: `seqseg run batch`)
+The limits in the command below (`-max_n_steps 10`, `-max_n_branches 3`, `-max_n_steps_per_branch 5`) are only so this example finishes in a few minutes. They stop the tree early. For your own data, omit those three flags and use the defaults (1000 steps, 100 branches, 100 steps per branch), or set them higher. The output filenames and the volume check in the next section assume this 10-step run.
+
+### Basic command (`seqseg run batch`)
 
 From the repository root, with `nnUNet_results` extracted next to the clone (adjust paths as needed):
 
@@ -200,7 +196,7 @@ seqseg run single \
   --simvascular 1
 ```
 
-Staging is created under `tutorial_output_single/_seqseg_single_staging/`.
+Staging is created under `tutorial_output_single/_seqseg_single_staging/`. The `--max-n-steps`, `--max-n-branches`, and `--max-n-steps-per-branch` values are the same short tutorial caps as the batch command above.
 
 ### Key arguments
 | Argument | Purpose |
@@ -208,9 +204,9 @@ Staging is created under `tutorial_output_single/_seqseg_single_staging/`.
 | `-data_dir` | Directory with `images/` (or `Images/`) and `seeds.json` |
 | `-nnunet_results_path` | Path to extracted `nnUNet_results` folder |
 | `-config_name` | Packaged YAML config (`aorta_tutorial` for this case) |
-| `-max_n_steps` | Maximum tracking steps |
-| `-max_n_branches` | Maximum branches to follow |
-| `-max_n_steps_per_branch` | Max steps per branch |
+| `-max_n_steps` | Maximum tracking steps. `10` in this tutorial; default is `1000` |
+| `-max_n_branches` | Maximum branches to follow. `3` in this tutorial; default is `100` |
+| `-max_n_steps_per_branch` | Max steps per branch. `5` in this tutorial; default is `100` |
 | `-extract_global_centerline` | Write global centerline VTP when `1` |
 | `-simvascular` | Write a SimVascular project under the case folder when `1` |
 
@@ -293,14 +289,8 @@ seqseg doctor --model-folder ../nnUNet_results/Dataset005_SEQAORTANDFEMOMR/nnUNe
 ```
 
 ### Debug mode
-For detailed analysis:
-```bash
-seqseg run batch \
-    -write_steps 1 \
-    -max_n_steps 3 \
-    # ... same paths as in section 4
-```
-Intermediate files appear under `tutorial_output/3d_fullres_0110_0001/` in `volumes/`, `predictions/`, `centerlines/`, `surfaces/`, etc.
+
+Copy the command from section 4, add `-write_steps 1`, and lower `-max_n_steps` if you want a short trace (for example `-max_n_steps 3`). Intermediate files appear under `tutorial_output/3d_fullres_0110_0001/` in `volumes/`, `predictions/`, `centerlines/`, `surfaces/`, and `points/`.
 
 ## Next Steps
 
@@ -419,41 +409,18 @@ You can still import the top-level surface manually if needed:
    ]
    ```
 
-4. **Run SeqSeg**:
+4. **Run SeqSeg** (omit the tutorial step caps, or keep them if you want a short trace):
    ```bash
-   seqseg run batch -data_dir your_data/ -nnunet_results_path ../nnUNet_results/ -outdir results/ -img_ext .mha -config_name global
+   seqseg run batch -data_dir your_data/ -nnunet_results_path ../nnUNet_results/ -outdir results/ -img_ext .mha -train_dataset Dataset005_SEQAORTANDFEMOMR -config_name global_aorta
    ```
 
-### Python API (optional)
-
-With seeds and config already chosen, embed tracing without writing SeqSeg outputs:
-
-```python
-import SimpleITK as sitk
-from seqseg.api import BranchSeed, TracingOptions, run_tracing
-
-image = sitk.ReadImage("seqseg/tutorial/data/images/0110_0001.mha")
-result = run_tracing(
-    image,
-    [BranchSeed(
-        old_point=[-2.07367, -2.1973, 13.4288],
-        new_point=[-1.17086, -1.33526, 12.2407],
-        radius=1.1,
-    )],
-    "/path/to/nnUNet_results/Dataset005_SEQAORTANDFEMOMR/nnUNetTrainer__nnUNetPlans__3d_fullres",
-    config="aorta_tutorial",
-    options=TracingOptions(disk_io=False, unit="cm", max_n_steps=10),
-)
-prob = result.assembly.assembly  # sitk.Image; threshold for binary mask
-```
-
 ### Additional Resources
-- **SeqSeg Documentation**: [GitHub Repository](https://github.com/numisveinsson/SeqSeg)
+- **Guides**: [Installation](../../docs/installation.md), [Usage](../../docs/usage.md), [Configuration](../../docs/configuration.md), [Training](../../docs/training.md)
 - **SimVascular Tutorial**: [SimVascular.org](https://simvascular.github.io/)
 - **nnUNet Documentation**: [nnU-Net GitHub](https://github.com/MIC-DKFZ/nnUNet)
 - **ParaView User Guide**: [ParaView.org](https://www.paraview.org/documentation/)
 
-**Need help?** Check [GitHub Issues](https://github.com/numisveinsson/SeqSeg/issues) or [documentation](https://github.com/numisveinsson/SeqSeg)
+**Need help?** Open a [GitHub issue](https://github.com/numisveinsson/SeqSeg/issues).
 
 ---
 

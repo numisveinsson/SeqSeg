@@ -1,65 +1,55 @@
-# SeqSeg Windows Install ✨
+# SeqSeg on Windows
 
-## 1. Install Python (if not already installed) 🐍
+## 1. Install Python
 
-Download and install Python 3.11 from the official Python website: [Python Downloads](https://www.python.org/downloads/). Make sure to check the box to add Python to your PATH during installation.
-
-You can verify the installation by opening a command prompt and running:
+Install Python 3.11 (3.9 or newer also works; 3.11 matches the tutorial) from [python.org](https://www.python.org/downloads/). Check **Add python.exe to PATH** in the installer.
 
 ```bash
 python --version
 ```
 
-## 2. Install Git (if not already installed)
+## 2. Install Git
 
-Download and install Git from the official Git website: [Git Downloads](https://git-scm.com/downloads). This is necessary to clone the SeqSeg repository.
-
-You can verify the installation by opening a command prompt and running:
+Install Git from [git-scm.com](https://git-scm.com/downloads). The tutorial data lives in the SeqSeg repository.
 
 ```bash
 git --version
 ```
 
-## 3. Create virtual environment (optional but recommended) 🌱
-
-1. Choose a location for your virtual environment, e.g., `C:\seqseg_env`.
-2. Open a command prompt and run the following commands:
+## 3. Create a virtual environment
 
 ```bash
 python -m venv C:\seqseg_env
-```
-
-3. Activate the virtual environment:
-
-```bash
 C:\seqseg_env\Scripts\activate
 ```
 
-## 4. Install SeqSeg using pip 📦
+## 4. Install SeqSeg
+
 ```bash
 pip install seqseg
-```
-This might take a few minutes as it will download and install all necessary dependencies.
-
-## 5. Verify installation ✅
-```bash
 seqseg --help
 seqseg --version
 ```
-If the installation was successful, you should see subcommands (`run`, `post`, `config`, `doctor`, …) and version **2.1.0** or newer.
 
-For the aorta tutorial, run batch tracing from the cloned repo (see `seqseg/tutorial/tutorial.md`):
+`seqseg --help` lists subcommands (`run`, `post`, `config`, `doctor`, …). `seqseg --version` prints the installed version.
 
-```powershell
-seqseg run batch -data_dir seqseg\tutorial\data\ -nnunet_results_path ..\nnUNet_results\ -outdir tutorial_output\ -img_ext .mha -config_name aorta_tutorial -simvascular 1
-```
+## 5. Clone the repository
 
-## 6. Git clone the SeqSeg repository 📂
+The clone is how you get the tutorial image and `seeds.json`. Pick a directory such as `C:\Documents` and run:
 
-Choose a directory where you want to clone the SeqSeg repository, e.g., `C:\Documents\`. Open a command prompt and run the following command:
 ```bash
 git clone https://github.com/numisveinsson/SeqSeg.git
+cd SeqSeg
 ```
-This will create a directory named `SeqSeg` containing the tutorial data and scripts.
 
-## 7. All set! 🎉
+## 6. Run the tutorial
+
+Download the aorta weights and follow [tutorial.md](tutorial.md) from the repository root. The command there includes `-max_n_steps 10`, `-max_n_branches 3`, and `-max_n_steps_per_branch 5` so the example finishes in a few minutes.
+
+The same run in one line, once `nnUNet_results` is extracted next to the clone:
+
+```powershell
+seqseg run batch -data_dir seqseg\tutorial\data\ -nnunet_results_path ..\nnUNet_results\ -outdir tutorial_output\ -img_ext .mha -train_dataset Dataset005_SEQAORTANDFEMOMR -config_name aorta_tutorial -max_n_steps 10 -max_n_branches 3 -max_n_steps_per_branch 5 -simvascular 1
+```
+
+Drop those three `-max_n_*` flags to use the defaults (1000 steps, 100 branches, 100 steps per branch) and trace more of the tree.
