@@ -664,6 +664,7 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
             verbose=ns.verbose,
             img_ext=ns.img_ext,
             global_volumes=ns.global_volumes,
+            keep_extracted=ns.keep_extracted,
         )
     except TrainDependencyError as e:
         print(str(e), file=sys.stderr)
@@ -684,8 +685,17 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         sys.exit(1)
 
     print("\nPrepare complete.")
-    kind = "Whole volumes" if ns.global_volumes else "Patches"
-    print(f"  {kind}: {result.extracted_dir}")
+    if result.removed_staging:
+        print(
+            "  Extracted volumes were linked into nnU-Net raw and the "
+            "temporary folder was removed."
+        )
+    else:
+        kind = "Whole volumes" if ns.global_volumes else "Patches"
+        print(f"  {kind}: {result.extracted_dir}")
+    results = resolve_path("nnunet_results")
+    if results:
+        print(f"  Trained models will be written under: {results}")
     for name, path in zip(result.dataset_names, result.dataset_dirs):
         try:
             ds_id = dataset_id_from_name(name)
@@ -725,6 +735,7 @@ def _cmd_train_nnunet(ns: argparse.Namespace) -> None:
             np=ns.np,
             trainer=ns.trainer,
             plans=ns.plans,
+            cleanup=ns.cleanup,
         )
     except Exception as e:  # noqa: BLE001
         print(f"seqseg train nnunet failed: {e}", file=sys.stderr)
@@ -1005,8 +1016,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "-outdir",
         default=None,
         type=str,
-        help="Directory for extracted patches or whole volumes "
-        "(default: seqseg paths outdir, else ./extracted_data/)",
+        help="Optional scratch directory for extracted patches or whole volumes. "
+        "Default: <parent of nnUNet_raw>/_seqseg_extracted, removed after "
+        "conversion. Pass this to keep extracts or resume with --skip-sample.",
     )
     p_prep.add_argument(
         "--name",
@@ -1041,7 +1053,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
         help="Write DatasetXXX_* here "
-        "(default: seqseg paths nnunet_raw / $nnUNet_raw; else --outdir)",
+        "(default: seqseg paths nnunet_raw / $nnUNet_raw)",
     )
     p_prep.add_argument(
         "--img-ext",
@@ -1094,6 +1106,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_prep.add_argument("--yes", action="store_true", help="Non-interactive confirms")
     p_prep.add_argument("--verbose", action="store_true")
+    p_prep.add_argument(
+        "--keep-extracted",
+        action="store_true",
+        help="Keep <nnunet-root>/_seqseg_extracted after conversion into nnUNet_raw",
+    )
     p_prep.set_defaults(_handler=_cmd_train_prepare, img_ext=None)
 
     p_nn = train_sub.add_parser(
@@ -1143,6 +1160,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_nn.add_argument("--trainer", default="nnUNetTrainer", type=str)
     p_nn.add_argument("--plans", default="nnUNetPlans", type=str)
+    p_nn.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="After training succeeds, delete this dataset's nnUNet_raw and "
+        "nnUNet_preprocessed folders. Leaves nnUNet_results. "
+        "Ignored with --plan-only.",
+    )
     p_nn.set_defaults(_handler=_cmd_train_nnunet)
 
     paths_p = sub.add_parser(

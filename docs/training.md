@@ -10,22 +10,23 @@ pip install "seqseg[train]"
 
 ## 0. Set paths once
 
-Avoid exporting `nnUNet_*` in every shell. Save defaults under `~/.seqseg/paths.yaml`:
+Training uses one directory: the nnU-Net root. Models land in `nnUNet_results` under that root. Avoid exporting `nnUNet_*` in every shell. Save defaults under `~/.seqseg/paths.yaml`:
 
 ```bash
 seqseg paths init \
-  --data-dir /path/to/your_project/ \
-  --outdir ~/seqseg_train
+  --nnunet-root ~/nnunet_data \
+  --data-dir /path/to/your_project/
 
 # or update later (--nnunet-root is required):
 seqseg paths set \
   --nnunet-root ~/nnunet_data \
-  --data-dir /path/to/your_project \
-  --outdir ~/seqseg_train
+  --data-dir /path/to/your_project
 seqseg paths show
 ```
 
-`seqseg paths init` creates `~/nnunet_data/nnUNet_{raw,preprocessed,results}` by default (override with `--nnunet-root`). `seqseg paths set` always requires `--nnunet-root` and rewrites the three nnU-Net directories under that root.
+`seqseg paths init` creates `~/nnunet_data/nnUNet_{raw,preprocessed,results}` (override with `--nnunet-root`). `seqseg paths set` always requires `--nnunet-root` and rewrites the three nnU-Net directories under that root.
+
+`--outdir` on `seqseg paths` is the inference results folder (`seqseg run`), not the training scratch space. `seqseg train prepare` writes temporary extracts to `<nnunet-root>/_seqseg_extracted` and removes that folder after it has linked them into `nnUNet_raw`.
 
 Optional: still export into the current shell with:
 
@@ -60,17 +61,18 @@ seqseg train prepare \
     --num-cores 4
 ```
 
-Or pass them explicitly:
+Or pass the nnU-Net raw directory explicitly:
 
 ```bash
 seqseg train prepare \
     --data-dir /path/to/your_project/ \
-    --outdir /path/to/extracted/ \
     --nnunet-raw "$nnUNet_raw" \
     --name MYDATA \
     --dataset-number 999 \
     --modality CT
 ```
+
+Extracted patches (or whole volumes) are staged in `<parent of nnUNet_raw>/_seqseg_extracted`, hardlinked into `nnUNet_raw/DatasetXXX_*`, then deleted. Pass `--keep-extracted` to leave that folder, or `--outdir` to stage somewhere else and keep it (needed to resume with `--skip-sample`). `--outdir` is not deleted.
 
 ### Whole volumes (no patch sampling)
 
@@ -125,9 +127,13 @@ seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --fold 0
 seqseg train nnunet --dataset-id 999 --configuration 3d_fullres --plan-only
 # train only (after planning):
 seqseg train nnunet --dataset-id 999 --skip-plan --fold all
+# after training succeeds, drop this dataset's raw and preprocessed copies:
+seqseg train nnunet --dataset-id 999 --skip-plan --fold all --cleanup
 ```
 
 `--configuration` is passed to nnU-Net preprocessing as `-c` (default `3d_fullres`, instead of all of `2d 3d_fullres 3d_lowres`) and to training.
+
+`nnUNet_preprocessed` is a second copy nnU-Net needs while training. `--cleanup` deletes that dataset under `nnUNet_raw` and `nnUNet_preprocessed` only after training succeeds, and leaves `nnUNet_results`. It is ignored with `--plan-only`, so later folds can reuse preprocessed data.
 
 Equivalent manual commands:
 

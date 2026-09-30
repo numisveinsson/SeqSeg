@@ -17,6 +17,7 @@ from seqseg.cli import (
     dispatch,
 )
 from seqseg.pipeline.train import (
+    PrepareResult,
     TrainDependencyError,
     dataset_id_from_name,
     expected_nnunet_dataset_name,
@@ -290,6 +291,7 @@ def test_parser_train_prepare():
     assert ns.dataset_number == 999
     assert ns.img_ext is None
     assert ns.global_volumes is False
+    assert ns.keep_extracted is False
 
 
 def test_parser_train_prepare_global_volumes():
@@ -365,6 +367,7 @@ def test_parser_train_nnunet():
     assert ns.train_cmd == "nnunet"
     assert ns.dataset_id == 999
     assert ns.plan_only is True
+    assert ns.cleanup is False
 
 
 def test_dataset_id_from_name():
@@ -399,6 +402,7 @@ def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
         verbose=False,
         img_ext=None,
         global_volumes=False,
+        keep_extracted=False,
     )
     with patch(
         "seqseg.cli.prepare_training_dataset",
@@ -436,6 +440,7 @@ def test_cmd_train_prepare_getdatatype_hint(tmp_path, capsys):
         verbose=False,
         img_ext=None,
         global_volumes=False,
+        keep_extracted=False,
     )
     with patch(
         "seqseg.cli.prepare_training_dataset",
@@ -469,7 +474,64 @@ def test_cmd_train_nnunet_resolves_name(monkeypatch):
         np=None,
         trainer="nnUNetTrainer",
         plans="nnUNetPlans",
+        cleanup=False,
     )
     _cmd_train_nnunet(ns)
     assert called["dataset_id"] == 999
     assert called["kwargs"]["plan_only"] is True
+    assert called["kwargs"]["cleanup"] is False
+
+
+def test_parser_train_prepare_keep_extracted_and_cleanup():
+    parser = _build_parser()
+    prep = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--name",
+            "MYDATA",
+            "--dataset-number",
+            "999",
+            "--keep-extracted",
+        ]
+    )
+    assert prep.keep_extracted is True
+    train = parser.parse_args(
+        ["train", "nnunet", "--dataset-id", "999", "--cleanup"]
+    )
+    assert train.cleanup is True
+
+
+def test_cmd_train_prepare_points_at_results(capsys, monkeypatch):
+    sentinel = PrepareResult(
+        extracted_dir="/tmp/stage",
+        dataset_dirs=["/nn/nnUNet_raw/Dataset0999_MYDATACT"],
+        dataset_names=["Dataset0999_MYDATACT"],
+        modalities=["CT"],
+        removed_staging=True,
+    )
+    monkeypatch.setattr(
+        "seqseg.cli.prepare_training_dataset",
+        lambda *_args, **_kwargs: sentinel,
+    )
+    monkeypatch.setattr(
+        "seqseg.cli.resolve_path",
+        lambda *_args, **_kwargs: "/nn/nnUNet_results",
+    )
+    ns = _build_parser().parse_args(
+        [
+            "train",
+            "prepare",
+            "--name",
+            "MYDATA",
+            "--dataset-number",
+            "999",
+            "--data-dir",
+            "/tmp/data",
+        ]
+    )
+    _cmd_train_prepare(ns)
+    out = capsys.readouterr().out
+    assert "temporary folder was removed" in out
+    assert "/nn/nnUNet_results" in out
+    assert "seqseg train nnunet --dataset-id 999" in out

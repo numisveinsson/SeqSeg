@@ -15,6 +15,7 @@ import numpy as np
 from seqseg.user_paths import apply_nnunet_env, ensure_nnunet_dirs, resolve_path
 
 _VOLUME_EXTS = (".nii.gz", ".nrrd", ".nii", ".mha", ".mhd")
+_STAGING_DIR_NAME = "_seqseg_extracted"
 
 
 class TrainDependencyError(RuntimeError):
@@ -475,6 +476,74 @@ def _run_extract_patches(extract_patches, **kwargs) -> None:
         print(f"Warning: {e}")
 
 
+def _link_or_copy(src: str, dst: str, copy_fn: Callable, *args, **kwargs) -> None:
+    """Hardlink ``src`` to ``dst``; fall back to ``copy_fn`` across filesystems."""
+    try:
+        os.link(src, dst)
+    except OSError:
+        copy_fn(src, dst, *args, **kwargs)
+
+
+@contextmanager
+def _prefer_hardlinks_for_nnunet_copy() -> Iterator[None]:
+    """Make sampler dataset conversion link files instead of copying them."""
+    try:
+        import vascular_segment_sampler.nnunet.convert as convert_mod
+    except ImportError:
+        yield
+        return
+
+    orig = convert_mod.shutil.copy
+
+    def _copy(src, dst, *args, **kwargs):
+        _link_or_copy(src, dst, orig, *args, **kwargs)
+
+    convert_mod.shutil.copy = _copy
+    try:
+        yield
+    finally:
+        convert_mod.shutil.copy = orig
+
+
+def _resolve_training_dirs(
+    outdir: Optional[str],
+    nnunet_raw: Optional[str],
+) -> tuple[str, str, bool]:
+    """Return ``(staging_dir, nnunet_raw, managed_staging)``.
+
+    Staging is ``<parent of nnUNet_raw>/_seqseg_extracted`` unless ``outdir``
+    was passed. A passed ``outdir`` is never treated as disposable.
+    """
+    raw = nnunet_raw if nnunet_raw else resolve_path("nnunet_raw")
+    if not raw:
+        raise ValueError(
+            "nnUNet_raw is required. Pass --nnunet-raw or set it once with:\n"
+            "  seqseg paths init --nnunet-root ~/nnunet_data"
+        )
+    raw_abs = os.path.abspath(os.path.expanduser(raw))
+    explicit = outdir is not None and str(outdir) != ""
+    if explicit:
+        staging = str(outdir)
+        managed = False
+    else:
+        staging = os.path.join(os.path.dirname(raw_abs), _STAGING_DIR_NAME)
+        managed = True
+    return _dir_for_sampler(staging), raw_abs, managed
+
+
+def _staging_is_safe_to_remove(staging: str, raw: str) -> bool:
+    """True when deleting ``staging`` cannot remove ``raw``."""
+    staging_norm = os.path.normpath(staging)
+    raw_norm = os.path.normpath(raw)
+    if staging_norm == os.path.abspath(os.sep) or staging_norm == raw_norm:
+        return False
+    try:
+        common = os.path.commonpath([staging_norm, raw_norm])
+    except ValueError:
+        return True
+    return common != staging_norm
+
+
 def expected_nnunet_dataset_name(name: str, dataset_number: int, modality: str) -> str:
     """Match vascular-segment-sampler naming for DatasetXXX_* folders."""
     if dataset_number < 10:
@@ -492,6 +561,7 @@ class PrepareResult:
     dataset_dirs: List[str]
     dataset_names: List[str]
     modalities: List[str]
+    removed_staging: bool = False
 
 
 def prepare_training_dataset(
@@ -520,6 +590,7 @@ def prepare_training_dataset(
     verbose: bool = False,
     img_ext: Optional[str] = None,
     global_volumes: bool = False,
+    keep_extracted: bool = False,
 ) -> PrepareResult:
     """
     Prepare training volumes and convert them to nnU-Net raw datasets.
@@ -527,25 +598,25 @@ def prepare_training_dataset(
     By default extracts SeqSeg-style patches. With ``global_volumes=True``,
     copies each case's full image and label instead (``gather_global_volumes``).
 
+    Extracted files are written under ``<parent of nnUNet_raw>/_seqseg_extracted``
+    unless ``outdir`` is set, then hardlinked into ``nnUNet_raw``. That temporary
+    folder is removed after a successful conversion unless ``keep_extracted``
+    is set or ``outdir`` was passed explicitly.
+
     Uses ``vascular-segment-sampler`` (``pip install seqseg[train]``).
     """
     extract_patches, write_nnunet_dataset = _require_sampler()
 
     resolved_data = resolve_path("data_dir", data_dir)
-    resolved_out = resolve_path("outdir", outdir) or "./extracted_data/"
     if not resolved_data:
         raise ValueError(
             "data_dir is required. Pass --data-dir or set it with:\n"
             "  seqseg paths set --nnunet-root ~/nnunet_data --data-dir /path/to/cases"
         )
     data_dir = resolved_data
-    outdir = _dir_for_sampler(resolved_out)
+    outdir, nnunet_raw, managed_staging = _resolve_training_dirs(outdir, nnunet_raw)
     os.makedirs(outdir, exist_ok=True)
-
-    if nnunet_raw is None:
-        nnunet_raw = resolve_path("nnunet_raw")
-    if nnunet_raw:
-        ensure_nnunet_dirs({"nnunet_raw": nnunet_raw})
+    ensure_nnunet_dirs({"nnunet_raw": nnunet_raw})
 
     modalities = _parse_modalities(modality)
     modality_arg = ",".join(modalities)
@@ -567,6 +638,8 @@ def prepare_training_dataset(
             print("Extracting vascular segment patches")
         print(f"  data_dir: {data_dir}")
         print(f"  outdir:   {outdir}")
+        if managed_staging and not keep_extracted:
+            print("  (temporary; removed after conversion into nnUNet_raw)")
         print(f"  IMG_EXT:  {resolved_img_ext}")
         print("=" * 72)
         if global_volumes:
@@ -628,37 +701,46 @@ def prepare_training_dataset(
 
     dataset_dirs: List[str] = []
     dataset_names: List[str] = []
+    removed_staging = False
 
     if not skip_convert:
-        convert_outdir = (
-            os.path.abspath(os.path.expanduser(nnunet_raw))
-            if nnunet_raw
-            else outdir
-        )
-        os.makedirs(convert_outdir, exist_ok=True)
+        os.makedirs(nnunet_raw, exist_ok=True)
 
         print("=" * 72)
         print(
             f"Converting {'volumes' if global_volumes else 'patches'} "
-            f"to nnU-Net format under {convert_outdir}"
+            f"to nnU-Net format under {nnunet_raw}"
         )
         print("=" * 72)
 
         # Dataset numbers must be unique per modality when converting several.
-        for i, mod in enumerate(modalities):
-            ds_num = dataset_number + i
-            ds_path = write_nnunet_dataset(
-                indir=outdir,
-                name=name,
-                dataset_number=ds_num,
-                modality=mod.lower(),
-                outdir=convert_outdir,
-                also_test=also_test,
-            )
-            ds_name = expected_nnunet_dataset_name(name, ds_num, mod)
-            dataset_dirs.append(os.path.abspath(ds_path))
-            dataset_names.append(ds_name)
-            print(f"  {mod}: {ds_path}")
+        with _prefer_hardlinks_for_nnunet_copy():
+            for i, mod in enumerate(modalities):
+                ds_num = dataset_number + i
+                ds_path = write_nnunet_dataset(
+                    indir=outdir,
+                    name=name,
+                    dataset_number=ds_num,
+                    modality=mod.lower(),
+                    outdir=nnunet_raw,
+                    also_test=also_test,
+                )
+                ds_name = expected_nnunet_dataset_name(name, ds_num, mod)
+                dataset_dirs.append(os.path.abspath(ds_path))
+                dataset_names.append(ds_name)
+                print(f"  {mod}: {ds_path}")
+
+        if managed_staging and not keep_extracted:
+            staging_path = os.path.normpath(outdir)
+            if _staging_is_safe_to_remove(staging_path, nnunet_raw):
+                shutil.rmtree(staging_path)
+                removed_staging = True
+                print(f"Removed temporary extracts at {staging_path}")
+            else:
+                print(
+                    f"Keeping extracts at {staging_path}; "
+                    "removing them would also remove nnUNet_raw."
+                )
     else:
         print("Skipping nnU-Net conversion (--skip-convert)")
 
@@ -667,6 +749,7 @@ def prepare_training_dataset(
         dataset_dirs=dataset_dirs,
         dataset_names=dataset_names,
         modalities=modalities,
+        removed_staging=removed_staging,
     )
 
 
@@ -703,6 +786,33 @@ def _resolve_nnunet_cli(exe: str) -> str:
     return exe
 
 
+def _remove_nnunet_dataset_copies(env: dict, dataset_id: int) -> None:
+    """Delete raw and preprocessed folders for ``dataset_id``. Leave results."""
+    removed = False
+    for key in ("nnUNet_raw", "nnUNet_preprocessed"):
+        root = env.get(key)
+        if not root or not os.path.isdir(root):
+            continue
+        for name in sorted(os.listdir(root)):
+            path = os.path.join(root, name)
+            if not os.path.isdir(path):
+                continue
+            try:
+                found_id = dataset_id_from_name(name)
+            except ValueError:
+                continue
+            if found_id != dataset_id:
+                continue
+            print(f"Removing {path}")
+            shutil.rmtree(path)
+            removed = True
+    if not removed:
+        print(
+            "No nnUNet_raw or nnUNet_preprocessed folder matched "
+            f"dataset id {dataset_id}."
+        )
+
+
 def run_nnunet_training(
     dataset_id: int,
     *,
@@ -713,11 +823,16 @@ def run_nnunet_training(
     np: Optional[int] = None,
     trainer: str = "nnUNetTrainer",
     plans: str = "nnUNetPlans",
+    cleanup: bool = False,
 ) -> None:
     """
     Run ``nnUNetv2_plan_and_preprocess`` and/or ``nnUNetv2_train``.
 
     Requires ``nnUNet_raw``, ``nnUNet_preprocessed``, and ``nnUNet_results``.
+
+    With ``cleanup=True``, after training succeeds, delete that dataset's
+    folders under ``nnUNet_raw`` and ``nnUNet_preprocessed``. ``nnUNet_results``
+    is kept. Cleanup is skipped for ``plan_only`` and when training fails.
     """
     env = _nnunet_env_or_raise()
 
@@ -739,6 +854,8 @@ def run_nnunet_training(
 
     if plan_only:
         print("Plan/preprocess only; skipping training (--plan-only).")
+        if cleanup:
+            print("Leaving nnUNet_raw and nnUNet_preprocessed in place.")
         return
 
     train_cmd = [
@@ -756,6 +873,9 @@ def run_nnunet_training(
     print(" ", " ".join(train_cmd))
     print("=" * 72)
     subprocess.run(train_cmd, check=True, env=env)
+
+    if cleanup:
+        _remove_nnunet_dataset_copies(env, dataset_id)
 
     results = env["nnUNet_results"]
     # Folder layout used by SeqSeg NnUNetModelSpec.model_folder()
