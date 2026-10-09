@@ -105,8 +105,8 @@ def run_global_centerline_single(
     seg_path: str,
     out_vtp: str,
     *,
-    seeds_json: str,
-    case_name: str,
+    seeds_json: Optional[str] = None,
+    case_name: Optional[str] = None,
     merge_method: str = "clean",
     directory_data: Optional[str] = None,
     unit: str = "cm",
@@ -115,33 +115,46 @@ def run_global_centerline_single(
     """
     Compute global centerline from an existing binary/probability segmentation.
 
-    ``seeds_json`` must be the dataset ``seeds.json`` (or compatible) and ``case_name``
-    selects the entry. If seeds are empty in JSON, ``directory_data`` must point to the
-    dataset root (with ``centerlines/``) as in a full SeqSeg dataset layout.
+    When ``seeds_json`` is omitted, one seed is placed in each disconnected body
+    (the interior point farthest from the surface), the same way
+    ``calc_multi_component_centerlines`` does.
+
+    When ``seeds_json`` is set, ``case_name`` selects that entry and the number of
+    seed entries limits how many bodies are traced (largest first). If those seeds
+    are empty, ``directory_data`` must point to the dataset root (with
+    ``centerlines/``) as in a full SeqSeg dataset layout.
     """
     seg = sitk.ReadImage(seg_path)
-    seeds_data = _load_seeds_json(seeds_json)
-    test_case = _resolve_test_case(seeds_data, case_name)
-    if directory_data is None:
-        directory_data = normalize_dataset_root(
-            str(Path(seeds_json).resolve().parent)
-        )
-    else:
-        directory_data = normalize_dataset_root(directory_data)
-    dir_cent = os.path.join(directory_data, "centerlines", case_name + ".vtp")
-    tmp_out = os.path.join(os.path.dirname(out_vtp), ".seqseg_post_tmp")
-    os.makedirs(tmp_out, exist_ok=True)
-    initial_seeds = _initial_seeds_from_test_case(
-        test_case,
-        dir_output=tmp_out + os.sep,
-        dir_cent=dir_cent,
-        dir_data=directory_data,
-        unit=unit,
-    )
     mm = merge_method
     if global_config is not None:
         mm = global_config.get("CENTERLINE_MERGE_METHOD", merge_method)
-    nr = len(initial_seeds)
+
+    if seeds_json:
+        if not case_name:
+            raise ValueError("case_name is required when seeds_json is set")
+        seeds_data = _load_seeds_json(seeds_json)
+        test_case = _resolve_test_case(seeds_data, case_name)
+        if directory_data is None:
+            directory_data = normalize_dataset_root(
+                str(Path(seeds_json).resolve().parent)
+            )
+        else:
+            directory_data = normalize_dataset_root(directory_data)
+        dir_cent = os.path.join(directory_data, "centerlines", case_name + ".vtp")
+        tmp_out = os.path.join(os.path.dirname(out_vtp), ".seqseg_post_tmp")
+        os.makedirs(tmp_out, exist_ok=True)
+        initial_seeds = _initial_seeds_from_test_case(
+            test_case,
+            dir_output=tmp_out + os.sep,
+            dir_cent=dir_cent,
+            dir_data=directory_data,
+            unit=unit,
+        )
+        nr: Optional[int] = len(initial_seeds)
+    else:
+        initial_seeds = []
+        nr = None
+
     global_centerline, targets, success = calc_centerline_global(
         seg,
         initial_seeds,
@@ -176,24 +189,29 @@ def run_global_centerline_batch(
     seg_dir: str,
     *,
     seg_glob: str,
-    seeds_json: str,
+    seeds_json: Optional[str] = None,
     out_dir: Optional[str] = None,
     merge_method: str = "clean",
     directory_data: Optional[str] = None,
     unit: str = "cm",
     global_config: Optional[Mapping[str, Any]] = None,
 ) -> None:
-    """Batch variant of :func:`run_global_centerline_single` using filename-derived case ids."""
+    """Batch variant of :func:`run_global_centerline_single` using filename-derived case ids.
+
+    Omit ``seeds_json`` to identify one seed per disconnected body in each segmentation.
+    """
     seg_dir = os.path.abspath(seg_dir)
     out_dir = out_dir or seg_dir
     os.makedirs(out_dir, exist_ok=True)
-    seeds_data = _load_seeds_json(seeds_json)
-    if directory_data is None:
-        directory_data = normalize_dataset_root(
-            str(Path(seeds_json).resolve().parent)
-        )
-    else:
-        directory_data = normalize_dataset_root(directory_data)
+    seeds_data = None
+    if seeds_json:
+        seeds_data = _load_seeds_json(seeds_json)
+        if directory_data is None:
+            directory_data = normalize_dataset_root(
+                str(Path(seeds_json).resolve().parent)
+            )
+        else:
+            directory_data = normalize_dataset_root(directory_data)
 
     for name in sorted(os.listdir(seg_dir)):
         if not fnmatch.fnmatch(name, seg_glob):
@@ -202,7 +220,8 @@ def run_global_centerline_batch(
         if not os.path.isfile(seg_path):
             continue
         case_name = _case_name_from_seg_filename(seg_path)
-        _resolve_test_case(seeds_data, case_name)
+        if seeds_data is not None:
+            _resolve_test_case(seeds_data, case_name)
         out_vtp = os.path.join(out_dir, f"{case_name}_global_centerline.vtp")
         run_global_centerline_single(
             seg_path,

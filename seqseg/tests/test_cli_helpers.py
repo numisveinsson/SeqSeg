@@ -535,3 +535,62 @@ def test_cmd_train_prepare_points_at_results(capsys, monkeypatch):
     assert "temporary folder was removed" in out
     assert "/nn/nnUNet_results" in out
     assert "seqseg train nnunet --dataset-id 999" in out
+
+
+def test_parser_global_centerline_seeds_json_optional():
+    parser = _build_parser()
+    single = parser.parse_args(
+        [
+            "post",
+            "global-centerline",
+            "single",
+            "--seg",
+            "/tmp/case.mha",
+            "--out",
+            "/tmp/case.vtp",
+        ]
+    )
+    assert single.seeds_json is None
+    assert single.case_name is None
+
+    batch = parser.parse_args(
+        [
+            "post",
+            "global-centerline",
+            "batch",
+            "--seg-dir",
+            "/tmp/segs",
+            "--seg-glob",
+            "*.mha",
+        ]
+    )
+    assert batch.seeds_json is None
+
+
+def test_global_centerline_single_identifies_seeds_without_json(tmp_path):
+    from seqseg.pipeline.post import run_global_centerline_single
+
+    seg = tmp_path / "case.mha"
+    seg.write_bytes(b"x")
+    out = tmp_path / "out.vtp"
+    with patch("seqseg.pipeline.post.sitk.ReadImage", return_value="img"), patch(
+        "seqseg.pipeline.post.calc_centerline_global",
+        return_value=(object(), [], True),
+    ) as calc, patch("seqseg.pipeline.post.vf.write_vtk_polydata"):
+        run_global_centerline_single(str(seg), str(out))
+    assert calc.call_args.args[1] == []
+    assert calc.call_args.kwargs["nr_seeds"] is None
+
+
+def test_global_centerline_single_requires_case_name_with_seeds(tmp_path):
+    from seqseg.pipeline.post import run_global_centerline_single
+
+    seg = tmp_path / "case.mha"
+    seg.write_bytes(b"x")
+    with patch("seqseg.pipeline.post.sitk.ReadImage", return_value="img"):
+        with pytest.raises(ValueError, match="case_name is required"):
+            run_global_centerline_single(
+                str(seg),
+                str(tmp_path / "out.vtp"),
+                seeds_json=str(tmp_path / "seeds.json"),
+            )

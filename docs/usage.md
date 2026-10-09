@@ -122,9 +122,22 @@ Other common commands:
 | `seqseg train prepare` | Extract patches or whole volumes and create an nnU-Net Dataset (`pip install "seqseg[train]"`) |
 | `seqseg train nnunet` | Plan/preprocess and train with nnU-Net |
 | `seqseg doctor` | Check imports and optional trainer folder |
+| `seqseg post global-centerline` | Centerlines from an existing segmentation (all bodies by default) |
 | `seqseg simvascular init` | Create/refresh a SimVascular project layout under a case directory |
 
 Training a model on a new dataset is documented in [Training](training.md).
+
+### Centerlines from an existing segmentation
+
+```bash
+seqseg post global-centerline single --seg case.mha --out case_centerline.vtp
+```
+
+```bash
+seqseg post global-centerline batch --seg-dir results/ --seg-glob "*.mha"
+```
+
+With no `--seeds-json`, one seed is placed in each disconnected body. Pass `--seeds-json` and `--case-name` to cap tracing at that many bodies (largest first).
 
 ## Advanced Usage Examples
 

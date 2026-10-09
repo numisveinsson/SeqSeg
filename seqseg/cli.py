@@ -923,8 +923,18 @@ def _build_parser() -> argparse.ArgumentParser:
     g1 = gcl_sub.add_parser("single", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     g1.add_argument("--seg", required=True, type=str)
     g1.add_argument("--out", required=True, type=str)
-    g1.add_argument("--seeds-json", required=True, type=str)
-    g1.add_argument("--case-name", required=True, type=str)
+    g1.add_argument(
+        "--seeds-json",
+        default=None,
+        type=str,
+        help="Dataset seeds.json. Omit to place one seed in each disconnected body",
+    )
+    g1.add_argument(
+        "--case-name",
+        default=None,
+        type=str,
+        help="Case name in seeds.json. Required when --seeds-json is set",
+    )
     g1.add_argument("--config-name", default=None, type=str)
     g1.add_argument("--merge-method", default="clean", type=str)
     g1.add_argument("--directory-data", default=None, type=str)
@@ -934,7 +944,12 @@ def _build_parser() -> argparse.ArgumentParser:
     g2 = gcl_sub.add_parser("batch", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     g2.add_argument("--seg-dir", required=True, type=str)
     g2.add_argument("--seg-glob", required=True, type=str)
-    g2.add_argument("--seeds-json", required=True, type=str)
+    g2.add_argument(
+        "--seeds-json",
+        default=None,
+        type=str,
+        help="Dataset seeds.json. Omit to place one seed in each disconnected body",
+    )
     g2.add_argument("--out-dir", default=None, type=str)
     g2.add_argument("--config-name", default=None, type=str)
     g2.add_argument("--merge-method", default="clean", type=str)
