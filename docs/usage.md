@@ -134,10 +134,10 @@ seqseg post global-centerline single --seg case.mha --out case_centerline.vtp
 ```
 
 ```bash
-seqseg post global-centerline batch --seg-dir results/ --seg-glob "*.mha"
+seqseg post global-centerline batch --seg-dir results/ --seg-glob "*.mha" --out-dir centerlines/
 ```
 
-With no `--seeds-json`, one seed is placed in each disconnected body. Pass `--seeds-json` and `--case-name` to cap tracing at that many bodies (largest first).
+With no `--seeds-json`, one seed is placed in each disconnected body. Pass `--seeds-json` and `--case-name` to cap tracing at that many bodies (largest first). Omit `--out-dir` to write next to the segmentations.
 
 ## Advanced Usage Examples
 
