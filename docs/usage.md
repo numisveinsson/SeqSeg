@@ -119,7 +119,7 @@ Other common commands:
 | `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
 | `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg |
 | `seqseg paths init` / `set` / `show` | Save default nnU-Net / data / out dirs (`~/.seqseg/paths.yaml`) |
-| `seqseg train prepare` | Extract patches or whole volumes and create an nnU-Net Dataset (`pip install "seqseg[train]"`) |
+| `seqseg train prepare` | Extract patches or whole volumes and create an nnU-Net Dataset |
 | `seqseg train nnunet` | Plan/preprocess and train with nnU-Net |
 | `seqseg doctor` | Check imports and optional trainer folder |
 | `seqseg post global-centerline` | Centerlines from an existing segmentation (all bodies by default) |

@@ -56,6 +56,24 @@ _CHECKPOINT_CANDIDATES = (
 )
 
 
+def select_training_device():
+    """nnU-Net ``-device`` name: CUDA, then MPS, then CPU.
+
+    Returns ``cpu`` when torch is not installed. Training itself still needs
+    torch; this keeps command construction usable in tests that mock it.
+    """
+    try:
+        import torch
+    except ImportError:
+        return 'cpu'
+    if torch.cuda.is_available():
+        return 'cuda'
+    mps = getattr(getattr(torch, 'backends', None), 'mps', None)
+    if mps is not None and mps.is_available():
+        return 'mps'
+    return 'cpu'
+
+
 def select_inference_device(model_folder, force_cpu=False):
     """Pick torch device for nnU-Net inference.
 

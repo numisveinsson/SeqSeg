@@ -51,9 +51,9 @@ SeqSeg **2.0** uses subcommands. A command from 1.x that starts with a flag, suc
 | **`seqseg run plus batch`** | Global nnU-Net sweep, then SeqSeg |
 | **`seqseg init dataset`** | Create `images/`, `centerlines/`, `truths/`, and a template `seeds.json` |
 | **`seqseg paths init` / `set` / `show`** | Save default nnU-Net, data, and output directories in `~/.seqseg/paths.yaml` |
-| **`seqseg train prepare`** | Extract patches or whole volumes and build an nnU-Net dataset (`pip install "seqseg[train]"`) |
+| **`seqseg train prepare`** | Extract patches or whole volumes and build an nnU-Net dataset |
 | **`seqseg train nnunet`** | Run nnU-Net planning, preprocessing, and training |
-| **`seqseg doctor`** | Check imports (SimpleITK, vtk, nnunetv2, scipy, optional sampler) and paths |
+| **`seqseg doctor`** | Check imports (SimpleITK, vtk, nnunetv2, scipy, vascular-segment-sampler) and paths |
 | **`seqseg config dump` / `fingerprint`** | Print a packaged YAML config, or list keys that differ from another |
 | **`seqseg post global-centerline`** | Build global centerlines from existing segmentations |
 | **`seqseg simvascular init`** | Create or refresh a SimVascular project under a case directory |

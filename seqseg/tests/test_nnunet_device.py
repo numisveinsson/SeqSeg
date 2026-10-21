@@ -4,7 +4,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from seqseg.modules.nnunet import select_inference_device
+from seqseg.modules.nnunet import select_inference_device, select_training_device
 
 
 def _fake_torch(*, cuda=False, mps=False):
@@ -14,6 +14,21 @@ def _fake_torch(*, cuda=False, mps=False):
         backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda: mps)),
         device=device,
     )
+
+
+def test_select_training_device_prefers_cuda(monkeypatch):
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=True, mps=True))
+    assert select_training_device() == "cuda"
+
+
+def test_select_training_device_uses_mps_without_cuda(monkeypatch):
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=False, mps=True))
+    assert select_training_device() == "mps"
+
+
+def test_select_training_device_falls_back_to_cpu(monkeypatch):
+    monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=False, mps=False))
+    assert select_training_device() == "cpu"
 
 
 def test_select_inference_device_force_cpu_skips_cuda(monkeypatch):

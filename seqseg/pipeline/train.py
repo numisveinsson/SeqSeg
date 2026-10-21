@@ -12,6 +12,7 @@ from typing import Any, Callable, Iterator, List, Optional, Sequence, Union
 
 import numpy as np
 
+from seqseg.modules.nnunet import select_training_device
 from seqseg.user_paths import apply_nnunet_env, ensure_nnunet_dirs, resolve_path
 
 _VOLUME_EXTS = (".nii.gz", ".nrrd", ".nii", ".mha", ".mhd")
@@ -19,7 +20,7 @@ _STAGING_DIR_NAME = "_seqseg_extracted"
 
 
 class TrainDependencyError(RuntimeError):
-    """Raised when optional training dependencies are missing."""
+    """Raised when training dependencies are missing."""
 
 
 def _require_sampler():
@@ -29,8 +30,8 @@ def _require_sampler():
     except ImportError as e:
         raise TrainDependencyError(
             "vascular-segment-sampler is required for training-data preparation.\n"
-            "Install with:\n"
-            '  pip install "seqseg[train]"\n'
+            "It is installed with SeqSeg. Reinstall with:\n"
+            "  pip install -U seqseg\n"
             "or:\n"
             "  pip install vascular-segment-sampler"
         ) from e
@@ -46,7 +47,7 @@ def _require_gather_global_volumes():
             "Whole-volume dataset construction requires gather_global_volumes "
             "from a recent vascular-segment-sampler.\n"
             "Upgrade with:\n"
-            '  pip install -U "seqseg[train]"\n'
+            "  pip install -U seqseg\n"
             "or:\n"
             "  pip install -U vascular-segment-sampler"
         ) from e
@@ -242,15 +243,118 @@ def _detect_img_ext(images_dir: Path) -> Optional[str]:
     return None
 
 
+def _sampler_config_dirs() -> List[str]:
+    """Directories searched for sampler YAML overlays.
+
+    Same places as ``vascular-segment-sampler``: ``./config`` in the working
+    directory, then the installed package's ``config`` directory.
+    """
+    dirs: List[str] = []
+    cwd_cfg = os.path.join(os.getcwd(), "config")
+    if os.path.isdir(cwd_cfg):
+        dirs.append(os.path.abspath(cwd_cfg))
+    try:
+        import vascular_segment_sampler
+    except ImportError:
+        return dirs
+    packaged = os.path.join(
+        os.path.dirname(vascular_segment_sampler.__file__), "config"
+    )
+    if os.path.isdir(packaged) and packaged not in dirs:
+        dirs.append(os.path.abspath(packaged))
+    return dirs
+
+
+def _yaml_defines(path: str, key: str) -> bool:
+    try:
+        import yaml
+    except ImportError:
+        return False
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = yaml.safe_load(handle) or {}
+    except Exception:  # noqa: BLE001 — unreadable overlay is not a match
+        return False
+    return isinstance(data, dict) and data.get(key) is not None
+
+
+def _pick_config_file(directory: str, name: str) -> Optional[str]:
+    """Choose ``name.yml`` / ``name.yaml`` inside one directory.
+
+    A bare name prefers the file that sets ``MAX_SAMPLES``. ``config/test.yaml``
+    and ``config/test.yml`` both exist; only the ``.yml`` smoke overlay sets
+    the cap, and ``--config-name test`` has to select that file.
+    """
+    yml = os.path.join(directory, name + ".yml")
+    yaml_path = os.path.join(directory, name + ".yaml")
+    yml_ok = os.path.isfile(yml)
+    yaml_ok = os.path.isfile(yaml_path)
+    if yml_ok and yaml_ok:
+        yml_cap = _yaml_defines(yml, "MAX_SAMPLES")
+        yaml_cap = _yaml_defines(yaml_path, "MAX_SAMPLES")
+        if yml_cap and not yaml_cap:
+            return os.path.abspath(yml)
+        if yaml_cap and not yml_cap:
+            return os.path.abspath(yaml_path)
+        return os.path.abspath(yaml_path)
+    if yml_ok:
+        return os.path.abspath(yml)
+    if yaml_ok:
+        return os.path.abspath(yaml_path)
+    return None
+
+
+def _resolve_sampler_config_file(config: str) -> Optional[str]:
+    """Return an existing sampler YAML path, or None."""
+    raw = str(config)
+    if os.path.isfile(raw):
+        return os.path.abspath(raw)
+    base = os.path.basename(raw)
+    if base.endswith((".yaml", ".yml")):
+        names = [base]
+        bare = None
+    else:
+        names = []
+        bare = base
+    for directory in _sampler_config_dirs():
+        if bare is not None:
+            picked = _pick_config_file(directory, bare)
+            if picked:
+                return picked
+        for name in names:
+            path = os.path.join(directory, name)
+            if os.path.isfile(path):
+                return os.path.abspath(path)
+    return None
+
+
 def _load_sampler_config(config: Union[str, dict]) -> dict:
     if isinstance(config, dict):
         return dict(config)
-    try:
-        from vascular_segment_sampler.sampling.extract import _load_config
+    path = _resolve_sampler_config_file(str(config))
+    if path is None:
+        looked = ", ".join(_sampler_config_dirs()) or "(none)"
+        raise FileNotFoundError(
+            f"Sampler config {config!r} was not found.\n"
+            f"  looked in: {looked}\n"
+            "Pass a YAML path, or a name such as test, test.yml, or default_mm."
+        )
+    from vascular_segment_sampler.sampling.extract import _load_config
 
-        return dict(_load_config(config))
-    except Exception:  # noqa: BLE001 — tests and missing sampler YAML
-        return {"IMG_EXT": ".nrrd"}
+    return dict(_load_config(path))
+
+
+def _cap_from_sampler_config(
+    sampler_config: dict,
+    max_samples: Optional[float],
+) -> Optional[float]:
+    """CLI ``--max-samples`` wins; otherwise use YAML ``MAX_SAMPLES``."""
+    if max_samples is not None:
+        return max_samples
+    configured = sampler_config.get("MAX_SAMPLES")
+    if configured is None:
+        return None
+    return configured
 
 
 def _resolve_img_ext(
@@ -603,7 +707,7 @@ def prepare_training_dataset(
     folder is removed after a successful conversion unless ``keep_extracted``
     is set or ``outdir`` was passed explicitly.
 
-    Uses ``vascular-segment-sampler`` (``pip install seqseg[train]``).
+    Uses ``vascular-segment-sampler``, which is installed with SeqSeg.
     """
     extract_patches, write_nnunet_dataset = _require_sampler()
 
@@ -614,16 +718,20 @@ def prepare_training_dataset(
             "  seqseg paths set --nnunet-root ~/nnunet_data --data-dir /path/to/cases"
         )
     data_dir = resolved_data
+    config_path = (
+        None if isinstance(config, dict) else _resolve_sampler_config_file(str(config))
+    )
+    sampler_config = _load_sampler_config(config)
+    resolved_img_ext = _resolve_img_ext(data_dir, sampler_config, img_ext)
+    sampler_config["IMG_EXT"] = resolved_img_ext
+    max_samples = _cap_from_sampler_config(sampler_config, max_samples)
+
     outdir, nnunet_raw, managed_staging = _resolve_training_dirs(outdir, nnunet_raw)
     os.makedirs(outdir, exist_ok=True)
     ensure_nnunet_dirs({"nnunet_raw": nnunet_raw})
 
     modalities = _parse_modalities(modality)
     modality_arg = ",".join(modalities)
-
-    sampler_config = _load_sampler_config(config)
-    resolved_img_ext = _resolve_img_ext(data_dir, sampler_config, img_ext)
-    sampler_config["IMG_EXT"] = resolved_img_ext
 
     if not skip_sample:
         _preflight_training_data(
@@ -638,6 +746,10 @@ def prepare_training_dataset(
             print("Extracting vascular segment patches")
         print(f"  data_dir: {data_dir}")
         print(f"  outdir:   {outdir}")
+        if config_path:
+            print(f"  config:   {config_path}")
+        if max_samples is not None and not global_volumes:
+            print(f"  max_samples: {max_samples}")
         if managed_staging and not keep_extracted:
             print("  (temporary; removed after conversion into nnUNet_raw)")
         print(f"  IMG_EXT:  {resolved_img_ext}")
@@ -828,6 +940,9 @@ def run_nnunet_training(
     """
     Run ``nnUNetv2_plan_and_preprocess`` and/or ``nnUNetv2_train``.
 
+    Training is started with ``-device`` set from what is available:
+    CUDA, then MPS, then CPU.
+
     Requires ``nnUNet_raw``, ``nnUNet_preprocessed``, and ``nnUNet_results``.
 
     With ``cleanup=True``, after training succeeds, delete that dataset's
@@ -858,6 +973,7 @@ def run_nnunet_training(
             print("Leaving nnUNet_raw and nnUNet_preprocessed in place.")
         return
 
+    device = select_training_device()
     train_cmd = [
         _resolve_nnunet_cli("nnUNetv2_train"),
         str(dataset_id),
@@ -867,9 +983,12 @@ def run_nnunet_training(
         trainer,
         "-p",
         plans,
+        "-device",
+        device,
     ]
     print("=" * 72)
     print("Running nnU-Net training")
+    print(f"  device: {device}")
     print(" ", " ".join(train_cmd))
     print("=" * 72)
     subprocess.run(train_cmd, check=True, env=env)

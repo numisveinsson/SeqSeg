@@ -15,13 +15,17 @@ import numpy as np
 from seqseg.pipeline.train import (
     TrainDependencyError,
     _STAGING_DIR_NAME,
+    _cap_from_sampler_config,
     _detect_img_ext,
     _dir_for_sampler,
     _harden_sampler_vtk,
     _link_or_copy,
+    _load_sampler_config,
     _normalize_img_ext,
+    _pick_config_file,
     _reduction_or_nan,
     _resolve_img_ext,
+    _resolve_sampler_config_file,
     _safe_add_image_stats,
     _safe_add_local_stats,
     _staging_is_safe_to_remove,
@@ -30,6 +34,18 @@ from seqseg.pipeline.train import (
     prepare_training_dataset,
     run_nnunet_training,
 )
+
+
+@pytest.fixture(autouse=True)
+def _stub_missing_sampler_config(monkeypatch):
+    """Prepare tests do not ship a sampler YAML. A missing name is an error."""
+
+    def _stub(config):
+        if isinstance(config, dict):
+            return dict(config)
+        return {"IMG_EXT": ".nrrd"}
+
+    monkeypatch.setattr("seqseg.pipeline.train._load_sampler_config", _stub)
 
 
 def _make_training_data(tmp_path, *, surfaces=False, img_ext=".nrrd"):
@@ -123,6 +139,87 @@ def test_prepare_calls_sampler_apis(tmp_path):
     assert result.removed_staging is False
     assert (extracted / "ct_train" / "a.nrrd").is_file()
     assert write.call_args.kwargs["outdir"] == str(tmp_path / "nnUNet_raw")
+
+
+def test_pick_config_file_prefers_overlay_that_sets_max_samples(tmp_path):
+    (tmp_path / "test.yaml").write_text("MOVE_DIST: 10\n")
+    (tmp_path / "test.yml").write_text("MAX_SAMPLES: 12\n")
+    picked = _pick_config_file(str(tmp_path), "test")
+    assert picked.endswith("test.yml")
+
+
+def test_resolve_sampler_config_file_bare_name(tmp_path, monkeypatch):
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    (cfg / "test.yaml").write_text("MOVE_DIST: 10\n")
+    (cfg / "test.yml").write_text("MAX_SAMPLES: 12\nMOVE_DIST: 8\n")
+    monkeypatch.setattr(
+        "seqseg.pipeline.train._sampler_config_dirs", lambda: [str(cfg)]
+    )
+    resolved = _resolve_sampler_config_file("test")
+    assert resolved.endswith("test.yml")
+    explicit = _resolve_sampler_config_file("test.yaml")
+    assert explicit.endswith("test.yaml")
+
+
+def test_prepare_missing_config_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "seqseg.pipeline.train._load_sampler_config", _load_sampler_config
+    )
+    monkeypatch.setattr(
+        "seqseg.pipeline.train._sampler_config_dirs", lambda: [str(tmp_path)]
+    )
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(MagicMock(), MagicMock()),
+    ):
+        with pytest.raises(FileNotFoundError, match="was not found"):
+            prepare_training_dataset(
+                str(tmp_path / "data"),
+                str(tmp_path / "extracted"),
+                name="MYDATA",
+                dataset_number=1,
+                nnunet_raw=str(tmp_path / "nnUNet_raw"),
+                config="does_not_exist",
+            )
+
+
+def test_cap_from_sampler_config_cli_overrides_yaml():
+    assert _cap_from_sampler_config({"MAX_SAMPLES": 12}, None) == 12
+    assert _cap_from_sampler_config({"MAX_SAMPLES": 12}, 3) == 3
+    assert _cap_from_sampler_config({}, None) is None
+
+
+def test_prepare_passes_yaml_max_samples(tmp_path):
+    extract = MagicMock()
+    write = MagicMock(return_value=str(tmp_path / "Dataset0999_MYDATACT"))
+    data = _make_training_data(tmp_path)
+    extracted = tmp_path / "extracted"
+    _make_patch_dirs(extracted)
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ), patch(
+        "seqseg.pipeline.train._load_sampler_config",
+        return_value={"IMG_EXT": ".nrrd", "MAX_SAMPLES": 12},
+    ), patch(
+        "seqseg.pipeline.train._resolve_sampler_config_file",
+        return_value=str(tmp_path / "test.yml"),
+    ):
+        prepare_training_dataset(
+            data,
+            str(extracted),
+            name="MYDATA",
+            dataset_number=999,
+            nnunet_raw=str(tmp_path / "nnUNet_raw"),
+            modality="CT",
+            config="test",
+            yes=True,
+        )
+
+    assert extract.call_args.kwargs["max_samples"] == 12
+    assert extract.call_args.kwargs["config"]["MAX_SAMPLES"] == 12
 
 
 def test_prepare_global_volumes_calls_gather_not_extract(tmp_path):
@@ -496,6 +593,25 @@ def test_run_nnunet_training_requires_env(tmp_path, monkeypatch):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(RuntimeError, match="nnU-Net paths"):
         run_nnunet_training(999, plan_only=True)
+
+
+def test_run_nnunet_training_passes_detected_device(monkeypatch):
+    monkeypatch.setenv("nnUNet_raw", "/raw")
+    monkeypatch.setenv("nnUNet_preprocessed", "/pre")
+    monkeypatch.setenv("nnUNet_results", "/res")
+    monkeypatch.setattr(
+        "seqseg.pipeline.train.select_training_device", lambda: "mps"
+    )
+
+    with patch("seqseg.pipeline.train.subprocess.run") as run:
+        run_nnunet_training(1, configuration="3d_fullres", fold="0")
+
+    assert run.call_count == 2
+    plan_cmd = run.call_args_list[0][0][0]
+    train_cmd = run.call_args_list[1][0][0]
+    assert "-device" not in plan_cmd
+    assert train_cmd[train_cmd.index("-device") + 1] == "mps"
+    assert "nnUNetv2_train" in train_cmd[0]
 
 
 def test_run_nnunet_training_plan_only(monkeypatch):

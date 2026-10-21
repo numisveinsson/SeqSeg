@@ -2,11 +2,7 @@
 
 [← Back to README](../README.md)
 
-Inference needs an nnU-Net trainer folder. To train one on a new dataset, install the optional [vascular-segment-sampler](https://pypi.org/project/vascular-segment-sampler/) extra:
-
-```bash
-pip install "seqseg[train]"
-```
+Inference needs an nnU-Net trainer folder. Preparing a new dataset uses [vascular-segment-sampler](https://pypi.org/project/vascular-segment-sampler/), which is installed with SeqSeg.
 
 `seqseg train` and `seqseg paths` use hyphen flags (`--data-dir`). `seqseg run batch` uses underscore flags (`-data_dir`). Both forms are in the examples below.
 

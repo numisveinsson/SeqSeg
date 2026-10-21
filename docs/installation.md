@@ -15,10 +15,9 @@ pip install seqseg
 seqseg --help  # Verify installation
 ```
 
-To prepare training data and train new nnU-Net models for SeqSeg:
+`pip install seqseg` includes `vascular-segment-sampler`, used by `seqseg train prepare`. To set up training directories:
 
 ```bash
-pip install "seqseg[train]"   # adds vascular-segment-sampler
 seqseg paths init             # saves ~/nnunet_data/... in ~/.seqseg/paths.yaml
 seqseg doctor                 # checks sampler + saved/effective paths
 ```
@@ -31,7 +30,6 @@ See [Training](training.md).
 git clone https://github.com/numisveinsson/SeqSeg.git
 cd SeqSeg
 pip install -e .
-pip install -e ".[train]"   # optional: training-data tools
 ```
 
 ## Option 3: Conda Environment
@@ -52,16 +50,16 @@ SimpleITK                # Medical image I/O
 vtk                      # 3D visualization and processing
 PyYAML                   # Configuration management
 scipy                    # Scientific computing
+vascular-segment-sampler # Patch sampling + nnU-Net dataset prep
 ```
 
 **Optional Dependencies:**
 ```
 matplotlib                       # Plotting and visualization (pip install "seqseg[viz]")
-vascular-segment-sampler         # Patch sampling + nnU-Net dataset prep (pip install "seqseg[train]")
 vmtk                             # Advanced vascular modeling tools
 ```
 
-`vascular-segment-sampler` is required for `seqseg train prepare`. See [Training](training.md).
+`vascular-segment-sampler` is used by `seqseg train prepare`. See [Training](training.md).
 
 ## Model Weights
 

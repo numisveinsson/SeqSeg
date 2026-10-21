@@ -436,7 +436,6 @@ def _cmd_init_dataset(ns: argparse.Namespace) -> None:
         f"  seqseg run batch -data_dir {root}/ -outdir ... -img_ext .nii.gz "
         "-nnunet_results_path ...\n"
         "\nNext (train a new model): also fill centerlines/ and truths/, then:\n"
-        f'  pip install "seqseg[train]"\n'
         f"  seqseg paths init --data-dir {root}/ --outdir ~/seqseg_train\n"
         "  seqseg train prepare --name MYDATA --dataset-number 999 --modality CT\n"
     )
@@ -551,10 +550,7 @@ def _cmd_doctor(ns: argparse.Namespace) -> None:
         try:
             importlib.import_module(modname)
         except ImportError as e:
-            extra = ""
-            if modname == "vascular_segment_sampler":
-                extra = ' — optional; pip install "seqseg[train]"'
-            print(f"  {label}: MISSING ({e}){extra}")
+            print(f"  {label}: MISSING ({e})")
         else:
             print(f"  {label}: OK")
 
@@ -668,6 +664,16 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         )
     except TrainDependencyError as e:
         print(str(e), file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError as e:
+        message = str(e)
+        if message.startswith("Sampler config"):
+            print(message, file=sys.stderr)
+            sys.exit(2)
+        import traceback
+
+        traceback.print_exc()
+        print(f"seqseg train prepare failed: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:  # noqa: BLE001
         import traceback
