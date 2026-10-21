@@ -292,6 +292,36 @@ def test_parser_train_prepare():
     assert ns.img_ext is None
     assert ns.global_volumes is False
     assert ns.keep_extracted is False
+    assert ns.configuration == "3d_fullres"
+    assert ns.preprocess_only is False
+    by_id = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--name",
+            "MYDATA",
+            "--dataset-id",
+            "999",
+        ]
+    )
+    assert by_id.dataset_number == 999
+    only = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--dataset-id",
+            "999",
+            "--configuration",
+            "2d",
+            "--preprocess-only",
+            "--np",
+            "8",
+        ]
+    )
+    assert only.preprocess_only is True
+    assert only.configuration == "2d"
+    assert only.np == 8
+    assert only.name is None
 
 
 def test_parser_train_prepare_global_volumes():
@@ -361,19 +391,28 @@ def test_parser_paths_set_requires_nnunet_root():
 def test_parser_train_nnunet():
     parser = _build_parser()
     ns = parser.parse_args(
-        ["train", "nnunet", "--dataset-id", "999", "--fold", "all", "--plan-only"]
+        ["train", "nnunet", "--dataset-id", "999", "--fold", "all", "--c"]
     )
     assert ns.command == "train"
     assert ns.train_cmd == "nnunet"
     assert ns.dataset_id == 999
-    assert ns.plan_only is True
+    assert ns.continue_training is True
     assert ns.cleanup is False
+    assert ns.configuration == "3d_fullres"
+    continued = parser.parse_args(
+        ["train", "nnunet", "--dataset-id", "999", "--continue"]
+    )
+    assert continued.continue_training is True
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            ["train", "nnunet", "--dataset-id", "999", "--plan-only"]
+        )
 
 
 def test_dataset_id_from_name():
     assert dataset_id_from_name("Dataset010_SEQCOROASOCACT") == 10
-    assert dataset_id_from_name("Dataset0999_MYDATACT") == 999
-    assert expected_nnunet_dataset_name("MYDATA", 999, "ct") == "Dataset0999_MYDATACT"
+    assert dataset_id_from_name("Dataset999_MYDATACT") == 999
+    assert expected_nnunet_dataset_name("MYDATA", 999, "ct") == "Dataset999_MYDATACT"
 
 
 def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
@@ -403,6 +442,10 @@ def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
         img_ext=None,
         global_volumes=False,
         keep_extracted=False,
+        configuration="3d_fullres",
+        plans="nnUNetPlans",
+        np=None,
+        preprocess_only=False,
     )
     with patch(
         "seqseg.cli.prepare_training_dataset",
@@ -441,6 +484,10 @@ def test_cmd_train_prepare_getdatatype_hint(tmp_path, capsys):
         img_ext=None,
         global_volumes=False,
         keep_extracted=False,
+        configuration="3d_fullres",
+        plans="nnUNetPlans",
+        np=None,
+        preprocess_only=False,
     )
     with patch(
         "seqseg.cli.prepare_training_dataset",
@@ -466,19 +513,17 @@ def test_cmd_train_nnunet_resolves_name(monkeypatch):
     monkeypatch.setattr("seqseg.cli.run_nnunet_training", fake_run)
     ns = argparse.Namespace(
         dataset_id=None,
-        dataset_name="Dataset0999_MYDATACT",
+        dataset_name="Dataset999_MYDATACT",
         configuration="3d_fullres",
         fold="0",
-        skip_plan=False,
-        plan_only=True,
-        np=None,
         trainer="nnUNetTrainer",
         plans="nnUNetPlans",
         cleanup=False,
+        continue_training=True,
     )
     _cmd_train_nnunet(ns)
     assert called["dataset_id"] == 999
-    assert called["kwargs"]["plan_only"] is True
+    assert called["kwargs"]["continue_training"] is True
     assert called["kwargs"]["cleanup"] is False
 
 
@@ -505,10 +550,11 @@ def test_parser_train_prepare_keep_extracted_and_cleanup():
 def test_cmd_train_prepare_points_at_results(capsys, monkeypatch):
     sentinel = PrepareResult(
         extracted_dir="/tmp/stage",
-        dataset_dirs=["/nn/nnUNet_raw/Dataset0999_MYDATACT"],
-        dataset_names=["Dataset0999_MYDATACT"],
+        dataset_dirs=["/nn/nnUNet_raw/Dataset999_MYDATACT"],
+        dataset_names=["Dataset999_MYDATACT"],
         modalities=["CT"],
         removed_staging=True,
+        preprocessed=True,
     )
     monkeypatch.setattr(
         "seqseg.cli.prepare_training_dataset",

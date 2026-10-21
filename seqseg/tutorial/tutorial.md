@@ -2,10 +2,10 @@
 
 A practical guide for automatic vessel segmentation using SeqSeg on medical images.
 
-**SeqSeg 2.x:** This tutorial uses `seqseg run batch`. A command that starts with a flag and omits `run batch` still runs. Windows setup is in [windows.md](windows.md).
+Windows setup is in [windows.md](windows.md).
 
 **Tutorial Dataset**: Abdominal aorta MR scan from SimVascular demo project  
-**Expected Time**: 15-20 minutes  
+**Expected Time**: 15–20 minutes including setup. Tracing is capped, so that part finishes in a few minutes.  
 **Expected Results**: Complete aortic segmentation with surface mesh and centerlines
 
 ## Quick Start Checklist
@@ -65,7 +65,7 @@ Details for each flag are in [Usage](../../docs/usage.md).
 Download pre-trained nnUNet weights (0.2GB):
 ```bash
 # Download and extract
-wget https://zenodo.org/records/15020477/files/nnUNet_results.zip
+curl -L -o nnUNet_results.zip https://zenodo.org/records/15020477/files/nnUNet_results.zip
 unzip nnUNet_results.zip
 ```
 Alternative: [Manual download](https://zenodo.org/records/15020477)

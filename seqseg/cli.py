@@ -437,7 +437,7 @@ def _cmd_init_dataset(ns: argparse.Namespace) -> None:
         "-nnunet_results_path ...\n"
         "\nNext (train a new model): also fill centerlines/ and truths/, then:\n"
         f"  seqseg paths init --data-dir {root}/ --outdir ~/seqseg_train\n"
-        "  seqseg train prepare --name MYDATA --dataset-number 999 --modality CT\n"
+        "  seqseg train prepare --name MYDATA --dataset-id 999 --modality CT\n"
     )
 
 
@@ -634,6 +634,12 @@ def _cmd_paths_export(_ns: argparse.Namespace) -> None:
 
 
 def _cmd_train_prepare(ns: argparse.Namespace) -> None:
+    if not ns.preprocess_only and not ns.name:
+        print(
+            "seqseg train prepare: --name is required",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     try:
         result = prepare_training_dataset(
             data_dir=ns.data_dir,
@@ -661,6 +667,10 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
             img_ext=ns.img_ext,
             global_volumes=ns.global_volumes,
             keep_extracted=ns.keep_extracted,
+            configuration=ns.configuration,
+            plans=ns.plans,
+            np=ns.np,
+            preprocess_only=ns.preprocess_only,
         )
     except TrainDependencyError as e:
         print(str(e), file=sys.stderr)
@@ -670,6 +680,9 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         if message.startswith("Sampler config"):
             print(message, file=sys.stderr)
             sys.exit(2)
+        if "seqseg train prepare" in message:
+            print(message, file=sys.stderr)
+            sys.exit(1)
         import traceback
 
         traceback.print_exc()
@@ -691,7 +704,11 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         sys.exit(1)
 
     print("\nPrepare complete.")
-    if result.removed_staging:
+    if ns.preprocess_only:
+        print(
+            f"  Preprocessed {ns.configuration} from the existing raw dataset."
+        )
+    elif result.removed_staging:
         print(
             "  Extracted volumes were linked into nnU-Net raw and the "
             "temporary folder was removed."
@@ -699,9 +716,17 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
     else:
         kind = "Whole volumes" if ns.global_volumes else "Patches"
         print(f"  {kind}: {result.extracted_dir}")
+    if not result.preprocessed:
+        print(
+            "  nnU-Net preprocessing was skipped (--skip-convert). "
+            "Re-run prepare without --skip-convert before training."
+        )
     results = resolve_path("nnunet_results")
     if results:
         print(f"  Trained models will be written under: {results}")
+    config_flag = ""
+    if ns.configuration != "3d_fullres":
+        config_flag = f" --configuration {ns.configuration}"
     for name, path in zip(result.dataset_names, result.dataset_dirs):
         try:
             ds_id = dataset_id_from_name(name)
@@ -709,11 +734,12 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
             ds_id = "?"
         print(f"  nnU-Net dataset: {name}")
         print(f"    path: {path}")
-        print(
-            "    next:\n"
-            f"      seqseg train nnunet --dataset-id {ds_id} "
-            "--configuration 3d_fullres --fold 0"
-        )
+        if result.preprocessed:
+            print(
+                "    next:\n"
+                f"      seqseg train nnunet --dataset-id {ds_id}"
+                f"{config_flag} --fold 0"
+            )
 
 
 def _cmd_train_nnunet(ns: argparse.Namespace) -> None:
@@ -736,12 +762,10 @@ def _cmd_train_nnunet(ns: argparse.Namespace) -> None:
             dataset_id,
             configuration=ns.configuration,
             fold=ns.fold,
-            skip_plan=ns.skip_plan,
-            plan_only=ns.plan_only,
-            np=ns.np,
             trainer=ns.trainer,
             plans=ns.plans,
             cleanup=ns.cleanup,
+            continue_training=ns.continue_training,
         )
     except Exception as e:  # noqa: BLE001
         print(f"seqseg train nnunet failed: {e}", file=sys.stderr)
@@ -1021,7 +1045,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_prep = train_sub.add_parser(
         "prepare",
-        help="Prepare patches or whole volumes and convert to nnU-Net DatasetXXX format",
+        help="Extract volumes, write an nnU-Net dataset, and plan/preprocess",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p_prep.add_argument(
@@ -1044,16 +1068,20 @@ def _build_parser() -> argparse.ArgumentParser:
     p_prep.add_argument(
         "--name",
         "-name",
-        required=True,
+        default=None,
         type=str,
-        help="Dataset name stem (e.g. MYDATA → Dataset0XX_MYDATACT)",
+        help="Dataset name stem (e.g. MYDATA → Dataset0XX_MYDATACT). "
+        "Required unless --preprocess-only",
     )
     p_prep.add_argument(
+        "--dataset-id",
         "--dataset-number",
         "-dataset_number",
+        dest="dataset_number",
         required=True,
         type=int,
-        help="nnU-Net dataset id (e.g. 999). Incremented per modality if several",
+        help="nnU-Net dataset id to create (e.g. 999). "
+        "Incremented per modality if several",
     )
     p_prep.add_argument(
         "--modality",
@@ -1132,11 +1160,35 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Keep <nnunet-root>/_seqseg_extracted after conversion into nnUNet_raw",
     )
+    p_prep.add_argument(
+        "--configuration",
+        default="3d_fullres",
+        choices=["3d_fullres", "2d", "3d_lowres", "3d_cascade_fullres"],
+        help="nnU-Net configuration to preprocess. Default 3d_fullres",
+    )
+    p_prep.add_argument(
+        "--plans",
+        default="nnUNetPlans",
+        type=str,
+        help="nnU-Net plans name (training -p). Default nnUNetPlans",
+    )
+    p_prep.add_argument(
+        "--np",
+        type=int,
+        default=None,
+        help="Processes for nnU-Net preprocessing. Default: --num-cores",
+    )
+    p_prep.add_argument(
+        "--preprocess-only",
+        action="store_true",
+        help="Preprocess another configuration from an existing raw dataset "
+        "and plans file. Does not extract or convert subvolumes",
+    )
     p_prep.set_defaults(_handler=_cmd_train_prepare, img_ext=None)
 
     p_nn = train_sub.add_parser(
         "nnunet",
-        help="Run nnUNetv2_plan_and_preprocess and/or nnUNetv2_train",
+        help="Train with nnUNetv2_train (--c continues from the latest checkpoint)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p_nn.add_argument(
@@ -1149,13 +1201,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--dataset-name",
         type=str,
         default=None,
-        help="Alternative to --dataset-id (e.g. Dataset0999_MYDATACT)",
+        help="Alternative to --dataset-id (e.g. Dataset999_MYDATACT)",
     )
     p_nn.add_argument(
         "--configuration",
         default="3d_fullres",
         choices=["3d_fullres", "2d", "3d_lowres", "3d_cascade_fullres"],
-        help="nnU-Net configuration for preprocessing (-c) and training",
+        help="nnU-Net configuration to train. Default 3d_fullres",
     )
     p_nn.add_argument(
         "--fold",
@@ -1164,20 +1216,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Fold to train (0-4 or all)",
     )
     p_nn.add_argument(
-        "--skip-plan",
+        "--c",
+        "--continue",
+        dest="continue_training",
         action="store_true",
-        help="Skip plan_and_preprocess; only train",
-    )
-    p_nn.add_argument(
-        "--plan-only",
-        action="store_true",
-        help="Only run plan_and_preprocess",
-    )
-    p_nn.add_argument(
-        "--np",
-        type=int,
-        default=None,
-        help="Processes for plan_and_preprocess (-np)",
+        help="Continue training from checkpoint_latest.pth (nnU-Net --c)",
     )
     p_nn.add_argument("--trainer", default="nnUNetTrainer", type=str)
     p_nn.add_argument("--plans", default="nnUNetPlans", type=str)
@@ -1186,7 +1229,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="After training succeeds, delete this dataset's nnUNet_raw and "
         "nnUNet_preprocessed folders. Leaves nnUNet_results. "
-        "Ignored with --plan-only.",
+        "A later --c run needs that preprocessed data.",
     )
     p_nn.set_defaults(_handler=_cmd_train_nnunet)
 

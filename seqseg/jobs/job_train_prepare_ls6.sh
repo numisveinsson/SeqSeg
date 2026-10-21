@@ -51,9 +51,10 @@ seqseg doctor || true
 
 # Do not use ibrun for this (not MPI).
 # Add --img-ext .nii.gz (or .mha) if auto-detect picks the wrong suffix.
+# This job also runs nnUNetv2_plan_and_preprocess (default configuration 3d_fullres).
 seqseg train prepare \
     --name MYDATA \
-    --dataset-number 999 \
+    --dataset-id 999 \
     --modality CT \
     --truth-from-surface \
     --truth-regenerate \

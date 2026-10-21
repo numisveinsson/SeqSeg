@@ -8,8 +8,6 @@ For a complete walkthrough with example data, see the [step-by-step tutorial](..
 
 `seqseg run batch` and `seqseg run plus batch` take underscore flags (`-outdir` / `--outdir`). The data folder is `-data_dir` or `--data_directory`. `seqseg run single`, `seqseg train`, and `seqseg paths` take hyphen flags (`--image`, `--data-dir`). `seqseg train prepare` also accepts `-data_dir`.
 
-A 1.x command that starts with a flag (`seqseg -data_dir ...`) still runs. It is rewritten to `seqseg run batch`.
-
 `-img_ext` is required on every batch command. These three can be omitted when they are saved with `seqseg paths`:
 
 | Flag | Role |
@@ -119,9 +117,10 @@ Other common commands:
 | `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
 | `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg |
 | `seqseg paths init` / `set` / `show` | Save default nnU-Net / data / out dirs (`~/.seqseg/paths.yaml`) |
-| `seqseg train prepare` | Extract patches or whole volumes and create an nnU-Net Dataset |
-| `seqseg train nnunet` | Plan/preprocess and train with nnU-Net |
+| `seqseg train prepare` | Extract patches or whole volumes, create an nnU-Net dataset, and preprocess |
+| `seqseg train nnunet` | Train with nnU-Net (`--c` continues from the latest checkpoint) |
 | `seqseg doctor` | Check imports and optional trainer folder |
+| `seqseg config dump` / `fingerprint` | Print a packaged YAML config, or list keys that differ from another |
 | `seqseg post global-centerline` | Centerlines from an existing segmentation (all bodies by default) |
 | `seqseg simvascular init` | Create/refresh a SimVascular project layout under a case directory |
 
@@ -169,7 +168,7 @@ Tracing is unchanged; the SeqSeg result is merged (union) into the initial mask.
 
 ## Command Line Arguments
 
-Arguments for `seqseg run batch` (same flags as legacy flat CLI):
+Arguments for `seqseg run batch`:
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -649,12 +650,35 @@ def _staging_is_safe_to_remove(staging: str, raw: str) -> bool:
 
 
 def expected_nnunet_dataset_name(name: str, dataset_number: int, modality: str) -> str:
-    """Match vascular-segment-sampler naming for DatasetXXX_* folders."""
-    if dataset_number < 10:
-        dataset_number_str = "0" + str(dataset_number)
-    else:
-        dataset_number_str = str(dataset_number)
-    return f"Dataset0{dataset_number_str}_{name}{modality.upper()}"
+    """nnU-Net folder name: ``Dataset`` + id (at least 3 digits) + name + modality.
+
+    nnU-Net finds a dataset by the prefix ``Dataset{id:03d}``. The sampler
+    writes ``Dataset0`` plus the id, which matches for ids 1–99 and not for
+    100 and above (``999`` must be ``Dataset999``, not ``Dataset0999``).
+    """
+    return f"Dataset{int(dataset_number):03d}_{name}{modality.upper()}"
+
+
+def _align_dataset_dir_with_nnunet(
+    written: str, expected_name: str, nnunet_raw: str
+) -> str:
+    """Rename a sampler folder so nnU-Net's id lookup finds it."""
+    written_abs = os.path.abspath(written)
+    expected_abs = os.path.join(os.path.abspath(nnunet_raw), expected_name)
+    if os.path.normpath(written_abs) == os.path.normpath(expected_abs):
+        return written_abs
+    if not os.path.isdir(written_abs):
+        return written_abs
+    if os.path.exists(expected_abs):
+        raise FileExistsError(
+            f"Cannot rename {written_abs} to {expected_abs}; destination exists."
+        )
+    os.rename(written_abs, expected_abs)
+    print(
+        f"  Renamed {os.path.basename(written_abs)} to {expected_name} "
+        "so nnU-Net can find this dataset id."
+    )
+    return expected_abs
 
 
 @dataclass
@@ -666,13 +690,14 @@ class PrepareResult:
     dataset_names: List[str]
     modalities: List[str]
     removed_staging: bool = False
+    preprocessed: bool = False
 
 
 def prepare_training_dataset(
     data_dir: Optional[str] = None,
     outdir: Optional[str] = None,
     *,
-    name: str,
+    name: Optional[str] = None,
     dataset_number: int,
     modality: str = "CT",
     config: Union[str, dict] = "global",
@@ -695,9 +720,13 @@ def prepare_training_dataset(
     img_ext: Optional[str] = None,
     global_volumes: bool = False,
     keep_extracted: bool = False,
+    configuration: str = "3d_fullres",
+    plans: str = "nnUNetPlans",
+    np: Optional[int] = None,
+    preprocess_only: bool = False,
 ) -> PrepareResult:
     """
-    Prepare training volumes and convert them to nnU-Net raw datasets.
+    Prepare training volumes, convert them to nnU-Net raw datasets, and preprocess.
 
     By default extracts SeqSeg-style patches. With ``global_volumes=True``,
     copies each case's full image and label instead (``gather_global_volumes``).
@@ -705,10 +734,27 @@ def prepare_training_dataset(
     Extracted files are written under ``<parent of nnUNet_raw>/_seqseg_extracted``
     unless ``outdir`` is set, then hardlinked into ``nnUNet_raw``. That temporary
     folder is removed after a successful conversion unless ``keep_extracted``
-    is set or ``outdir`` was passed explicitly.
+    is set or ``outdir`` was passed explicitly. ``nnUNetv2_plan_and_preprocess``
+    then runs for ``configuration`` (default ``3d_fullres``).
+
+    ``preprocess_only=True`` resamples an additional configuration from plans
+    and raw data that already exist. It does not sample or convert.
 
     Uses ``vascular-segment-sampler``, which is installed with SeqSeg.
     """
+    if preprocess_only:
+        return _preprocess_existing_dataset(
+            dataset_number,
+            configuration=configuration,
+            plans=plans,
+            np=np,
+            num_cores=num_cores,
+            nnunet_raw=nnunet_raw,
+        )
+    if not name:
+        raise ValueError(
+            "--name is required unless --preprocess-only is set."
+        )
     extract_patches, write_nnunet_dataset = _require_sampler()
 
     resolved_data = resolve_path("data_dir", data_dir)
@@ -838,6 +884,7 @@ def prepare_training_dataset(
                     also_test=also_test,
                 )
                 ds_name = expected_nnunet_dataset_name(name, ds_num, mod)
+                ds_path = _align_dataset_dir_with_nnunet(ds_path, ds_name, nnunet_raw)
                 dataset_dirs.append(os.path.abspath(ds_path))
                 dataset_names.append(ds_name)
                 print(f"  {mod}: {ds_path}")
@@ -856,12 +903,26 @@ def prepare_training_dataset(
     else:
         print("Skipping nnU-Net conversion (--skip-convert)")
 
+    preprocessed = False
+    if not skip_convert:
+        workers = num_cores if np is None else np
+        dataset_ids = [dataset_id_from_name(ds_name) for ds_name in dataset_names]
+        _run_nnunet_plan_and_preprocess(
+            nnunet_raw,
+            dataset_ids,
+            configuration=configuration,
+            np=workers,
+            plans=plans,
+        )
+        preprocessed = True
+
     return PrepareResult(
         extracted_dir=outdir,
         dataset_dirs=dataset_dirs,
         dataset_names=dataset_names,
         modalities=modalities,
         removed_staging=removed_staging,
+        preprocessed=preprocessed,
     )
 
 
@@ -890,11 +951,18 @@ def _nnunet_env_or_raise() -> dict:
 
 
 def _resolve_nnunet_cli(exe: str) -> str:
-    """Prefer PATH; fall back to python -m for common nnU-Net entry points."""
+    """Prefer PATH, then the directory that contains the running Python.
+
+    A venv installs ``nnUNetv2_plan_and_preprocess`` next to ``python`` even
+    when that bin directory is not on ``PATH``.
+    """
     found = shutil.which(exe)
     if found:
         return found
-    # nnUNetv2 installs console scripts; if missing, try module form where available.
+    sibling = os.path.join(os.path.dirname(sys.executable), exe)
+    for candidate in (sibling, sibling + ".exe"):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
     return exe
 
 
@@ -925,53 +993,289 @@ def _remove_nnunet_dataset_copies(env: dict, dataset_id: int) -> None:
         )
 
 
+def _nnunet_env_for_raw(nnunet_raw: str) -> dict:
+    """Env for nnU-Net commands, with ``nnUNet_raw`` set to ``nnunet_raw``."""
+    env = _nnunet_env_or_raise()
+    env["nnUNet_raw"] = os.path.abspath(nnunet_raw)
+    return env
+
+
+def _dataset_dirs_matching_id(root: str, dataset_id: int) -> List[str]:
+    """Dataset folders under ``root`` whose name encodes ``dataset_id``."""
+    if not root or not os.path.isdir(root):
+        return []
+    found: List[str] = []
+    for name in sorted(os.listdir(root)):
+        path = os.path.join(root, name)
+        if not os.path.isdir(path):
+            continue
+        try:
+            found_id = dataset_id_from_name(name)
+        except ValueError:
+            continue
+        if found_id == dataset_id:
+            found.append(path)
+    return found
+
+
+def _one_dataset_dir(root: str, dataset_id: int, label: str) -> str:
+    matches = _dataset_dirs_matching_id(root, dataset_id)
+    if not matches:
+        raise FileNotFoundError(
+            f"No {label} folder for dataset id {dataset_id} under {root}."
+        )
+    if len(matches) > 1:
+        names = ", ".join(os.path.basename(path) for path in matches)
+        raise RuntimeError(
+            f"Multiple {label} folders match dataset id {dataset_id}: {names}"
+        )
+    return matches[0]
+
+
+def _plan_and_preprocess_command(
+    dataset_id: int,
+    configuration: str,
+    np: int,
+    plans: str,
+) -> List[str]:
+    """``nnUNetv2_plan_and_preprocess`` argv.
+
+    ``plans`` is the plans file name (training ``-p``), not the planner class.
+    The default name ``nnUNetPlans`` is nnU-Net's own default, so it is omitted.
+    """
+    cmd = [
+        _resolve_nnunet_cli("nnUNetv2_plan_and_preprocess"),
+        "-d",
+        str(dataset_id),
+        "-c",
+        configuration,
+        "-np",
+        str(np),
+    ]
+    if plans != "nnUNetPlans":
+        cmd.extend(["-overwrite_plans_name", plans])
+    return cmd
+
+
+def _preprocess_only_command(
+    dataset_id: int,
+    configuration: str,
+    np: int,
+    plans: str,
+) -> List[str]:
+    """``nnUNetv2_preprocess`` argv for one configuration of existing plans."""
+    return [
+        _resolve_nnunet_cli("nnUNetv2_preprocess"),
+        "-d",
+        str(dataset_id),
+        "-plans_name",
+        plans,
+        "-c",
+        configuration,
+        "-np",
+        str(np),
+    ]
+
+
+def _run_nnunet_cli(cmd: List[str], env: dict, title: str) -> None:
+    print("=" * 72)
+    print(title)
+    print(" ", " ".join(cmd))
+    print("=" * 72)
+    subprocess.run(cmd, check=True, env=env)
+
+
+def _run_nnunet_plan_and_preprocess(
+    nnunet_raw: str,
+    dataset_ids: Sequence[int],
+    *,
+    configuration: str,
+    np: int,
+    plans: str,
+) -> None:
+    """Plan and preprocess each dataset id that prepare just wrote."""
+    if not dataset_ids:
+        return
+    env = _nnunet_env_for_raw(nnunet_raw)
+    for dataset_id in dataset_ids:
+        _run_nnunet_cli(
+            _plan_and_preprocess_command(dataset_id, configuration, np, plans),
+            env,
+            "Running nnU-Net plan and preprocess",
+        )
+
+
+def _run_nnunet_preprocess_only(
+    nnunet_raw: str,
+    dataset_id: int,
+    *,
+    configuration: str,
+    np: int,
+    plans: str,
+) -> None:
+    """Resample one configuration from plans that already exist."""
+    env = _nnunet_env_for_raw(nnunet_raw)
+    _run_nnunet_cli(
+        _preprocess_only_command(dataset_id, configuration, np, plans),
+        env,
+        f"Running nnU-Net preprocess for {configuration}",
+    )
+
+
+def _resolve_nnunet_raw(nnunet_raw: Optional[str]) -> str:
+    raw = nnunet_raw if nnunet_raw else resolve_path("nnunet_raw")
+    if not raw:
+        raise ValueError(
+            "nnUNet_raw is required. Pass --nnunet-raw or set it once with:\n"
+            "  seqseg paths init --nnunet-root ~/nnunet_data"
+        )
+    return os.path.abspath(os.path.expanduser(raw))
+
+
+def _preprocess_existing_dataset(
+    dataset_number: int,
+    *,
+    configuration: str,
+    plans: str,
+    np: Optional[int],
+    num_cores: int,
+    nnunet_raw: Optional[str],
+) -> PrepareResult:
+    """Preprocess ``configuration`` using raw data and plans from an earlier prepare.
+
+    Returns before the sampler is imported. Patch extraction and conversion
+    do not run, and ``_seqseg_extracted`` is not required.
+    """
+    raw_root = _resolve_nnunet_raw(nnunet_raw)
+    prepare_hint = (
+        "Run a full prepare before --preprocess-only:\n"
+        f"  seqseg train prepare --name NAME --dataset-id {dataset_number}"
+    )
+    try:
+        raw_dir = _one_dataset_dir(raw_root, dataset_number, "nnUNet_raw")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"{exc}\n{prepare_hint}") from exc
+    env = _nnunet_env_for_raw(raw_root)
+    try:
+        pre_dir = _one_dataset_dir(
+            env["nnUNet_preprocessed"], dataset_number, "nnUNet_preprocessed"
+        )
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"{exc}\n{prepare_hint}") from exc
+    plans_file = os.path.join(pre_dir, f"{plans}.json")
+    if not os.path.isfile(plans_file):
+        raise FileNotFoundError(
+            f"No plans file at {plans_file}.\n{prepare_hint}"
+        )
+    workers = num_cores if np is None else np
+    _run_nnunet_preprocess_only(
+        raw_root,
+        dataset_number,
+        configuration=configuration,
+        np=workers,
+        plans=plans,
+    )
+    dataset_name = os.path.basename(raw_dir)
+    return PrepareResult(
+        extracted_dir=raw_dir,
+        dataset_dirs=[raw_dir],
+        dataset_names=[dataset_name],
+        modalities=[],
+        removed_staging=False,
+        preprocessed=True,
+    )
+
+
+def _require_preprocessed_dataset(env: dict, dataset_id: int) -> str:
+    root = env.get("nnUNet_preprocessed") or ""
+    matches = _dataset_dirs_matching_id(root, dataset_id)
+    if not matches:
+        raise FileNotFoundError(
+            f"No preprocessed data for dataset id {dataset_id}"
+            + (f" under {root}." if root else ".")
+            + "\nseqseg train nnunet only trains. Preprocessing runs in prepare:\n"
+            f"  seqseg train prepare --name NAME --dataset-id {dataset_id}"
+        )
+    if len(matches) > 1:
+        names = ", ".join(os.path.basename(path) for path in matches)
+        raise RuntimeError(
+            f"Multiple nnUNet_preprocessed folders match dataset id {dataset_id}: "
+            f"{names}"
+        )
+    return matches[0]
+
+
+def _require_continue_checkpoint(
+    env: dict,
+    dataset_id: int,
+    *,
+    trainer: str,
+    plans: str,
+    configuration: str,
+    fold: str,
+) -> None:
+    root = env.get("nnUNet_results") or ""
+    try:
+        dataset_dir = _one_dataset_dir(root, dataset_id, "nnUNet_results")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"No training output for dataset id {dataset_id} to continue.\n"
+            "Train this fold once without --c."
+        ) from exc
+    checkpoint = os.path.join(
+        dataset_dir,
+        f"{trainer}__{plans}__{configuration}",
+        f"fold_{fold}",
+        "checkpoint_latest.pth",
+    )
+    if not os.path.isfile(checkpoint):
+        raise FileNotFoundError(
+            f"No checkpoint to continue at {checkpoint}.\n"
+            "Train this fold once without --c, or pass the fold that has "
+            "checkpoint_latest.pth."
+        )
+
+
 def run_nnunet_training(
     dataset_id: int,
     *,
     configuration: str = "3d_fullres",
     fold: str = "0",
-    skip_plan: bool = False,
-    plan_only: bool = False,
-    np: Optional[int] = None,
     trainer: str = "nnUNetTrainer",
     plans: str = "nnUNetPlans",
     cleanup: bool = False,
+    continue_training: bool = False,
 ) -> None:
     """
-    Run ``nnUNetv2_plan_and_preprocess`` and/or ``nnUNetv2_train``.
+    Run ``nnUNetv2_train``.
 
+    Planning and preprocessing happen in ``prepare_training_dataset``.
     Training is started with ``-device`` set from what is available:
     CUDA, then MPS, then CPU.
 
+    ``continue_training=True`` passes nnU-Net's ``--c`` and, for a single
+    fold, requires ``checkpoint_latest.pth``. ``--fold all`` leaves that
+    check to nnU-Net.
+
     Requires ``nnUNet_raw``, ``nnUNet_preprocessed``, and ``nnUNet_results``.
+    Preprocessed data for ``dataset_id`` must already exist.
 
     With ``cleanup=True``, after training succeeds, delete that dataset's
     folders under ``nnUNet_raw`` and ``nnUNet_preprocessed``. ``nnUNet_results``
-    is kept. Cleanup is skipped for ``plan_only`` and when training fails.
+    is kept. Cleanup is skipped when training fails. Cleanup removes the
+    preprocessed data a later ``--c`` run would need.
     """
     env = _nnunet_env_or_raise()
-
-    if not skip_plan:
-        plan_cmd = [
-            _resolve_nnunet_cli("nnUNetv2_plan_and_preprocess"),
-            "-d",
-            str(dataset_id),
-            "-c",
-            configuration,
-        ]
-        if np is not None:
-            plan_cmd.extend(["-np", str(np)])
-        print("=" * 72)
-        print("Running nnU-Net plan and preprocess")
-        print(" ", " ".join(plan_cmd))
-        print("=" * 72)
-        subprocess.run(plan_cmd, check=True, env=env)
-
-    if plan_only:
-        print("Plan/preprocess only; skipping training (--plan-only).")
-        if cleanup:
-            print("Leaving nnUNet_raw and nnUNet_preprocessed in place.")
-        return
+    _require_preprocessed_dataset(env, dataset_id)
+    if continue_training and str(fold) != "all":
+        _require_continue_checkpoint(
+            env,
+            dataset_id,
+            trainer=trainer,
+            plans=plans,
+            configuration=configuration,
+            fold=str(fold),
+        )
 
     device = select_training_device()
     train_cmd = [
@@ -986,6 +1290,8 @@ def run_nnunet_training(
         "-device",
         device,
     ]
+    if continue_training:
+        train_cmd.append("--c")
     print("=" * 72)
     print("Running nnU-Net training")
     print(f"  device: {device}")
@@ -1008,7 +1314,7 @@ def run_nnunet_training(
 
 
 def dataset_id_from_name(dataset_name: str) -> int:
-    """Parse ``Dataset010_FOO`` / ``Dataset0999_BAR`` → integer id."""
+    """Parse ``Dataset010_FOO`` / ``Dataset999_BAR`` → integer id."""
     stem = Path(dataset_name).name
     if not stem.startswith("Dataset"):
         raise ValueError(f"Not an nnU-Net dataset name: {dataset_name!r}")
