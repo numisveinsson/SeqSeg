@@ -290,6 +290,7 @@ def test_parser_train_prepare():
     assert ns.name == "MYDATA"
     assert ns.dataset_number == 999
     assert ns.img_ext is None
+    assert ns.config_name == "default_mm"
     assert ns.global_volumes is False
     assert ns.keep_extracted is False
     assert ns.configuration == "3d_fullres"
@@ -350,6 +351,34 @@ def test_parser_train_prepare_global_volumes():
         ]
     )
     assert ns_alias.global_volumes is True
+
+
+def test_parser_train_prepare_regenerate_truth_alias():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--name",
+            "MYDATA",
+            "--dataset-id",
+            "999",
+            "--regenerate-truth",
+        ]
+    )
+    assert ns.truth_regenerate is True
+    canonical = parser.parse_args(
+        [
+            "train",
+            "prepare",
+            "--name",
+            "MYDATA",
+            "--dataset-id",
+            "999",
+            "--truth-regenerate",
+        ]
+    )
+    assert canonical.truth_regenerate is True
 
 
 def test_parser_paths_init():
@@ -437,7 +466,6 @@ def test_cmd_train_prepare_missing_dep(tmp_path, capsys):
         skip_sample=False,
         skip_convert=False,
         also_test=False,
-        yes=False,
         verbose=False,
         img_ext=None,
         global_volumes=False,
@@ -479,7 +507,6 @@ def test_cmd_train_prepare_getdatatype_hint(tmp_path, capsys):
         skip_sample=False,
         skip_convert=False,
         also_test=False,
-        yes=False,
         verbose=False,
         img_ext=None,
         global_volumes=False,

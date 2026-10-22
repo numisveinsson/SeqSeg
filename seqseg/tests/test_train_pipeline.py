@@ -154,7 +154,6 @@ def test_prepare_calls_sampler_apis(tmp_path):
             dataset_number=999,
             nnunet_raw=str(tmp_path / "nnUNet_raw"),
             modality="CT",
-            yes=True,
         )
 
     extract.assert_called_once()
@@ -163,6 +162,7 @@ def test_prepare_calls_sampler_apis(tmp_path):
     assert outdir_arg.endswith(os.sep)
     assert os.path.basename(os.path.normpath(outdir_arg)) == "extracted"
     assert extract.call_args.kwargs["config"]["IMG_EXT"] == ".nrrd"
+    assert extract.call_args.kwargs["yes"] is True
     assert result.dataset_names == ["Dataset999_MYDATACT"]
     assert result.modalities == ["CT"]
     assert result.removed_staging is False
@@ -244,7 +244,6 @@ def test_prepare_passes_yaml_max_samples(tmp_path):
             nnunet_raw=str(tmp_path / "nnUNet_raw"),
             modality="CT",
             config="test",
-            yes=True,
         )
 
     assert extract.call_args.kwargs["max_samples"] == 12
@@ -273,7 +272,6 @@ def test_prepare_global_volumes_calls_gather_not_extract(tmp_path):
             dataset_number=999,
             nnunet_raw=str(tmp_path / "nnUNet_raw"),
             modality="CT",
-            yes=True,
             global_volumes=True,
         )
 
@@ -310,7 +308,6 @@ def test_prepare_global_volumes_requires_recent_sampler(tmp_path):
                 name="MYDATA",
                 dataset_number=999,
                 nnunet_raw=str(tmp_path / "nnUNet_raw"),
-                yes=True,
                 global_volumes=True,
             )
     extract.assert_not_called()
@@ -373,7 +370,6 @@ def test_prepare_detects_nii_gz_and_sets_sampler_config(tmp_path):
             name="MYDATA",
             dataset_number=999,
             nnunet_raw=str(tmp_path / "nnUNet_raw"),
-            yes=True,
         )
 
     assert extract.call_args.kwargs["config"]["IMG_EXT"] == ".nii.gz"
@@ -398,7 +394,6 @@ def test_prepare_explicit_img_ext_overrides_detection(tmp_path):
             dataset_number=999,
             nnunet_raw=str(tmp_path / "nnUNet_raw"),
             img_ext="mha",
-            yes=True,
         )
 
     assert extract.call_args.kwargs["config"]["IMG_EXT"] == ".mha"
@@ -450,7 +445,6 @@ def test_prepare_preflight_rejects_missing_images(tmp_path):
                 name="MYDATA",
                 dataset_number=999,
                 nnunet_raw=str(tmp_path / "nnUNet_raw"),
-                yes=True,
             )
     extract.assert_not_called()
 
@@ -476,7 +470,6 @@ def test_prepare_continues_if_stats_csv_missing_but_patches_exist(tmp_path):
             name="MYDATA",
             dataset_number=999,
             nnunet_raw=str(tmp_path / "nnUNet_raw"),
-            yes=True,
         )
 
     write.assert_called_once()
@@ -503,7 +496,6 @@ def test_prepare_missing_stats_csv_without_patches_is_actionable(tmp_path):
                 name="MYDATA",
                 dataset_number=999,
                 nnunet_raw=str(tmp_path / "nnUNet_raw"),
-                yes=True,
             )
     write.assert_not_called()
 
@@ -810,7 +802,6 @@ def test_prepare_defaults_staging_and_removes_it(tmp_path, monkeypatch):
             name="MYDATA",
             dataset_number=999,
             nnunet_raw=str(raw),
-            yes=True,
         )
 
     outdir_arg = extract.call_args.kwargs["outdir"]
@@ -837,7 +828,6 @@ def test_prepare_keep_extracted_leaves_managed_staging(tmp_path):
             dataset_number=999,
             nnunet_raw=str(raw),
             keep_extracted=True,
-            yes=True,
         )
 
     assert result.removed_staging is False
@@ -861,7 +851,6 @@ def test_prepare_failed_convert_keeps_staging(tmp_path):
                 name="MYDATA",
                 dataset_number=999,
                 nnunet_raw=str(raw),
-                yes=True,
             )
 
     assert (staging / "ct_train" / "a.nrrd").is_file()
@@ -934,7 +923,6 @@ def test_prepare_preprocesses_written_dataset_ids(
             nnunet_raw=str(tmp_path / "nnUNet_raw"),
             modality="CT",
             num_cores=4,
-            yes=True,
         )
 
     only.assert_not_called()

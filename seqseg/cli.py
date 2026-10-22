@@ -662,7 +662,6 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
             skip_sample=ns.skip_sample,
             skip_convert=ns.skip_convert,
             also_test=ns.also_test,
-            yes=ns.yes,
             verbose=ns.verbose,
             img_ext=ns.img_ext,
             global_volumes=ns.global_volumes,
@@ -1093,7 +1092,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_prep.add_argument(
         "--config-name",
         "-config_name",
-        default="global",
+        default="default_mm",
         type=str,
         help="Sampler YAML name/path (from vascular-segment-sampler)",
     )
@@ -1153,7 +1152,6 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also convert modality_test folders when present",
     )
-    p_prep.add_argument("--yes", action="store_true", help="Non-interactive confirms")
     p_prep.add_argument("--verbose", action="store_true")
     p_prep.add_argument(
         "--keep-extracted",

@@ -49,7 +49,6 @@ def _prepare(data_dir: Path, *, max_samples: str = "2") -> None:
             max_samples,
             "--num-cores",
             "1",
-            "--yes",
         ]
     )
 

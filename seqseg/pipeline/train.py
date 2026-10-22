@@ -700,7 +700,7 @@ def prepare_training_dataset(
     name: Optional[str] = None,
     dataset_number: int,
     modality: str = "CT",
-    config: Union[str, dict] = "global",
+    config: Union[str, dict] = "default_mm",
     nnunet_raw: Optional[str] = None,
     perc_dataset: float = 1.0,
     num_cores: int = 1,
@@ -715,7 +715,6 @@ def prepare_training_dataset(
     skip_sample: bool = False,
     skip_convert: bool = False,
     also_test: bool = False,
-    yes: bool = False,
     verbose: bool = False,
     img_ext: Optional[str] = None,
     global_volumes: bool = False,
@@ -741,6 +740,7 @@ def prepare_training_dataset(
     and raw data that already exist. It does not sample or convert.
 
     Uses ``vascular-segment-sampler``, which is installed with SeqSeg.
+    Sampler prompts are accepted automatically.
     """
     if preprocess_only:
         return _preprocess_existing_dataset(
@@ -820,7 +820,7 @@ def prepare_training_dataset(
                     else None
                 ),
                 truth_regenerate=truth_regenerate,
-                yes=yes,
+                yes=True,
                 verbose=verbose,
             )
         else:
@@ -844,7 +844,7 @@ def prepare_training_dataset(
                     else None
                 ),
                 truth_regenerate=truth_regenerate,
-                yes=yes,
+                yes=True,
                 verbose=verbose,
             )
         _assert_volumes_written(

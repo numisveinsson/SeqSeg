@@ -59,7 +59,6 @@ seqseg train prepare \
     --truth-from-surface \
     --truth-regenerate \
     --truth-target-spacing 0.8 0.8 0.8 \
-    --num-cores "$NUM_CORES" \
-    --yes
+    --num-cores "$NUM_CORES"
 
 date

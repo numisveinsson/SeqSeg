@@ -88,11 +88,11 @@ seqseg train prepare \
     --name MYDATA \
     --dataset-id 999 \
     --modality CT \
-    --config-name global \
+    --config-name default_mm \
     --num-cores 4
 ```
 
-`--config-name` here is the sampler YAML from vascular-segment-sampler (default `global`). It is a different file from the SeqSeg tracking config you pass to `seqseg run batch -config_name`.
+`--config-name` here is the sampler YAML from vascular-segment-sampler (default `default_mm`). It is a different file from the SeqSeg tracking config you pass to `seqseg run batch -config_name`.
 
 Or pass the raw directory yourself:
 
@@ -197,8 +197,7 @@ seqseg train prepare \
     --name MYDATA \
     --dataset-id 999 \
     --modality CT \
-    --global-volumes \
-    --yes
+    --global-volumes
 ```
 
 `--whole-volumes` is an alias for `--global-volumes`. Centerlines still decide which cases are included. `--num-cores` and `--max-samples` are ignored in this mode.
@@ -219,7 +218,7 @@ seqseg train prepare \
 ```
 
 - `--truth-from-surface` rasterizes `surfaces/` into `truths/` when needed
-- `--truth-regenerate` overwrites existing `truths/`
+- `--truth-regenerate` overwrites existing `truths/` (`--regenerate-truth` is the same flag)
 - `--truth-target-spacing SX SY SZ` is the spacing of the new truths and of the resampled images
 
 This requires `surfaces/` in the project. If `truths/` already exist and you only want resampling, resample images and labels before `seqseg train prepare` (the sampler command `change_img_resample` does this). These flags also apply with `--global-volumes`.
