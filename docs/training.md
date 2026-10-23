@@ -57,7 +57,7 @@ seqseg paths set \
   --data-dir /path/to/your_project
 ```
 
-`--outdir` on `seqseg paths` is where `seqseg run` writes results. `seqseg train prepare` writes temporary extracts to `<nnunet-root>/_seqseg_extracted` and removes that folder after linking them into `nnUNet_raw`.
+`--outdir` on `seqseg paths` is where `seqseg run` writes results. `seqseg train prepare` writes extracts to `nnUNet_raw/DatasetXXX_*/_seqseg_extracted`. After conversion it deletes the subvolumes and keeps `done.txt` plus the `.txt` and `.csv` metadata in that folder.
 
 To export the saved paths into the current shell:
 
@@ -105,7 +105,7 @@ seqseg train prepare \
     --modality CT
 ```
 
-Extracted patches (or whole volumes) are staged in `<parent of nnUNet_raw>/_seqseg_extracted`, hardlinked into `nnUNet_raw/DatasetXXX_*`, then deleted. Prepare then runs `nnUNetv2_plan_and_preprocess` for `3d_fullres`. `--dataset-number` and `-dataset_number` are aliases of `--dataset-id`.
+Extracted patches (or whole volumes) are staged in `nnUNet_raw/DatasetXXX_*/_seqseg_extracted` and hardlinked into that dataset's `imagesTr` and `labelsTr`. Prepare then deletes the subvolume folders and leaves `done.txt`, `info_*.txt`, and `*_Sample_stats.csv`. A later `seqseg train prepare` with the same dataset skips extraction when `done.txt` already lists every case, and skips conversion when the raw images are already there. It then runs `nnUNetv2_plan_and_preprocess` for `3d_fullres`. Prepare runs it through `python -m seqseg.pipeline.nnunet_cli`, which takes the same arguments and finds the training files in one listing of `imagesTr`. nnU-Net's own lookup searches that folder once per case, which takes hours with hundreds of thousands of patches. Do not list the files under `dataset` in `dataset.json` for this: nnU-Net sends dataset.json to every preprocessing job, and a long list slows preprocessing to about one case per second. `--dataset-number` and `-dataset_number` are aliases of `--dataset-id`.
 
 ### Dataset folder name
 
@@ -186,7 +186,7 @@ Skip these on a first training run.
 
 ### Keep the extracted patches
 
-`--keep-extracted` leaves `<nnunet-root>/_seqseg_extracted` in place. `--outdir` stages somewhere else and is kept (use it to resume with `--skip-sample`). `--outdir` is not deleted.
+`--keep-extracted` leaves the subvolumes in `nnUNet_raw/DatasetXXX_*/_seqseg_extracted`. `--outdir` stages somewhere else and is kept, including its subvolumes. `--outdir` is not deleted.
 
 ### Whole volumes
 
@@ -222,6 +222,16 @@ seqseg train prepare \
 - `--truth-target-spacing SX SY SZ` is the spacing of the new truths and of the resampled images
 
 This requires `surfaces/` in the project. If `truths/` already exist and you only want resampling, resample images and labels before `seqseg train prepare` (the sampler command `change_img_resample` does this). These flags also apply with `--global-volumes`.
+
+### Resume planning
+
+Conversion writes `nnUNet_raw` and then deletes the temporary extracts. If that step finished and planning did not, plan the raw dataset in place:
+
+```bash
+seqseg train prepare --dataset-id 999 --preprocess-only --num-cores 8
+```
+
+`--name` is optional. This does not extract or convert again. Once `nnUNetPlans.json` exists, the same flag only resamples `--configuration`.
 
 ### Train a 2d model from the same subvolumes
 

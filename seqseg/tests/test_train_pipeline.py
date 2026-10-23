@@ -784,12 +784,19 @@ def test_prepare_requires_nnunet_raw(tmp_path, monkeypatch):
             )
 
 
+def _managed_staging(raw: Path) -> Path:
+    return raw / "Dataset999_MYDATACT" / _STAGING_DIR_NAME
+
+
 def test_prepare_defaults_staging_and_removes_it(tmp_path, monkeypatch):
     monkeypatch.setenv("SEQSEG_PATHS_FILE", str(tmp_path / "no_paths.yaml"))
     monkeypatch.delenv("nnUNet_raw", raising=False)
     raw = tmp_path / "nn" / "nnUNet_raw"
-    staging = tmp_path / "nn" / _STAGING_DIR_NAME
+    staging = _managed_staging(raw)
     _make_patch_dirs(staging)
+    (staging / "done.txt").write_text("still-going\n")
+    (staging / "info_ct.txt").write_text("info\n")
+    (staging / "ct_train_Sample_stats.csv").write_text("a,b\n")
     extract = MagicMock()
     write = MagicMock(return_value=str(raw / "Dataset999_MYDATACT"))
 
@@ -806,14 +813,21 @@ def test_prepare_defaults_staging_and_removes_it(tmp_path, monkeypatch):
 
     outdir_arg = extract.call_args.kwargs["outdir"]
     assert os.path.basename(os.path.normpath(outdir_arg)) == _STAGING_DIR_NAME
+    assert (
+        os.path.basename(os.path.dirname(os.path.normpath(outdir_arg)))
+        == "Dataset999_MYDATACT"
+    )
     assert write.call_args.kwargs["outdir"] == str(raw)
     assert result.removed_staging is True
-    assert not staging.exists()
+    assert not (staging / "ct_train").exists()
+    assert (staging / "done.txt").read_text() == "still-going\n"
+    assert (staging / "info_ct.txt").is_file()
+    assert (staging / "ct_train_Sample_stats.csv").is_file()
 
 
 def test_prepare_keep_extracted_leaves_managed_staging(tmp_path):
     raw = tmp_path / "nn" / "nnUNet_raw"
-    staging = tmp_path / "nn" / _STAGING_DIR_NAME
+    staging = _managed_staging(raw)
     _make_patch_dirs(staging)
     extract = MagicMock()
     write = MagicMock(return_value=str(raw / "Dataset999_MYDATACT"))
@@ -836,7 +850,7 @@ def test_prepare_keep_extracted_leaves_managed_staging(tmp_path):
 
 def test_prepare_failed_convert_keeps_staging(tmp_path):
     raw = tmp_path / "nn" / "nnUNet_raw"
-    staging = tmp_path / "nn" / _STAGING_DIR_NAME
+    staging = _managed_staging(raw)
     _make_patch_dirs(staging)
     extract = MagicMock()
     write = MagicMock(side_effect=RuntimeError("convert failed"))
@@ -856,9 +870,75 @@ def test_prepare_failed_convert_keeps_staging(tmp_path):
     assert (staging / "ct_train" / "a.nrrd").is_file()
 
 
+def test_prepare_done_cases_skip_extraction_and_conversion(
+    tmp_path, _stub_nnunet_preprocess_runners
+):
+    plan, only = _stub_nnunet_preprocess_runners
+    raw = tmp_path / "nn" / "nnUNet_raw"
+    dataset = raw / "Dataset999_MYDATACT"
+    staging = _managed_staging(raw)
+    staging.mkdir(parents=True)
+    (staging / "done.txt").write_text("case1\n")
+    (staging / "info_ct.txt").write_text("info\n")
+    (dataset / "imagesTr").mkdir(parents=True)
+    (dataset / "labelsTr").mkdir()
+    (dataset / "imagesTr" / "a.nii.gz").write_bytes(b"x")
+    (dataset / "labelsTr" / "a.nii.gz").write_bytes(b"x")
+    extract = MagicMock()
+    write = MagicMock()
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ):
+        result = prepare_training_dataset(
+            _make_training_data(tmp_path),
+            name="MYDATA",
+            dataset_number=999,
+            nnunet_raw=str(raw),
+        )
+
+    extract.assert_not_called()
+    write.assert_not_called()
+    only.assert_not_called()
+    plan.assert_called_once()
+    assert result.dataset_names == ["Dataset999_MYDATACT"]
+    assert result.removed_staging is False
+    assert (staging / "done.txt").is_file()
+    assert (staging / "info_ct.txt").is_file()
+
+
+def test_prepare_done_cases_with_volumes_still_convert(tmp_path):
+    raw = tmp_path / "nn" / "nnUNet_raw"
+    staging = _managed_staging(raw)
+    _make_patch_dirs(staging)
+    (staging / "done.txt").write_text("case1\n")
+    (staging / "ct_train_Sample_stats.csv").write_text("a,b\n")
+    extract = MagicMock()
+    write = MagicMock(return_value=str(raw / "Dataset999_MYDATACT"))
+
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(extract, write),
+    ):
+        result = prepare_training_dataset(
+            _make_training_data(tmp_path),
+            name="MYDATA",
+            dataset_number=999,
+            nnunet_raw=str(raw),
+        )
+
+    extract.assert_not_called()
+    write.assert_called_once()
+    assert result.removed_staging is True
+    assert not (staging / "ct_train").exists()
+    assert (staging / "done.txt").read_text() == "case1\n"
+    assert (staging / "ct_train_Sample_stats.csv").is_file()
+
+
 def test_prepare_skip_convert_keeps_staging(tmp_path):
     raw = tmp_path / "nn" / "nnUNet_raw"
-    staging = tmp_path / "nn" / _STAGING_DIR_NAME
+    staging = _managed_staging(raw)
     write = MagicMock()
 
     with patch(
@@ -955,7 +1035,7 @@ def test_plan_and_preprocess_command_defaults():
     from seqseg.pipeline.train import _plan_and_preprocess_command
 
     cmd = _plan_and_preprocess_command(999, "3d_fullres", 4, "nnUNetPlans")
-    assert "nnUNetv2_plan_and_preprocess" in cmd[0]
+    assert cmd[1:4] == ["-m", "seqseg.pipeline.nnunet_cli", "plan_and_preprocess"]
     assert cmd[cmd.index("-d") + 1] == "999"
     assert cmd[cmd.index("-c") + 1] == "3d_fullres"
     assert cmd[cmd.index("-np") + 1] == "4"
@@ -975,14 +1055,16 @@ def test_preprocess_only_command():
     from seqseg.pipeline.train import _preprocess_only_command
 
     cmd = _preprocess_only_command(999, "2d", 8, "nnUNetPlans")
-    assert "nnUNetv2_preprocess" in cmd[0]
+    assert cmd[1:4] == ["-m", "seqseg.pipeline.nnunet_cli", "preprocess"]
     assert cmd[cmd.index("-d") + 1] == "999"
     assert cmd[cmd.index("-plans_name") + 1] == "nnUNetPlans"
     assert cmd[cmd.index("-c") + 1] == "2d"
     assert cmd[cmd.index("-np") + 1] == "8"
 
 
-def test_preprocess_only_does_not_sample(tmp_path, monkeypatch):
+def test_preprocess_only_does_not_sample(
+    tmp_path, monkeypatch, _stub_nnunet_preprocess_runners
+):
     raw = tmp_path / "nnUNet_raw" / "Dataset999_MYDATACT"
     pre = tmp_path / "nnUNet_preprocessed" / "Dataset999_MYDATACT"
     res = tmp_path / "nnUNet_results"
@@ -1003,6 +1085,7 @@ def test_preprocess_only_does_not_sample(tmp_path, monkeypatch):
         called["np"] = np
         called["plans"] = plans
 
+    plan, _only = _stub_nnunet_preprocess_runners
     monkeypatch.setattr("seqseg.pipeline.train._require_sampler", boom)
     monkeypatch.setattr(
         "seqseg.pipeline.train._run_nnunet_preprocess_only", capture
@@ -1021,9 +1104,12 @@ def test_preprocess_only_does_not_sample(tmp_path, monkeypatch):
     assert called["raw"] == str(raw.parent)
     assert result.preprocessed is True
     assert result.dataset_names == ["Dataset999_MYDATACT"]
+    plan.assert_not_called()
 
 
-def test_preprocess_only_missing_plans_tells_user_to_prepare(tmp_path, monkeypatch):
+def test_preprocess_only_missing_plans_plans_existing_raw(
+    tmp_path, monkeypatch, _stub_nnunet_preprocess_runners
+):
     raw = tmp_path / "nnUNet_raw" / "Dataset999_MYDATACT"
     pre = tmp_path / "nnUNet_preprocessed" / "Dataset999_MYDATACT"
     res = tmp_path / "nnUNet_results"
@@ -1031,11 +1117,69 @@ def test_preprocess_only_missing_plans_tells_user_to_prepare(tmp_path, monkeypat
     pre.mkdir(parents=True)
     res.mkdir()
     _isolate_nnunet_env(monkeypatch, raw.parent, pre.parent, res)
+    plan, only = _stub_nnunet_preprocess_runners
+
+    result = prepare_training_dataset(
+        dataset_number=999,
+        preprocess_only=True,
+        num_cores=8,
+        nnunet_raw=str(raw.parent),
+    )
+
+    only.assert_not_called()
+    plan.assert_called_once_with(
+        str(raw.parent),
+        [999],
+        configuration="3d_fullres",
+        np=8,
+        plans="nnUNetPlans",
+    )
+    assert result.preprocessed is True
+    assert result.dataset_names == ["Dataset999_MYDATACT"]
+
+
+def test_preprocess_only_missing_preprocessed_dir_plans_existing_raw(
+    tmp_path, monkeypatch, _stub_nnunet_preprocess_runners
+):
+    raw = tmp_path / "nnUNet_raw" / "Dataset002_CASXCT"
+    pre = tmp_path / "nnUNet_preprocessed"
+    res = tmp_path / "nnUNet_results"
+    raw.mkdir(parents=True)
+    pre.mkdir()
+    res.mkdir()
+    _isolate_nnunet_env(monkeypatch, raw.parent, pre, res)
+    plan, only = _stub_nnunet_preprocess_runners
+
+    result = prepare_training_dataset(
+        dataset_number=2,
+        preprocess_only=True,
+        nnunet_raw=str(raw.parent),
+    )
+
+    only.assert_not_called()
+    plan.assert_called_once_with(
+        str(raw.parent),
+        [2],
+        configuration="3d_fullres",
+        np=1,
+        plans="nnUNetPlans",
+    )
+    assert result.dataset_names == ["Dataset002_CASXCT"]
+
+
+def test_preprocess_only_missing_raw_tells_user_to_prepare(tmp_path, monkeypatch):
+    raw = tmp_path / "nnUNet_raw"
+    pre = tmp_path / "nnUNet_preprocessed"
+    res = tmp_path / "nnUNet_results"
+    raw.mkdir()
+    pre.mkdir()
+    res.mkdir()
+    _isolate_nnunet_env(monkeypatch, raw, pre, res)
     with pytest.raises(FileNotFoundError, match="seqseg train prepare"):
         prepare_training_dataset(
             dataset_number=999,
             preprocess_only=True,
-            nnunet_raw=str(raw.parent),
+            nnunet_raw=str(raw),
         )
 
 

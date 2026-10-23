@@ -605,7 +605,7 @@ def test_cmd_train_prepare_points_at_results(capsys, monkeypatch):
     )
     _cmd_train_prepare(ns)
     out = capsys.readouterr().out
-    assert "temporary folder was removed" in out
+    assert "subvolumes were removed" in out
     assert "/nn/nnUNet_results" in out
     assert "seqseg train nnunet --dataset-id 999" in out
 

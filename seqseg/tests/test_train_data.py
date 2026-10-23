@@ -73,8 +73,10 @@ def test_prepare_sample_case_preprocesses_extracted_patches(tmp_path, monkeypatc
     assert (pre_dir / "nnUNetPlans.json").is_file()
     assert (pre_dir / "nnUNetPlans_3d_fullres").is_dir()
     assert image.stat().st_mtime_ns == before
-    staging = tmp_path / "_seqseg_extracted"
-    assert not staging.exists()
+    staging = raw / DATASET_NAME / "_seqseg_extracted"
+    assert staging.is_dir()
+    assert not (staging / "ct_train").exists()
+    assert (staging / "done.txt").is_file()
 
     dispatch(
         [

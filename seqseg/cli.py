@@ -709,8 +709,9 @@ def _cmd_train_prepare(ns: argparse.Namespace) -> None:
         )
     elif result.removed_staging:
         print(
-            "  Extracted volumes were linked into nnU-Net raw and the "
-            "temporary folder was removed."
+            "  Extracted subvolumes were removed after conversion. "
+            "done.txt and the .txt/.csv metadata were kept in\n"
+            f"  {result.extracted_dir}"
         )
     else:
         kind = "Whole volumes" if ns.global_volumes else "Patches"
@@ -1061,8 +1062,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         type=str,
         help="Optional scratch directory for extracted patches or whole volumes. "
-        "Default: <parent of nnUNet_raw>/_seqseg_extracted, removed after "
-        "conversion. Pass this to keep extracts or resume with --skip-sample.",
+        "Default: nnUNet_raw/DatasetXXX_*/_seqseg_extracted. Subvolumes are "
+        "removed after conversion; done.txt and .txt/.csv metadata are kept. "
+        "Pass this to keep a copy elsewhere.",
     )
     p_prep.add_argument(
         "--name",
@@ -1156,7 +1158,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_prep.add_argument(
         "--keep-extracted",
         action="store_true",
-        help="Keep <nnunet-root>/_seqseg_extracted after conversion into nnUNet_raw",
+        help="Keep extracted subvolumes in nnUNet_raw/DatasetXXX_*/_seqseg_extracted "
+        "after conversion into nnUNet_raw",
     )
     p_prep.add_argument(
         "--configuration",
@@ -1179,8 +1182,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_prep.add_argument(
         "--preprocess-only",
         action="store_true",
-        help="Preprocess another configuration from an existing raw dataset "
-        "and plans file. Does not extract or convert subvolumes",
+        help="Use an existing nnUNet_raw dataset. Plans and preprocesses it "
+        "when plans are missing; otherwise resamples --configuration. "
+        "Does not extract or convert subvolumes",
     )
     p_prep.set_defaults(_handler=_cmd_train_prepare, img_ext=None)
 

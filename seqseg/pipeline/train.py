@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -613,11 +614,17 @@ def _prefer_hardlinks_for_nnunet_copy() -> Iterator[None]:
 def _resolve_training_dirs(
     outdir: Optional[str],
     nnunet_raw: Optional[str],
+    *,
+    name: str,
+    dataset_number: int,
+    modality: str,
 ) -> tuple[str, str, bool]:
     """Return ``(staging_dir, nnunet_raw, managed_staging)``.
 
-    Staging is ``<parent of nnUNet_raw>/_seqseg_extracted`` unless ``outdir``
+    Staging is ``nnUNet_raw/DatasetXXX_*/_seqseg_extracted`` unless ``outdir``
     was passed. A passed ``outdir`` is never treated as disposable.
+    ``modality`` is the first modality; a multi-modality prepare shares that
+    folder.
     """
     raw = nnunet_raw if nnunet_raw else resolve_path("nnunet_raw")
     if not raw:
@@ -631,7 +638,8 @@ def _resolve_training_dirs(
         staging = str(outdir)
         managed = False
     else:
-        staging = os.path.join(os.path.dirname(raw_abs), _STAGING_DIR_NAME)
+        dataset_name = expected_nnunet_dataset_name(name, dataset_number, modality)
+        staging = os.path.join(raw_abs, dataset_name, _STAGING_DIR_NAME)
         managed = True
     return _dir_for_sampler(staging), raw_abs, managed
 
@@ -647,6 +655,184 @@ def _staging_is_safe_to_remove(staging: str, raw: str) -> bool:
     except ValueError:
         return True
     return common != staging_norm
+
+
+def _read_done_cases(outdir: str) -> set[str]:
+    """Case names the sampler has already finished in this staging folder."""
+    path = os.path.join(os.path.normpath(outdir), "done.txt")
+    if not os.path.isfile(path):
+        return set()
+    with open(path, encoding="utf-8") as handle:
+        return {line.strip() for line in handle if line.strip()}
+
+
+def _local_training_cases(
+    data_dir: str,
+    img_ext: str,
+    *,
+    testing: bool,
+    test_cases: Sequence[str],
+) -> List[str]:
+    """Image/centerline stems, matching the sampler's ``other`` dataset list."""
+    images = Path(data_dir) / "images"
+    if testing:
+        img_stems = set(_stems_with_suffix(images, img_ext))
+        return sorted(case for case in test_cases if case in img_stems)
+    cent_stems = set(_stems_with_suffix(Path(data_dir) / "centerlines", ".vtp"))
+    held_out = set(test_cases)
+    return [
+        case
+        for case in _stems_with_suffix(images, img_ext)
+        if case in cent_stems and case not in held_out
+    ]
+
+
+def _select_cases(
+    cases: Sequence[str],
+    *,
+    perc_dataset: float,
+    start_from: int,
+    end_at: int,
+) -> List[str]:
+    """Apply the sampler's seeded shuffle, then perc and start/end slices."""
+    chosen = sorted(cases)
+    random.Random(42).shuffle(chosen)
+    chosen = chosen[: int(perc_dataset * len(chosen))]
+    if end_at != -1:
+        return chosen[start_from:end_at]
+    return chosen[start_from:]
+
+
+def _cases_this_run(
+    data_dir: str,
+    sampler_config: dict,
+    modality: str,
+    *,
+    img_ext: str,
+    perc_dataset: float,
+    start_from: int,
+    end_at: int,
+    testing: bool,
+) -> List[str]:
+    dataset_name = str(sampler_config.get("DATASET_NAME") or "other")
+    test_cases = list(sampler_config.get("TEST_CASES") or [])
+    if dataset_name == "vmr":
+        from vascular_segment_sampler.datasets import create_dataset
+
+        cfg = dict(sampler_config)
+        cfg["DATA_DIR"] = data_dir
+        cfg["IMG_EXT"] = img_ext
+        cfg.setdefault("TESTING", testing)
+        cfg.setdefault("TEST_CASES", [])
+        cfg.setdefault("BAD_CASES", [])
+        cases = list(create_dataset(cfg, modality))
+    else:
+        cases = _local_training_cases(
+            data_dir,
+            img_ext,
+            testing=testing,
+            test_cases=test_cases,
+        )
+    return _select_cases(
+        cases,
+        perc_dataset=perc_dataset,
+        start_from=start_from,
+        end_at=end_at,
+    )
+
+
+def _extraction_already_complete(
+    outdir: str,
+    data_dir: str,
+    sampler_config: dict,
+    modalities: Sequence[str],
+    *,
+    img_ext: str,
+    perc_dataset: float,
+    start_from: int,
+    end_at: int,
+    testing: bool,
+) -> bool:
+    """True when ``done.txt`` already lists every case this run would sample."""
+    done = _read_done_cases(outdir)
+    if not done:
+        return False
+    for mod in modalities:
+        selected = _cases_this_run(
+            data_dir,
+            sampler_config,
+            mod,
+            img_ext=img_ext,
+            perc_dataset=perc_dataset,
+            start_from=start_from,
+            end_at=end_at,
+            testing=testing,
+        )
+        if not selected or any(case not in done for case in selected):
+            return False
+    return True
+
+
+def _staging_has_volumes(outdir: str, modalities: Sequence[str]) -> bool:
+    root = os.path.normpath(outdir)
+    for mod in modalities:
+        kind = mod.lower()
+        for split in ("train", "val", "test"):
+            if _count_volume_files(os.path.join(root, f"{kind}_{split}")):
+                return True
+            if _count_volume_files(os.path.join(root, f"{kind}_{split}_masks")):
+                return True
+    return False
+
+
+def _raw_dataset_has_volumes(
+    nnunet_raw: str,
+    name: str,
+    dataset_number: int,
+    modalities: Sequence[str],
+) -> bool:
+    for i, mod in enumerate(modalities):
+        dataset = os.path.join(
+            nnunet_raw,
+            expected_nnunet_dataset_name(name, dataset_number + i, mod),
+        )
+        if _count_volume_files(os.path.join(dataset, "imagesTr")) == 0:
+            return False
+        if _count_volume_files(os.path.join(dataset, "labelsTr")) == 0:
+            return False
+    return True
+
+
+def _existing_dataset_records(
+    nnunet_raw: str,
+    name: str,
+    dataset_number: int,
+    modalities: Sequence[str],
+) -> tuple[List[str], List[str]]:
+    dirs: List[str] = []
+    names: List[str] = []
+    for i, mod in enumerate(modalities):
+        ds_name = expected_nnunet_dataset_name(name, dataset_number + i, mod)
+        dirs.append(os.path.abspath(os.path.join(nnunet_raw, ds_name)))
+        names.append(ds_name)
+    return dirs, names
+
+
+def _prune_extracted_volumes(staging: str) -> None:
+    """Delete subvolume directories and leave ``.txt`` / ``.csv`` metadata."""
+    root = os.path.normpath(staging)
+    if not os.path.isdir(root):
+        return
+    for name in os.listdir(root):
+        path = os.path.join(root, name)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        elif _volume_ext_of(name):
+            os.remove(path)
+    print(
+        f"Removed extracted subvolumes at {root}; "
+        "kept .txt and .csv metadata."
+    )
 
 
 def expected_nnunet_dataset_name(name: str, dataset_number: int, modality: str) -> str:
@@ -730,14 +916,20 @@ def prepare_training_dataset(
     By default extracts SeqSeg-style patches. With ``global_volumes=True``,
     copies each case's full image and label instead (``gather_global_volumes``).
 
-    Extracted files are written under ``<parent of nnUNet_raw>/_seqseg_extracted``
-    unless ``outdir`` is set, then hardlinked into ``nnUNet_raw``. That temporary
-    folder is removed after a successful conversion unless ``keep_extracted``
-    is set or ``outdir`` was passed explicitly. ``nnUNetv2_plan_and_preprocess``
+    Extracted files are written under
+    ``nnUNet_raw/DatasetXXX_*/_seqseg_extracted`` unless ``outdir`` is set,
+    then hardlinked into ``nnUNet_raw``. After a successful conversion the
+    subvolume directories are deleted and ``done.txt`` plus ``.txt`` / ``.csv``
+    metadata stay, unless ``keep_extracted`` is set or ``outdir`` was passed
+    explicitly. A later run skips extraction when ``done.txt`` already lists
+    every case, and skips conversion when those subvolumes are already gone
+    and ``imagesTr`` / ``labelsTr`` exist. ``nnUNetv2_plan_and_preprocess``
     then runs for ``configuration`` (default ``3d_fullres``).
 
-    ``preprocess_only=True`` resamples an additional configuration from plans
-    and raw data that already exist. It does not sample or convert.
+    ``preprocess_only=True`` uses the dataset already in ``nnUNet_raw``. It
+    does not sample or convert. When the plans file is missing it runs
+    ``nnUNetv2_plan_and_preprocess``. When that file exists it resamples
+    ``configuration`` with ``nnUNetv2_preprocess``.
 
     Uses ``vascular-segment-sampler``, which is installed with SeqSeg.
     Sampler prompts are accepted automatically.
@@ -772,14 +964,61 @@ def prepare_training_dataset(
     sampler_config["IMG_EXT"] = resolved_img_ext
     max_samples = _cap_from_sampler_config(sampler_config, max_samples)
 
-    outdir, nnunet_raw, managed_staging = _resolve_training_dirs(outdir, nnunet_raw)
+    modalities = _parse_modalities(modality)
+    modality_arg = ",".join(modalities)
+    outdir, nnunet_raw, managed_staging = _resolve_training_dirs(
+        outdir,
+        nnunet_raw,
+        name=name,
+        dataset_number=dataset_number,
+        modality=modalities[0],
+    )
     os.makedirs(outdir, exist_ok=True)
     ensure_nnunet_dirs({"nnunet_raw": nnunet_raw})
 
-    modalities = _parse_modalities(modality)
-    modality_arg = ",".join(modalities)
-
+    extraction_complete = False
     if not skip_sample:
+        extraction_complete = _extraction_already_complete(
+            outdir,
+            data_dir,
+            sampler_config,
+            modalities,
+            img_ext=resolved_img_ext,
+            perc_dataset=perc_dataset,
+            start_from=start_from,
+            end_at=end_at,
+            testing=testing,
+        )
+    volumes_present = _staging_has_volumes(outdir, modalities)
+    reuse_converted = extraction_complete and not volumes_present
+
+    if skip_sample:
+        print(
+            "Skipping volume gathering (--skip-sample)"
+            if global_volumes
+            else "Skipping patch extraction (--skip-sample)"
+        )
+    elif reuse_converted:
+        if not _raw_dataset_has_volumes(
+            nnunet_raw, name, dataset_number, modalities
+        ):
+            raise RuntimeError(
+                "done.txt lists every case for this run, and the extracted "
+                "subvolumes are already gone. nnUNet_raw is missing "
+                "imagesTr/labelsTr volumes.\n"
+                f"  staging: {os.path.normpath(outdir)}\n"
+                "Delete done.txt in that folder and run prepare again to extract."
+            )
+        print(
+            "All cases are listed in done.txt and nnUNet_raw already has "
+            "the volumes. Skipping extraction and conversion."
+        )
+    elif extraction_complete:
+        print(
+            "All cases are listed in done.txt. Skipping extraction; "
+            "converting volumes still in the staging folder."
+        )
+    else:
         _preflight_training_data(
             data_dir,
             img_ext=resolved_img_ext,
@@ -797,7 +1036,10 @@ def prepare_training_dataset(
         if max_samples is not None and not global_volumes:
             print(f"  max_samples: {max_samples}")
         if managed_staging and not keep_extracted:
-            print("  (temporary; removed after conversion into nnUNet_raw)")
+            print(
+                "  (subvolumes removed after conversion; "
+                ".txt and .csv metadata kept)"
+            )
         print(f"  IMG_EXT:  {resolved_img_ext}")
         print("=" * 72)
         if global_volumes:
@@ -850,18 +1092,18 @@ def prepare_training_dataset(
         _assert_volumes_written(
             outdir, modalities, global_volumes=global_volumes
         )
-    else:
-        print(
-            "Skipping volume gathering (--skip-sample)"
-            if global_volumes
-            else "Skipping patch extraction (--skip-sample)"
-        )
 
     dataset_dirs: List[str] = []
     dataset_names: List[str] = []
     removed_staging = False
 
-    if not skip_convert:
+    if skip_convert:
+        print("Skipping nnU-Net conversion (--skip-convert)")
+    elif reuse_converted:
+        dataset_dirs, dataset_names = _existing_dataset_records(
+            nnunet_raw, name, dataset_number, modalities
+        )
+    else:
         os.makedirs(nnunet_raw, exist_ok=True)
 
         print("=" * 72)
@@ -892,16 +1134,13 @@ def prepare_training_dataset(
         if managed_staging and not keep_extracted:
             staging_path = os.path.normpath(outdir)
             if _staging_is_safe_to_remove(staging_path, nnunet_raw):
-                shutil.rmtree(staging_path)
+                _prune_extracted_volumes(staging_path)
                 removed_staging = True
-                print(f"Removed temporary extracts at {staging_path}")
             else:
                 print(
                     f"Keeping extracts at {staging_path}; "
                     "removing them would also remove nnUNet_raw."
                 )
-    else:
-        print("Skipping nnU-Net conversion (--skip-convert)")
 
     preprocessed = False
     if not skip_convert:
@@ -953,7 +1192,7 @@ def _nnunet_env_or_raise() -> dict:
 def _resolve_nnunet_cli(exe: str) -> str:
     """Prefer PATH, then the directory that contains the running Python.
 
-    A venv installs ``nnUNetv2_plan_and_preprocess`` next to ``python`` even
+    A venv installs ``nnUNetv2_train`` next to ``python`` even
     when that bin directory is not on ``PATH``.
     """
     found = shutil.which(exe)
@@ -1032,19 +1271,23 @@ def _one_dataset_dir(root: str, dataset_id: int, label: str) -> str:
     return matches[0]
 
 
+_NNUNET_CLI = (sys.executable, "-m", "seqseg.pipeline.nnunet_cli")
+
+
 def _plan_and_preprocess_command(
     dataset_id: int,
     configuration: str,
     np: int,
     plans: str,
 ) -> List[str]:
-    """``nnUNetv2_plan_and_preprocess`` argv.
+    """``nnUNetv2_plan_and_preprocess`` argv, through ``seqseg.pipeline.nnunet_cli``.
 
     ``plans`` is the plans file name (training ``-p``), not the planner class.
     The default name ``nnUNetPlans`` is nnU-Net's own default, so it is omitted.
     """
     cmd = [
-        _resolve_nnunet_cli("nnUNetv2_plan_and_preprocess"),
+        *_NNUNET_CLI,
+        "plan_and_preprocess",
         "-d",
         str(dataset_id),
         "-c",
@@ -1065,7 +1308,8 @@ def _preprocess_only_command(
 ) -> List[str]:
     """``nnUNetv2_preprocess`` argv for one configuration of existing plans."""
     return [
-        _resolve_nnunet_cli("nnUNetv2_preprocess"),
+        *_NNUNET_CLI,
+        "preprocess",
         "-d",
         str(dataset_id),
         "-plans_name",
@@ -1141,10 +1385,12 @@ def _preprocess_existing_dataset(
     num_cores: int,
     nnunet_raw: Optional[str],
 ) -> PrepareResult:
-    """Preprocess ``configuration`` using raw data and plans from an earlier prepare.
+    """Plan or preprocess ``configuration`` from an existing raw dataset.
 
     Returns before the sampler is imported. Patch extraction and conversion
-    do not run, and ``_seqseg_extracted`` is not required.
+    do not run, and ``_seqseg_extracted`` is not required. A missing plans
+    file runs ``nnUNetv2_plan_and_preprocess``. An existing plans file
+    resamples ``configuration`` with ``nnUNetv2_preprocess``.
     """
     raw_root = _resolve_nnunet_raw(nnunet_raw)
     prepare_hint = (
@@ -1156,25 +1402,38 @@ def _preprocess_existing_dataset(
     except FileNotFoundError as exc:
         raise FileNotFoundError(f"{exc}\n{prepare_hint}") from exc
     env = _nnunet_env_for_raw(raw_root)
-    try:
-        pre_dir = _one_dataset_dir(
-            env["nnUNet_preprocessed"], dataset_number, "nnUNet_preprocessed"
-        )
-    except FileNotFoundError as exc:
-        raise FileNotFoundError(f"{exc}\n{prepare_hint}") from exc
-    plans_file = os.path.join(pre_dir, f"{plans}.json")
-    if not os.path.isfile(plans_file):
-        raise FileNotFoundError(
-            f"No plans file at {plans_file}.\n{prepare_hint}"
+    pre_root = env.get("nnUNet_preprocessed") or ""
+    pre_matches = _dataset_dirs_matching_id(pre_root, dataset_number)
+    if len(pre_matches) > 1:
+        names = ", ".join(os.path.basename(path) for path in pre_matches)
+        raise RuntimeError(
+            f"Multiple nnUNet_preprocessed folders match dataset id "
+            f"{dataset_number}: {names}"
         )
     workers = num_cores if np is None else np
-    _run_nnunet_preprocess_only(
-        raw_root,
-        dataset_number,
-        configuration=configuration,
-        np=workers,
-        plans=plans,
+    plans_file = (
+        os.path.join(pre_matches[0], f"{plans}.json") if pre_matches else ""
     )
+    if plans_file and os.path.isfile(plans_file):
+        _run_nnunet_preprocess_only(
+            raw_root,
+            dataset_number,
+            configuration=configuration,
+            np=workers,
+            plans=plans,
+        )
+    else:
+        print(
+            "No plans file for this dataset. "
+            "Planning and preprocessing the existing raw dataset."
+        )
+        _run_nnunet_plan_and_preprocess(
+            raw_root,
+            [dataset_number],
+            configuration=configuration,
+            np=workers,
+            plans=plans,
+        )
     dataset_name = os.path.basename(raw_dir)
     return PrepareResult(
         extracted_dir=raw_dir,
