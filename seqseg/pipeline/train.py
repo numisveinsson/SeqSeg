@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import random
 import shutil
@@ -1495,12 +1496,44 @@ def _require_continue_checkpoint(
         )
 
 
+def _configuration_n_stages(plans_file: str, configuration: str) -> Optional[int]:
+    """Number of encoder stages nnU-Net planned for ``configuration``."""
+    if not os.path.isfile(plans_file):
+        return None
+    with open(plans_file, "r", encoding="utf-8") as f:
+        configurations = json.load(f).get("configurations", {})
+    merged: dict = {}
+    name: Optional[str] = configuration
+    while name is not None and name in configurations:
+        merged = {**configurations[name], **merged}
+        name = configurations[name].get("inherits_from")
+    n_stages = merged.get("architecture", {}).get("arch_kwargs", {}).get("n_stages")
+    if n_stages is None and "pool_op_kernel_sizes" in merged:
+        n_stages = len(merged["pool_op_kernel_sizes"])
+    return n_stages
+
+
+def default_training_trainer(
+    preprocessed_dir: str, plans: str, configuration: str
+) -> str:
+    """``nnUNetTrainer``, or ``nnUNetTrainerNoDeepSupervision`` for shallow plans.
+
+    With two stages or fewer, nnU-Net's deep supervision zeroes the weight
+    of its only output and then normalizes by that zero, so every loss is NaN.
+    """
+    plans_file = os.path.join(preprocessed_dir, f"{plans}.json")
+    n_stages = _configuration_n_stages(plans_file, configuration)
+    if n_stages is not None and n_stages <= 2:
+        return "nnUNetTrainerNoDeepSupervision"
+    return "nnUNetTrainer"
+
+
 def run_nnunet_training(
     dataset_id: int,
     *,
     configuration: str = "3d_fullres",
     fold: str = "0",
-    trainer: str = "nnUNetTrainer",
+    trainer: Optional[str] = None,
     plans: str = "nnUNetPlans",
     cleanup: bool = False,
     continue_training: bool = False,
@@ -1523,9 +1556,18 @@ def run_nnunet_training(
     folders under ``nnUNet_raw`` and ``nnUNet_preprocessed``. ``nnUNet_results``
     is kept. Cleanup is skipped when training fails. Cleanup removes the
     preprocessed data a later ``--c`` run would need.
+
+    Without ``trainer``, ``default_training_trainer`` picks it from the plans.
     """
     env = _nnunet_env_or_raise()
-    _require_preprocessed_dataset(env, dataset_id)
+    preprocessed_dir = _require_preprocessed_dataset(env, dataset_id)
+    if trainer is None:
+        trainer = default_training_trainer(preprocessed_dir, plans, configuration)
+        if trainer != "nnUNetTrainer":
+            print(
+                f"The {configuration} plan downsamples at most once, so deep "
+                f"supervision would make the loss NaN. Training with {trainer}."
+            )
     if continue_training and str(fold) != "all":
         _require_continue_checkpoint(
             env,

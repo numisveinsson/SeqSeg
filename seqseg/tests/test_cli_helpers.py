@@ -14,8 +14,10 @@ from seqseg.cli import (
     _cmd_train_nnunet,
     _cmd_train_prepare,
     _inject_legacy_run_batch,
+    _resolve_run_weights,
     dispatch,
 )
+from seqseg.config_models import NnUNetModelSpec, resolve_nnunet_model_folder
 from seqseg.pipeline.train import (
     PrepareResult,
     TrainDependencyError,
@@ -103,6 +105,50 @@ def test_parser_run_batch_cpu_flag():
         ]
     )
     assert ns_off.force_cpu is False
+
+
+def test_resolve_model_folder_finds_the_trainer_for_the_configuration(tmp_path):
+    root = tmp_path / "Dataset002_CASXCT"
+    full = root / "nnUNetTrainerNoDeepSupervision__nnUNetPlans__3d_fullres"
+    two_d = root / "nnUNetTrainer__nnUNetPlans__2d"
+    full.mkdir(parents=True)
+    two_d.mkdir()
+    (root / "dataset.json").write_text("{}")
+    spec = NnUNetModelSpec(
+        train_dataset="Dataset002_CASXCT",
+        results_path=str(tmp_path),
+    )
+    assert resolve_nnunet_model_folder(spec) == str(full)
+    assert _resolve_run_weights(spec) == str(full)
+    spec_2d = NnUNetModelSpec(
+        train_dataset="Dataset002_CASXCT",
+        nnunet_type="2d",
+        results_path=str(tmp_path),
+    )
+    assert resolve_nnunet_model_folder(spec_2d) == str(two_d)
+
+
+def test_resolve_model_folder_without_weights_returns_default_path(tmp_path):
+    spec = NnUNetModelSpec(
+        train_dataset="Dataset002_CASXCT",
+        results_path=str(tmp_path),
+    )
+    assert resolve_nnunet_model_folder(spec) == spec.model_folder()
+
+
+def test_resolve_model_folder_with_several_trainers_exits(tmp_path, capsys):
+    root = tmp_path / "Dataset002_CASXCT"
+    (root / "nnUNetTrainer__nnUNetPlans__3d_fullres").mkdir(parents=True)
+    (root / "nnUNetTrainerNoDeepSupervision__nnUNetPlans__3d_fullres").mkdir()
+    spec = NnUNetModelSpec(
+        train_dataset="Dataset002_CASXCT",
+        results_path=str(tmp_path),
+    )
+    with pytest.raises(ValueError, match="move the others"):
+        resolve_nnunet_model_folder(spec)
+    with pytest.raises(SystemExit):
+        _resolve_run_weights(spec)
+    assert "Several 3d_fullres trainer folders" in capsys.readouterr().err
 
 
 def test_parser_run_batch_start_seg():
@@ -543,7 +589,7 @@ def test_cmd_train_nnunet_resolves_name(monkeypatch):
         dataset_name="Dataset999_MYDATACT",
         configuration="3d_fullres",
         fold="0",
-        trainer="nnUNetTrainer",
+        trainer=None,
         plans="nnUNetPlans",
         cleanup=False,
         continue_training=True,

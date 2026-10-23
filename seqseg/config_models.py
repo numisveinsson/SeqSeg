@@ -70,6 +70,48 @@ class NnUNetModelSpec:
         return rel
 
 
+def trainer_folders_for_configuration(
+    dataset_dir: str, configuration: str
+) -> list[str]:
+    """Trainer folders ``<Trainer>__<Plans>__<configuration>`` under a dataset."""
+    if not os.path.isdir(dataset_dir):
+        return []
+    found = []
+    for name in sorted(os.listdir(dataset_dir)):
+        parts = name.split("__")
+        if len(parts) != 3 or parts[2] != configuration:
+            continue
+        path = os.path.join(dataset_dir, name)
+        if os.path.isdir(path):
+            found.append(path)
+    return found
+
+
+def resolve_nnunet_model_folder(spec: NnUNetModelSpec) -> str:
+    """Return the trainer folder ``seqseg run`` should load.
+
+    The dataset under ``results_path`` is searched for the trainer folder of
+    ``nnunet_type``, whatever trainer and plans wrote it. When none is found
+    the default ``nnUNetTrainer`` path is returned. More than one raises
+    ``ValueError``.
+    """
+    if spec.results_path is None:
+        return spec.model_folder()
+    dataset_dir = os.path.join(spec.results_path, spec.train_dataset)
+    found = trainer_folders_for_configuration(dataset_dir, spec.nnunet_type)
+    if not found:
+        return spec.model_folder()
+    if len(found) > 1:
+        names = "\n  ".join(os.path.basename(path) for path in found)
+        raise ValueError(
+            f"Several {spec.nnunet_type} trainer folders under {dataset_dir}:\n"
+            f"  {names}\n"
+            "Keep one trainer folder per configuration; move the others out "
+            "of this dataset folder."
+        )
+    return found[0]
+
+
 @dataclass(frozen=True)
 class TracingLimits:
     max_n_steps: int = 1000

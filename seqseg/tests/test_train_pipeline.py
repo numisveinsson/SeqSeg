@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import json
 import os
 import shutil
 import subprocess
@@ -30,6 +31,7 @@ from seqseg.pipeline.train import (
     _safe_add_local_stats,
     _staging_is_safe_to_remove,
     dataset_id_from_name,
+    default_training_trainer,
     expected_nnunet_dataset_name,
     prepare_training_dataset,
     run_nnunet_training,
@@ -637,6 +639,69 @@ def test_run_nnunet_training_passes_detected_device(tmp_path, monkeypatch):
     assert "nnUNetv2_plan_and_preprocess" not in train_cmd[0]
     assert "--c" not in train_cmd
     assert train_cmd[train_cmd.index("-device") + 1] == "mps"
+
+
+def _write_plans(pre_dir, n_stages):
+    plans = {
+        "configurations": {
+            "3d_fullres": {
+                "architecture": {"arch_kwargs": {"n_stages": n_stages}},
+            },
+            "3d_cascade_fullres": {"inherits_from": "3d_fullres"},
+        }
+    }
+    (pre_dir / "nnUNetPlans.json").write_text(json.dumps(plans))
+
+
+@pytest.mark.parametrize(
+    ("n_stages", "configuration", "expected"),
+    [
+        (2, "3d_fullres", "nnUNetTrainerNoDeepSupervision"),
+        (2, "3d_cascade_fullres", "nnUNetTrainerNoDeepSupervision"),
+        (5, "3d_fullres", "nnUNetTrainer"),
+        (2, "2d", "nnUNetTrainer"),
+    ],
+)
+def test_default_training_trainer(tmp_path, n_stages, configuration, expected):
+    _write_plans(tmp_path, n_stages)
+    assert (
+        default_training_trainer(str(tmp_path), "nnUNetPlans", configuration)
+        == expected
+    )
+
+
+def test_default_training_trainer_without_plans(tmp_path):
+    assert (
+        default_training_trainer(str(tmp_path), "nnUNetPlans", "3d_fullres")
+        == "nnUNetTrainer"
+    )
+
+
+@pytest.mark.parametrize(
+    ("trainer", "expected"),
+    [
+        (None, "nnUNetTrainerNoDeepSupervision"),
+        ("nnUNetTrainer", "nnUNetTrainer"),
+    ],
+)
+def test_run_nnunet_training_picks_trainer_from_plans(
+    tmp_path, monkeypatch, trainer, expected
+):
+    raw = tmp_path / "nnUNet_raw"
+    pre = tmp_path / "nnUNet_preprocessed" / "Dataset002_CASXCT"
+    res = tmp_path / "nnUNet_results"
+    pre.mkdir(parents=True)
+    raw.mkdir()
+    res.mkdir()
+    _write_plans(pre, 2)
+    _isolate_nnunet_env(monkeypatch, raw, pre.parent, res)
+    monkeypatch.setattr(
+        "seqseg.pipeline.train.select_training_device", lambda: "cpu"
+    )
+    with patch("seqseg.pipeline.train.subprocess.run") as run:
+        run_nnunet_training(2, fold="0", trainer=trainer)
+    train_cmd = run.call_args[0][0]
+    assert train_cmd[train_cmd.index("-tr") + 1] == expected
 
 
 def test_run_nnunet_training_requires_preprocessed_data(tmp_path, monkeypatch):

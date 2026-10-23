@@ -136,6 +136,8 @@ seqseg train nnunet --dataset-id 999 --fold 0
 
 This only trains. Preprocessing already ran in `seqseg train prepare`. The default configuration is `3d_fullres`.
 
+The trainer is chosen from the plans. Small patches can produce a plan that downsamples at most once (`n_stages` of 2 or fewer). nnU-Net's deep supervision makes every loss NaN on such a plan, so `seqseg train nnunet` trains it with `nnUNetTrainerNoDeepSupervision` and prints that it did. Other plans use `nnUNetTrainer`. `--trainer` overrides the choice.
+
 The same training step, run by hand:
 
 ```bash
@@ -163,6 +165,8 @@ seqseg run batch \
     -img_ext .nrrd \
     -config_name global
 ```
+
+`seqseg run` loads the trainer folder `<Trainer>__<Plans>__<configuration>` under that dataset whose configuration matches `-nnunet_type`, whatever the trainer is called. Keep one trainer folder per configuration: if the dataset has more than one, `seqseg run` stops and lists them, and you move the extra ones out of the dataset folder. `seqseg run single --model-folder` is the full trainer directory, so it loads whatever path you give it.
 
 Or pass paths on the command:
 

@@ -16,7 +16,12 @@ import faulthandler
 import numpy as np
 
 from seqseg.citations import print_citation_banner
-from seqseg.config_models import AlgorithmConfig, NnUNetModelSpec, load_yaml_config
+from seqseg.config_models import (
+    AlgorithmConfig,
+    NnUNetModelSpec,
+    load_yaml_config,
+    resolve_nnunet_model_folder,
+)
 from seqseg.modules import sitk_functions as sf
 from seqseg.modules.datasets import get_testing_samples
 from seqseg.pipeline.classic import run_classic_batch
@@ -244,6 +249,15 @@ def _validate_trace_batch(ns: argparse.Namespace) -> None:
         ns.start_seg = start_seg
 
 
+def _resolve_run_weights(spec: NnUNetModelSpec) -> str:
+    """Pick the trainer folder, or exit when the dataset has several."""
+    try:
+        return resolve_nnunet_model_folder(spec)
+    except ValueError as e:
+        print(f"seqseg: {e}", file=sys.stderr)
+        sys.exit(2)
+
+
 def _cmd_trace_batch(ns: argparse.Namespace) -> None:
     _validate_trace_batch(ns)
     faulthandler.enable()
@@ -265,7 +279,8 @@ def _cmd_trace_batch(ns: argparse.Namespace) -> None:
         fold=ns.fold,
         scale=ns.scale,
     )
-    dir_model_weights = spec.model_folder()
+    dir_model_weights = _resolve_run_weights(spec)
+    print(f"Using nnU-Net weights from:\n  {dir_model_weights}")
 
     testing_samples, directory_data = get_testing_samples(ns.train_dataset, data_dir)
     print("Testing samples about to run:")
@@ -328,20 +343,24 @@ def _cmd_trace_plus_batch(ns: argparse.Namespace) -> None:
     except Exception as e:  # noqa: BLE001
         print(e)
 
-    dir_model_weights_seqseg = NnUNetModelSpec(
-        train_dataset=ns.seqseg_train_dataset,
-        nnunet_type=ns.seqseg_test_name,
-        results_path=ns.nnunet_results_path,
-        fold=ns.seqseg_fold,
-        scale=ns.seqseg_scale,
-    ).model_folder()
-    dir_model_weights_global = NnUNetModelSpec(
-        train_dataset=ns.global_train_dataset,
-        nnunet_type=ns.global_test_name,
-        results_path=ns.nnunet_results_path,
-        fold=ns.global_fold,
-        scale=ns.global_scale,
-    ).model_folder()
+    dir_model_weights_seqseg = _resolve_run_weights(
+        NnUNetModelSpec(
+            train_dataset=ns.seqseg_train_dataset,
+            nnunet_type=ns.seqseg_test_name,
+            results_path=ns.nnunet_results_path,
+            fold=ns.seqseg_fold,
+            scale=ns.seqseg_scale,
+        )
+    )
+    dir_model_weights_global = _resolve_run_weights(
+        NnUNetModelSpec(
+            train_dataset=ns.global_train_dataset,
+            nnunet_type=ns.global_test_name,
+            results_path=ns.nnunet_results_path,
+            fold=ns.global_fold,
+            scale=ns.global_scale,
+        )
+    )
     print("Using nnUNet model weights from:")
     print(dir_model_weights_seqseg)
     print("Using nnUNet model weights for global segmentation from:")
@@ -1224,7 +1243,13 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Continue training from checkpoint_latest.pth (nnU-Net --c)",
     )
-    p_nn.add_argument("--trainer", default="nnUNetTrainer", type=str)
+    p_nn.add_argument(
+        "--trainer",
+        default=None,
+        type=str,
+        help="nnU-Net trainer class. Default: nnUNetTrainer, or "
+        "nnUNetTrainerNoDeepSupervision when the plan downsamples at most once",
+    )
     p_nn.add_argument("--plans", default="nnUNetPlans", type=str)
     p_nn.add_argument(
         "--cleanup",
