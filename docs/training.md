@@ -222,7 +222,7 @@ seqseg train prepare \
 ```
 
 - `--truth-from-surface` rasterizes `surfaces/` into `truths/` when needed
-- `--truth-regenerate` overwrites existing `truths/` (`--regenerate-truth` is the same flag)
+- `--truth-regenerate` overwrites existing `truths/`
 - `--truth-target-spacing SX SY SZ` is the spacing of the new truths and of the resampled images
 
 This requires `surfaces/` in the project. If `truths/` already exist and you only want resampling, resample images and labels before `seqseg train prepare` (the sampler command `change_img_resample` does this). These flags also apply with `--global-volumes`.

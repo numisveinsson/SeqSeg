@@ -476,21 +476,9 @@ def test_parser_train_prepare_global_volumes():
     assert ns_alias.global_volumes is True
 
 
-def test_parser_train_prepare_regenerate_truth_alias():
+def test_parser_train_prepare_truth_regenerate():
     parser = _build_parser()
     ns = parser.parse_args(
-        [
-            "train",
-            "prepare",
-            "--name",
-            "MYDATA",
-            "--dataset-id",
-            "999",
-            "--regenerate-truth",
-        ]
-    )
-    assert ns.truth_regenerate is True
-    canonical = parser.parse_args(
         [
             "train",
             "prepare",
@@ -501,7 +489,19 @@ def test_parser_train_prepare_regenerate_truth_alias():
             "--truth-regenerate",
         ]
     )
-    assert canonical.truth_regenerate is True
+    assert ns.truth_regenerate is True
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "train",
+                "prepare",
+                "--name",
+                "MYDATA",
+                "--dataset-id",
+                "999",
+                "--regenerate-truth",
+            ]
+        )
 
 
 def test_parser_paths_init():
