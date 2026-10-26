@@ -1,0 +1,46 @@
+# SeqSeg sampler default for millimeter data. Base for every named sampler config.
+# Adapted from vascular-segment-sampler 0.7.0 config/default_mm.yaml, keeping only
+# the keys the sampler requires for `seqseg train prepare`.
+# Image, truth, surface, and centerline must all be in mm.
+# For centimeter data (VMR), use --config-name default_cm.
+#
+# The optional outputs below are off. Turning one on in your own YAML also needs
+# its companion keys, e.g. RESAMPLE_SIZE with RESAMPLE_VOLUMES, OUTLET_CLASSES
+# with WRITE_SURFACE/WRITE_CENTERLINE, N_SLICES and RESAMPLE_CROSS_IMG with
+# WRITE_TRAJECTORIES/WRITE_CROSS_SECTIONAL.
+
+DATASET_NAME: 'other'
+
+EXTRACT_VOLUMES: True
+WRITE_SAMPLES: True
+WRITE_IMG: True
+BINARIZE: True
+REMOVE_OTHER: True # Remove other unconnected vessels in gt volume, can cause problems where vessels are close
+ROTATE_VOLUMES: False
+RESAMPLE_VOLUMES: False
+CAPFREE: False # whether to require a certain amount of cap-free volume
+CAPFREE_PROP: 0.0 # how much of volume must be cap free, per sidelength
+
+WRITE_SURFACE: False
+WRITE_CENTERLINE: False
+WRITE_VTK: False
+WRITE_DISCRETE_CENTERLINE: False
+WRITE_OUTLET_STATS: False
+WRITE_CROSS_SECTIONAL: False
+WRITE_TRAJECTORIES: False
+
+# MOVE_DIST, MU_SIZE, SIGMA_SHIFT are multiples of local radius. RADIUS_ADD and
+# LARGE_RADIUS_THRESH are absolute, in the centerline's unit.
+MOVE_DIST: 1.5 # how far to move along centerline between sampling, in radii
+MOVE_SLOWER_LARGE: 0.5 # how much slower for bigger vessels
+MOVE_SLOWER_BIFURC: 0.5 # how much slower at bifurcations
+LARGE_RADIUS_THRESH: 4.0 # radius in mm at which MOVE_SLOWER_LARGE applies
+RADIUS_ADD: 0.2 # absolute add to radius in mm (before RADIUS_SCALE)
+RADIUS_SCALE: 1 # keep 1 when image and centerline units match
+MU_SIZE: 5 # mean for subvolume-radius ratio
+SIGMA_SIZE: 0.8 # standard deviation for subvolume-radius ratio
+MU_SHIFT: 0 # mean for subvolume shift off centerline
+SIGMA_SHIFT: 0.8 # standard deviation for subvolume shift off centerline
+NUMBER_SAMPLES: 3 # samples at each point along vessel
+NUMBER_SAMPLES_BIFURC: 5 # samples at a bifurcation
+NUMBER_SAMPLES_START: 3 # samples at start of vessel (first 5%)

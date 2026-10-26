@@ -1195,7 +1195,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "-config_name",
         default="default_mm",
         type=str,
-        help="Sampler YAML name/path (from vascular-segment-sampler)",
+        help="Sampler YAML name/path (default_mm, default_cm, test, or a file)",
     )
     p_prep.add_argument(
         "--nnunet-raw",

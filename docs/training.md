@@ -92,7 +92,13 @@ seqseg train prepare \
     --num-cores 4
 ```
 
-`--config-name` here is the sampler YAML from vascular-segment-sampler (default `default_mm`). It is a different file from the SeqSeg tracking config you pass to `seqseg run batch -config_name`.
+`--config-name` here is a sampler YAML (default `default_mm`). It is a different file from the SeqSeg tracking config you pass to `seqseg run batch -config_name`. SeqSeg ships its own sampler configs in `seqseg/config/sampler/`:
+
+- `default_mm`: millimeter data (the default). Every other config is layered on top of it.
+- `default_cm`: centimeter data, such as VMR / SimVascular models.
+- `test`: a quick smoke run with few samples per case.
+
+A bare name is looked up in `./config` first, then in SeqSeg's bundled folder. You can also pass a path to your own YAML; any keys it sets override `default_mm`.
 
 Or pass the raw directory yourself:
 

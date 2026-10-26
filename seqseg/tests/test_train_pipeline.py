@@ -215,6 +215,96 @@ def test_prepare_missing_config_raises(tmp_path, monkeypatch):
             )
 
 
+_REQUIRED_SAMPLER_KEYS = (
+    "DATASET_NAME",
+    "EXTRACT_VOLUMES",
+    "WRITE_SAMPLES",
+    "WRITE_IMG",
+    "BINARIZE",
+    "REMOVE_OTHER",
+    "ROTATE_VOLUMES",
+    "RESAMPLE_VOLUMES",
+    "CAPFREE",
+    "CAPFREE_PROP",
+    "WRITE_SURFACE",
+    "WRITE_CENTERLINE",
+    "WRITE_VTK",
+    "WRITE_DISCRETE_CENTERLINE",
+    "WRITE_OUTLET_STATS",
+    "WRITE_CROSS_SECTIONAL",
+    "WRITE_TRAJECTORIES",
+    "MOVE_DIST",
+    "MOVE_SLOWER_LARGE",
+    "MOVE_SLOWER_BIFURC",
+    "LARGE_RADIUS_THRESH",
+    "RADIUS_ADD",
+    "RADIUS_SCALE",
+    "MU_SIZE",
+    "SIGMA_SIZE",
+    "MU_SHIFT",
+    "SIGMA_SHIFT",
+    "NUMBER_SAMPLES",
+    "NUMBER_SAMPLES_BIFURC",
+    "NUMBER_SAMPLES_START",
+)
+
+
+@pytest.mark.parametrize("name", ["default_mm", "default_cm", "test"])
+def test_bundled_sampler_configs_resolve_inside_seqseg(name, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    resolved = Path(_resolve_sampler_config_file(name))
+    bundled = Path(__file__).resolve().parents[1] / "config" / "sampler"
+    assert resolved.parent == bundled
+
+
+def test_sampler_config_dirs_skip_sampler_package(tmp_path, monkeypatch):
+    from seqseg.pipeline.train import _sampler_config_dirs
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config").mkdir()
+    dirs = _sampler_config_dirs()
+    assert dirs[0] == str(tmp_path / "config")
+    assert not any("vascular_segment_sampler" in d for d in dirs)
+
+
+def test_cwd_config_overrides_bundled_sampler_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "default_cm.yaml").write_text("RADIUS_ADD: 0.5\n")
+    resolved = _resolve_sampler_config_file("default_cm")
+    assert resolved == str(tmp_path / "config" / "default_cm.yaml")
+    assert _load_sampler_config("default_cm")["RADIUS_ADD"] == 0.5
+
+
+@pytest.mark.parametrize("name", ["default_mm", "default_cm", "test"])
+def test_bundled_sampler_configs_have_required_keys(name, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    loaded = _load_sampler_config(name)
+    missing = [k for k in _REQUIRED_SAMPLER_KEYS if k not in loaded]
+    assert missing == []
+    assert loaded["TEST_CASES"] == []
+    assert loaded["BAD_CASES"] == []
+
+
+def test_default_cm_overrides_unit_dependent_keys(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    loaded = _load_sampler_config("default_cm")
+    assert loaded["RADIUS_ADD"] == 0.02
+    assert loaded["LARGE_RADIUS_THRESH"] == 0.4
+    assert loaded["MOVE_DIST"] == 1.5
+
+
+def test_sampler_overlay_merges_onto_seqseg_default(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    base = tmp_path / "base.yaml"
+    base.write_text("SEQSEG_ONLY_KEY: 7\nMOVE_DIST: 1.5\n")
+    monkeypatch.setattr("seqseg.pipeline.train._SAMPLER_DEFAULT_CONFIG", base)
+    loaded = _load_sampler_config("test")
+    assert loaded["SEQSEG_ONLY_KEY"] == 7
+    assert loaded["MOVE_DIST"] == 8
+    assert loaded["MAX_SAMPLES"] == 12
+
+
 def test_cap_from_sampler_config_cli_overrides_yaml():
     assert _cap_from_sampler_config({"MAX_SAMPLES": 12}, None) == 12
     assert _cap_from_sampler_config({"MAX_SAMPLES": 12}, 3) == 3

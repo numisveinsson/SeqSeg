@@ -1,0 +1,13 @@
+# SeqSeg smoke-test sampler overlay on default_mm.yaml.
+# Adapted from vascular-segment-sampler 0.7.0 config/test.yml.
+# One extract per point, long steps, and a hard cap so a case finishes quickly.
+
+MAX_SAMPLES: 12
+
+MOVE_DIST: 8 # centerline step, in radii (default 1.5)
+MOVE_SLOWER_LARGE: 1
+MOVE_SLOWER_BIFURC: 1
+
+NUMBER_SAMPLES: 1
+NUMBER_SAMPLES_BIFURC: 1
+NUMBER_SAMPLES_START: 1

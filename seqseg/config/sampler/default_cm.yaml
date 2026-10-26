@@ -1,0 +1,6 @@
+# SeqSeg sampler config for centimeter data (VMR / SimVascular). Overlay on default_mm.yaml.
+# Adapted from vascular-segment-sampler 0.7.0 config/default_cm.yaml.
+# Image, truth, surface, and centerline must all be in cm.
+
+RADIUS_ADD: 0.02 # absolute add to radius in cm (0.2 mm)
+LARGE_RADIUS_THRESH: 0.4 # radius in cm at which MOVE_SLOWER_LARGE applies (4 mm)

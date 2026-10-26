@@ -54,7 +54,7 @@ homepage = "https://github.com/numisveinsson/SeqSeg"
 repository = "https://github.com/numisveinsson/SeqSeg"
 
 [tool.setuptools]
-package-data = { "seqseg" = ["config/*.yaml"] }
+package-data = { "seqseg" = ["config/*.yaml", "config/sampler/*.yaml", "config/sampler/*.yml"] }
 
 [project.optional-dependencies]
 dev = [

@@ -246,25 +246,25 @@ def _detect_img_ext(images_dir: Path) -> Optional[str]:
     return None
 
 
+_SAMPLER_CONFIG_DIR = Path(__file__).resolve().parents[1] / "config" / "sampler"
+_SAMPLER_DEFAULT_CONFIG = _SAMPLER_CONFIG_DIR / "default_mm.yaml"
+_SAMPLER_EMPTY_LIST_KEYS = ("TEST_CASES", "BAD_CASES")
+
+
 def _sampler_config_dirs() -> List[str]:
     """Directories searched for sampler YAML overlays.
 
-    Same places as ``vascular-segment-sampler``: ``./config`` in the working
-    directory, then the installed package's ``config`` directory.
+    ``./config`` in the working directory, then SeqSeg's bundled
+    ``seqseg/config/sampler``. The configs shipped inside
+    ``vascular-segment-sampler`` are never used.
     """
     dirs: List[str] = []
     cwd_cfg = os.path.join(os.getcwd(), "config")
     if os.path.isdir(cwd_cfg):
         dirs.append(os.path.abspath(cwd_cfg))
-    try:
-        import vascular_segment_sampler
-    except ImportError:
-        return dirs
-    packaged = os.path.join(
-        os.path.dirname(vascular_segment_sampler.__file__), "config"
-    )
-    if os.path.isdir(packaged) and packaged not in dirs:
-        dirs.append(os.path.abspath(packaged))
+    bundled = str(_SAMPLER_CONFIG_DIR)
+    if os.path.isdir(bundled) and bundled not in dirs:
+        dirs.append(bundled)
     return dirs
 
 
@@ -340,11 +340,29 @@ def _load_sampler_config(config: Union[str, dict]) -> dict:
         raise FileNotFoundError(
             f"Sampler config {config!r} was not found.\n"
             f"  looked in: {looked}\n"
-            "Pass a YAML path, or a name such as test, test.yml, or default_mm."
+            "Pass a YAML path, or a name such as default_mm, default_cm, or test."
         )
-    from vascular_segment_sampler.sampling.extract import _load_config
+    defaults = _read_sampler_yaml(str(_SAMPLER_DEFAULT_CONFIG))
+    if os.path.abspath(path) == str(_SAMPLER_DEFAULT_CONFIG):
+        merged = defaults
+    else:
+        merged = {**defaults, **_read_sampler_yaml(path)}
+    for key in _SAMPLER_EMPTY_LIST_KEYS:
+        if merged.get(key) is None:
+            merged[key] = []
+    return merged
 
-    return dict(_load_config(path))
+
+def _read_sampler_yaml(path: str) -> dict:
+    import yaml
+
+    with open(path, encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Sampler config {path!r} must parse to a mapping")
+    return dict(data)
 
 
 def _cap_from_sampler_config(
