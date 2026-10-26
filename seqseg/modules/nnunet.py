@@ -74,10 +74,18 @@ def select_training_device():
     return 'cpu'
 
 
+def _inference_configuration(model_folder):
+    """Last path component's configuration, e.g. ``3d_fullres`` or ``2d``."""
+    folder = os.path.basename(os.path.normpath(str(model_folder)))
+    return folder.split('__')[-1]
+
+
 def select_inference_device(model_folder, force_cpu=False):
     """Pick torch device for nnU-Net inference.
 
     ``force_cpu`` skips CUDA/MPS even when they are available (CLI ``-cpu``).
+    MPS is used for 2D and ``3d_fullres`` models. Other 3D configurations
+    stay on CPU.
     """
     import torch
 
@@ -87,8 +95,11 @@ def select_inference_device(model_folder, force_cpu=False):
     if torch.cuda.is_available():
         print('GPU available, using GPU')
         return torch.device('cuda', 0)
-    if torch.backends.mps.is_available() and '3d' not in model_folder:
-        print('Using MPS backend for Apple Silicon, only available for 2D models')
+    configuration = _inference_configuration(model_folder)
+    if torch.backends.mps.is_available() and (
+        '3d' not in configuration or configuration == '3d_fullres'
+    ):
+        print('Using MPS backend for Apple Silicon')
         return torch.device('mps')
     print('GPU not available, using CPU')
     return torch.device('cpu', 0)

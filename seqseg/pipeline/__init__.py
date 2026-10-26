@@ -2,6 +2,7 @@
 
 from seqseg.pipeline.classic import run_classic_batch
 from seqseg.pipeline.plus import run_plus_batch
+from seqseg.pipeline.predict import run_global_prediction
 from seqseg.pipeline.post import (
     bootstrap_simvascular_project,
     run_global_centerline_batch,
@@ -13,6 +14,7 @@ __all__ = (
     "load_yaml_config",
     "run_classic_batch",
     "run_plus_batch",
+    "run_global_prediction",
     "bootstrap_simvascular_project",
     "run_global_centerline_single",
     "run_global_centerline_batch",

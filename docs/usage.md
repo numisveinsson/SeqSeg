@@ -6,7 +6,7 @@ For a complete walkthrough with example data, see the [step-by-step tutorial](..
 
 ## Commands and flag spelling
 
-`seqseg run batch` and `seqseg run plus batch` take underscore flags (`-outdir` / `--outdir`). The data folder is `-data_dir` or `--data_directory`. `seqseg run single`, `seqseg train`, and `seqseg paths` take hyphen flags (`--image`, `--data-dir`). `seqseg train prepare` also accepts `-data_dir`.
+`seqseg run batch` and `seqseg run plus batch` take underscore flags (`-outdir` / `--outdir`). The data folder is `-data_dir` or `--data_directory`. `seqseg run single`, `seqseg run global`, `seqseg train`, and `seqseg paths` take hyphen flags (`--image`, `--model-folder`). `seqseg train prepare` also accepts `-data_dir`.
 
 `-img_ext` is required on every batch command. These three can be omitted when they are saved with `seqseg paths`:
 
@@ -115,6 +115,7 @@ Other common commands:
 | Command | Purpose |
 | -------- | ------- |
 | `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
+| `seqseg run global` | Whole-volume nnU-Net prediction from a trainer folder and an image or image folder |
 | `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg |
 | `seqseg paths init` / `set` / `show` | Save default nnU-Net / data / out dirs (`~/.seqseg/paths.yaml`) |
 | `seqseg train prepare` | Extract patches or whole volumes, create an nnU-Net dataset, and preprocess |
@@ -125,6 +126,27 @@ Other common commands:
 | `seqseg simvascular init` | Create/refresh a SimVascular project layout under a case directory |
 
 Training a model on a new dataset is documented in [Training](training.md).
+
+### Whole-volume prediction
+
+`seqseg run global` runs an nnU-Net trainer on one image, or on every volume in a folder. It does not trace vessels and does not read `seeds.json`. `--model-folder` is the trainer directory, the same path `seqseg run single` uses. This command does not load the tracking config named `global`.
+
+```bash
+seqseg run global \
+    --model-folder /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres \
+    --image /path/to/case.nii.gz \
+    --outdir results/
+```
+
+```bash
+seqseg run global \
+    --model-folder /path/to/nnUNetTrainer__nnUNetPlans__3d_fullres \
+    --image-dir /path/to/images \
+    --img-ext .nii.gz \
+    --outdir results/
+```
+
+Each case writes `{stem}_segmentation.mha` and `{stem}_probability.mha`. `--fold` defaults to `all` and `--scale` to `1`. `-cpu` forces CPU inference. Omit `--img-ext` to accept `.nii.gz`, `.nii`, `.mha`, `.mhd`, and `.nrrd`.
 
 ### Centerlines from an existing segmentation
 

@@ -12,6 +12,7 @@ __all__ = (
     "load_yaml_config",
     "run_classic_batch",
     "run_plus_batch",
+    "run_global_prediction",
     "bootstrap_simvascular_project",
     "bootstrap_simvascular_project_batch",
     "run_global_centerline_single",
@@ -69,6 +70,10 @@ def __getattr__(name: str):
         from seqseg.pipeline.plus import run_plus_batch
 
         return run_plus_batch
+    if name == "run_global_prediction":
+        from seqseg.pipeline.predict import run_global_prediction
+
+        return run_global_prediction
     if name == "bootstrap_simvascular_project":
         from seqseg.pipeline.post import bootstrap_simvascular_project
 

@@ -46,7 +46,13 @@ def test_select_inference_device_falls_back_to_cpu(monkeypatch):
     assert select_inference_device(".../3d_fullres", force_cpu=False) == ("cpu", 0)
 
 
-def test_select_inference_device_mps_only_for_2d(monkeypatch):
+def test_select_inference_device_uses_mps_for_2d_and_3d_fullres(monkeypatch):
     monkeypatch.setitem(sys.modules, "torch", _fake_torch(cuda=False, mps=True))
     assert select_inference_device(".../2d", force_cpu=False) == ("mps", None)
-    assert select_inference_device(".../3d_fullres", force_cpu=False) == ("cpu", 0)
+    assert select_inference_device(
+        ".../nnUNetTrainer__nnUNetPlans__3d_fullres", force_cpu=False
+    ) == ("mps", None)
+    assert select_inference_device(".../3d_lowres", force_cpu=False) == ("cpu", 0)
+    assert select_inference_device(
+        ".../3d_cascade_fullres", force_cpu=False
+    ) == ("cpu", 0)

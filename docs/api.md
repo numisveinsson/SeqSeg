@@ -154,6 +154,7 @@ These are the functions the CLI calls. The commands in [Usage](usage.md) are the
 |------|-----|
 | `run_classic_batch` | `seqseg run batch` |
 | `run_plus_batch` | `seqseg run plus batch` |
+| `run_global_prediction` | `seqseg run global` |
 | `bootstrap_simvascular_project` | `seqseg simvascular init` |
 | `bootstrap_simvascular_project_batch` | `seqseg simvascular init-batch` |
 | `run_global_centerline_single` | `seqseg post global-centerline single` |

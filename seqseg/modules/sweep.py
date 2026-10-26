@@ -4,6 +4,60 @@ import numpy as np
 from .nnunet import initialize_predictor
 from .sitk_functions import copy_settings
 
+def predict_volume(predictor, dir_image, scale=1):
+    """Predict one volume with an already initialized nnU-Net predictor.
+
+    Parameters
+    ----------
+    predictor : nnUNetPredictor
+        Loaded predictor from :func:`seqseg.modules.nnunet.initialize_predictor`.
+    dir_image : str
+        Path to the image
+    scale : float
+        Scale factor applied to voxel spacing before prediction
+
+    Returns
+    -------
+    pred_img : sitk.Image
+        Segmentation image
+    prob_prediction : sitk.Image
+        Probability image
+    """
+
+    img = sitk.ReadImage(dir_image)
+
+    spacing_im = img.GetSpacing()
+    spacing_im = np.array(spacing_im)
+    spacing = (spacing_im * scale).tolist()
+    spacing = spacing[::-1]
+    props = {}
+    props['spacing'] = spacing
+
+    img_np = sitk.GetArrayFromImage(img)
+    img_np = img_np[None]
+    img_np = img_np.astype('float32')
+
+    start_time_pred = time.time()
+    prediction = predictor.predict_single_npy_array(img_np,
+                                                    props,
+                                                    None,
+                                                    None,
+                                                    True)
+    print(f"""Prediction time:
+            {(time.time() - start_time_pred):.3f} s""")
+
+    # Probability prediction
+    prob_prediction = sitk.GetImageFromArray(prediction[1][1])
+    prob_prediction = copy_settings(prob_prediction, img)
+
+    # Create segmentation prediction (binary)
+    predicted_vessel = prediction[0]
+    pred_img = sitk.GetImageFromArray(predicted_vessel)
+    pred_img = copy_settings(pred_img, img)
+
+    return pred_img, prob_prediction
+
+
 def run_global_segmentation(dir_image, model_folder, fold, scale=1, force_cpu=False):
     """ Run global segmentation on a single image
 
@@ -28,38 +82,5 @@ def run_global_segmentation(dir_image, model_folder, fold, scale=1, force_cpu=Fa
         Probability image
     """
 
-    # Load image
-    img = sitk.ReadImage(dir_image)
-
-    spacing_im = img.GetSpacing()
-    spacing_im = np.array(spacing_im)
-    spacing = (spacing_im * scale).tolist()
-    spacing = spacing[::-1]
-    props = {}
-    props['spacing'] = spacing
-
-    img_np = sitk.GetArrayFromImage(img)
-    img_np = img_np[None]
-    img_np = img_np.astype('float32')
-
     predictor = initialize_predictor(model_folder, fold, force_cpu=force_cpu)
-
-    start_time_pred = time.time()
-    prediction = predictor.predict_single_npy_array(img_np,
-                                                    props,
-                                                    None,
-                                                    None,
-                                                    True)
-    print(f"""Prediction time:
-            {(time.time() - start_time_pred):.3f} s""")
-
-    # Probability prediction
-    prob_prediction = sitk.GetImageFromArray(prediction[1][1])
-    prob_prediction = copy_settings(prob_prediction, img)
-
-    # Create segmentation prediction (binary)
-    predicted_vessel = prediction[0]
-    pred_img = sitk.GetImageFromArray(predicted_vessel)
-    pred_img = copy_settings(pred_img, img)
-
-    return pred_img, prob_prediction
+    return predict_volume(predictor, dir_image, scale=scale)

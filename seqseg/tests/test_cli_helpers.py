@@ -221,6 +221,83 @@ def test_parser_run_plus_batch_cpu_flag():
     assert ns.force_cpu is True
 
 
+def test_parser_run_global_image():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "run",
+            "global",
+            "--image",
+            "/tmp/case.nii.gz",
+            "--outdir",
+            "/tmp/out",
+            "--model-folder",
+            "/tmp/model",
+        ]
+    )
+    assert ns.command == "run"
+    assert ns.run_cmd == "global"
+    assert ns.image == "/tmp/case.nii.gz"
+    assert ns.image_dir is None
+    assert ns.model_folder == "/tmp/model"
+    assert ns.fold == "all"
+    assert ns.scale == 1.0
+    assert ns.force_cpu is False
+    assert ns._handler.__name__ == "_cmd_run_global"
+
+
+def test_parser_run_global_image_dir_and_cpu():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "run",
+            "global",
+            "--image-dir",
+            "/tmp/images",
+            "--img-ext",
+            ".nii.gz",
+            "--outdir",
+            "/tmp/out",
+            "--model-folder",
+            "/tmp/model",
+            "-cpu",
+        ]
+    )
+    assert ns.image_dir == "/tmp/images"
+    assert ns.img_ext == ".nii.gz"
+    assert ns.force_cpu is True
+
+
+def test_parser_run_global_requires_one_input():
+    parser = _build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "run",
+                "global",
+                "--outdir",
+                "/tmp/out",
+                "--model-folder",
+                "/tmp/model",
+            ]
+        )
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "run",
+                "global",
+                "--image",
+                "/tmp/case.nii.gz",
+                "--image-dir",
+                "/tmp/images",
+                "--outdir",
+                "/tmp/out",
+                "--model-folder",
+                "/tmp/model",
+            ]
+        )
+
+
 def test_parser_run_single_cpu_flag():
     parser = _build_parser()
     ns = parser.parse_args(

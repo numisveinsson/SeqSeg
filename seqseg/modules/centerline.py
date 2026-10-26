@@ -598,6 +598,79 @@ def gradient_matrix(x):
     return gradients
 
 
+def masked_world_frame_gradient(arrival, inside_mask, inward_field,
+                                spacing, direction):
+    """World-frame arrival gradient that ignores neighbors outside the mask.
+
+    Inside the vessel each axis uses a central difference when both
+    neighbors are inside, and a one-sided difference when only one is.
+    Exterior samples never enter an interior difference, so in a lumen one
+    or two voxels wide the step follows the vessel instead of being pushed
+    across it.
+
+    Exterior voxels get ``-grad(inward_field)``, normalized and scaled to the
+    median interior gradient magnitude. ``inward_field`` must increase into
+    the lumen (the inscribed distance, negative outside). A sample that
+    interpolates against an exterior voxel is then nudged back inside
+    without that nudge outweighing the motion along the vessel.
+    """
+    inside = np.asarray(inside_mask, dtype=bool)
+    values = np.asarray(arrival, dtype=np.float64)
+    spacing = np.asarray(spacing, dtype=np.float64).reshape(3)
+    inv_spacing = 1.0 / np.maximum(spacing, np.finfo(np.float64).tiny)
+    grad = np.zeros((3,) + values.shape, dtype=np.float64)
+
+    for axis in range(3):
+        n = values.shape[axis]
+        if n < 2:
+            continue
+        lo = [slice(None)] * 3
+        hi = [slice(None)] * 3
+        lo[axis] = slice(0, n - 1)
+        hi[axis] = slice(1, n)
+        lo = tuple(lo)
+        hi = tuple(hi)
+        diff = values[hi] - values[lo]
+        pair_inside = inside[hi] & inside[lo]
+
+        forward = np.zeros(values.shape, dtype=np.float64)
+        has_forward = np.zeros(values.shape, dtype=bool)
+        forward[lo] = diff
+        has_forward[lo] = pair_inside
+        backward = np.zeros(values.shape, dtype=np.float64)
+        has_backward = np.zeros(values.shape, dtype=bool)
+        backward[hi] = diff
+        has_backward[hi] = pair_inside
+        del diff, pair_inside
+
+        component = grad[axis]
+        both = has_forward & has_backward
+        component[both] = 0.5 * (forward[both] + backward[both])
+        only_f = has_forward & ~has_backward
+        component[only_f] = forward[only_f]
+        only_b = has_backward & ~has_forward
+        component[only_b] = backward[only_b]
+        component *= inv_spacing[axis]
+        del forward, backward, has_forward, has_backward, both, only_f, only_b
+
+    direction_matrix = np.asarray(direction, dtype=np.float64).reshape(3, 3)
+    if not np.allclose(direction_matrix, np.eye(3)):
+        grad = np.tensordot(direction_matrix, grad, axes=([1], [0]))
+
+    exterior = ~inside
+    if np.any(exterior):
+        inward = world_frame_gradient(inward_field, spacing, direction)
+        inward_ext = inward[:, exterior]
+        del inward
+        norm = np.linalg.norm(inward_ext, axis=0)
+        norm[norm < 1e-12] = 1.0
+        interior_mag = np.linalg.norm(grad[:, inside], axis=0)
+        interior_mag = interior_mag[interior_mag > 0]
+        scale = float(np.median(interior_mag)) if interior_mag.size else 1.0
+        grad[:, exterior] = -scale * inward_ext / norm
+    return grad
+
+
 def world_frame_gradient(grid_values, spacing, direction):
     """
     Convert a 3-D scalar field sampled on the image grid to a world-space
@@ -1072,12 +1145,88 @@ def interpolate_gradient(gradient, current, seg_img):
     )
 
 
+def _index_in_bounds(index, size):
+    return (0 <= index[0] < size[0]
+            and 0 <= index[1] < size[1]
+            and 0 <= index[2] < size[2])
+
+
+def _point_index(seg_img, point):
+    """Image index of a physical point, or None when it is not finite."""
+    point = np.asarray(point, dtype=np.float64)
+    if not np.all(np.isfinite(point)):
+        return None
+    idx = seg_img.TransformPhysicalPointToIndex(
+        (float(point[0]), float(point[1]), float(point[2])))
+    return (int(idx[0]), int(idx[1]), int(idx[2]))
+
+
+def _inscribed_radius(distance_np, index):
+    return float(distance_np[index[0], index[1], index[2]])
+
+
+def _physical_point(seg_img, index):
+    return np.array(
+        seg_img.TransformIndexToPhysicalPoint(
+            (int(index[0]), int(index[1]), int(index[2]))),
+        dtype=np.float64)
+
+
+def _project_toward_seed(index, distance_np, inside_np, seg_img, seed):
+    """Pull a step back onto a neighbor inside the segmentation.
+
+    Prefer the inside neighbor closest to ``seed`` that is closer than the
+    current voxel. Otherwise take the inside neighbor with the largest
+    inscribed radius. Returns ``(point, index)``, or None when no inside
+    neighbor other than the current voxel exists.
+    """
+    size = seg_img.GetSize()
+    seed = np.asarray(seed, dtype=np.float64)
+    here_dist = np.inf
+    if _index_in_bounds(index, size):
+        here_dist = float(np.linalg.norm(
+            _physical_point(seg_img, index) - seed))
+    best_progress = None
+    best_progress_dist = None
+    best_radius = None
+    best_radius_r = -np.inf
+    ix, iy, iz = index
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                j = (ix + dx, iy + dy, iz + dz)
+                if not _index_in_bounds(j, size) or not inside_np[j]:
+                    continue
+                point = _physical_point(seg_img, j)
+                dist = float(np.linalg.norm(point - seed))
+                if dist < here_dist and (best_progress_dist is None
+                                         or dist < best_progress_dist):
+                    best_progress = (point, j)
+                    best_progress_dist = dist
+                radius = _inscribed_radius(distance_np, j)
+                if radius > best_radius_r:
+                    best_radius_r = radius
+                    best_radius = (point, j)
+    if best_progress is not None:
+        return best_progress
+    if best_radius is None or best_radius[1] == tuple(index):
+        return None
+    return best_radius
+
+
 def backtracking_gradient(gradient, distance_map_surf_np,
                           seg_img, seed, target, relax_factor=1,
-                          verbose=False):
+                          verbose=False, inside_np=None):
     """
     Function to backtrack from a target point to
     a seed point using the gradient.
+
+    Steps follow the interpolated arrival gradient. A sample that leaves the
+    segmentation is pulled back to an inside neighbor. A target that sits
+    just outside is moved inside before the walk; that first sample is not
+    a failure. Inside means the segmentation mask: the inscribed distance
+    is 0 on the wall layer of inside voxels, so it cannot tell inside from
+    outside in a vessel one or two voxels wide.
 
     Parameters
     ----------
@@ -1093,6 +1242,9 @@ def backtracking_gradient(gradient, distance_map_surf_np,
         Target point
     relax_factor : float
         Factor to relax the tolerance
+    inside_np : np.ndarray of bool, optional
+        Segmentation mask in the same layout as ``distance_map_surf_np``.
+        Built from ``seg_img`` when omitted.
 
     Returns
     -------
@@ -1101,69 +1253,80 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     success : bool
         Boolean indicating if the backtracking was successful.
     """
-    # print(f"   Backtracking from {target} to {seed}")
     max_number_points = 100000
-    use_gradient_grid = True
     step_size = 0.01
 
+    if inside_np is None:
+        inside_np = sitk.GetArrayFromImage(seg_img).transpose(2, 1, 0) != 0
+    min_tol = float(min(seg_img.GetSpacing()))
+
     success = True
+    seed = np.asarray(seed, dtype=np.float64)
+    current = np.array(target, dtype=np.float64, copy=True)
+    current_index = _point_index(seg_img, current)
+    size = seg_img.GetSize()
 
-    # Index of seed and target points
-    target_index = seg_img.TransformPhysicalPointToIndex(target.tolist())
+    if current_index is None or not _index_in_bounds(current_index, size):
+        print("   Fail: Reached border, breaking")
+        points = [current, seed]
+        return points, False
 
-    # Initialize points
-    current = target
-    current_index = target_index
-    points = [current]
-    # Initialize tolerance
-    tol = distance_map_surf_np[target_index[0],
-                               target_index[1],
-                               target_index[2]]
-    # print(f"Tolerance: {tol}")
+    # A smoothed cap can sit just outside the binary mask. Move it to the
+    # nearest inside neighbor instead of treating that as a failed trace.
+    if not inside_np[current_index]:
+        projected = _project_toward_seed(
+            current_index, distance_map_surf_np, inside_np, seg_img, seed)
+        if projected is None:
+            print("   Fail: Left segmentation, breaking")
+            return [current, seed], False
+        current, current_index = projected
 
-    # Backtrack until we reach the seed point
-    while (np.linalg.norm(current - seed) > tol*relax_factor
+    points = [current.copy()]
+    tol = max(_inscribed_radius(distance_map_surf_np, current_index), min_tol)
+    stall = 0
+
+    while (np.linalg.norm(current - seed) > tol * relax_factor
            and len(points) < max_number_points):
-        # print(f"""Current: {current},
-        #       Seed: {seed},
-        #       Dist between: {np.linalg.norm(current - seed)}""")
-        # print(f"Seg value at current: {seg_img[current_index]}")
-        # Get gradient at current point
-        if use_gradient_grid:
-            gradient_current = gradient[:,
-                                        current_index[0],
-                                        current_index[1],
-                                        current_index[2]]
-        else:
-            gradient_current = interpolate_gradient(gradient, current, seg_img)
-        
-        # Calculate gradient magnitude before normalization
+        gradient_current = interpolate_gradient(gradient, current, seg_img)
         gradient_magnitude = np.linalg.norm(gradient_current)
-        # if verbose:
-        #     print(f"      Step {len(points)}: gradient magnitude = {gradient_magnitude:.6f}")
-        
-        # Normalize gradient
-        gradient_current = gradient_current / gradient_magnitude
-        # Move in the direction of the gradient
-        current = current - step_size * gradient_current
-        # Get index of current point
-        current_index = seg_img.TransformPhysicalPointToIndex(current.tolist())
-        # Add current point to path
-        points.append(current)
-        # If index is on the border, break
-        if (current_index[0] < 0
-           or current_index[1] < 0
-           or current_index[2] < 0
-           or current_index[0] >= seg_img.GetSize()[0]
-           or current_index[1] >= seg_img.GetSize()[1]
-           or current_index[2] >= seg_img.GetSize()[2]):
-            print("   Fail: Reached border, breaking")
-            success = False
-            break
-        # Update tolerance
-        tol = distance_map_surf_np[current_index[0],
-                                   current_index[1],
-                                   current_index[2]]
+        proposed = None
+        cand_index = None
+        if (np.isfinite(gradient_magnitude) and gradient_magnitude > 1e-12):
+            direction = gradient_current / gradient_magnitude
+            candidate = current - step_size * direction
+            cand_index = _point_index(seg_img, candidate)
+            if (cand_index is not None
+                    and _index_in_bounds(cand_index, size)
+                    and inside_np[cand_index]):
+                proposed = (candidate, cand_index)
+        if proposed is None:
+            proposed = _project_toward_seed(
+                current_index, distance_map_surf_np, inside_np, seg_img, seed)
+            if proposed is None:
+                left_image = (
+                    cand_index is None
+                    or not _index_in_bounds(cand_index, size))
+                if left_image:
+                    print("   Fail: Reached border, breaking")
+                else:
+                    print("   Fail: Left segmentation, breaking")
+                success = False
+                break
+
+        moved = float(np.linalg.norm(proposed[0] - current))
+        if moved < 1e-8:
+            stall += 1
+            if stall > 3:
+                print("   Fail: Left segmentation, breaking")
+                success = False
+                break
+        else:
+            stall = 0
+        current = np.array(proposed[0], dtype=np.float64, copy=True)
+        current_index = proposed[1]
+        tol = max(_inscribed_radius(distance_map_surf_np, current_index),
+                  min_tol)
+        points.append(current.copy())
 
     if len(points) == max_number_points:
         print("   Fail: Reached max number of points")
@@ -1171,7 +1334,6 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     elif success and verbose:
         print(f"   Success: {len(points)} points")
 
-    # Add seed point to path
     points.append(seed)
 
     return points, success
@@ -1299,13 +1461,26 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
             seed = [int(index[0][0]), int(index[1][0]), int(index[2][0])]
     elif targets is None:
         print(f"Need to create targets, seed given: {seed}")
-        _, targets, output = cluster_map(segmentation,
-                                         return_wave_distance_map=True,
-                                         out_dir=out_dir,
-                                         write_files=write_files,
-                                         verbose=verbose)
+        if isinstance(seed, np.ndarray):
+            seed_phys = seed
+        else:
+            seed_phys = np.array(segmentation.TransformIndexToPhysicalPoint(
+                [int(i) for i in seed]))
+        # The returned wave starts at the returned seed. Backtracking reuses
+        # that wave, so it has to walk back to the same point.
+        wave_seed, targets, output = cluster_map(
+            segmentation,
+            return_wave_distance_map=True,
+            out_dir=out_dir,
+            write_files=write_files,
+            verbose=verbose,
+            seed=seed_phys)
         # have same format as seed
-        if isinstance(seed, list):
+        if isinstance(seed, np.ndarray):
+            seed = wave_seed
+        else:
+            seed = list(
+                segmentation.TransformPhysicalPointToIndex(wave_seed.tolist()))
             # then list of indices
             targets = [list(
                 segmentation.TransformPhysicalPointToIndex(target.tolist()))
@@ -1366,12 +1541,11 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         os.path.join(out_dir, 'masked_out_fmm.mha'))
         sitk.WriteImage(segmentation,
                         os.path.join(out_dir, 'segmentation_from_fmm.mha'))
-    # Gradient of the *masked* arrival-time map. Unreached FastMarching
+    # Gradient of the masked arrival-time map. Unreached FastMarching
     # voxels keep ITK's float32 LargeValue (~1e38); differentiating that
     # field and scaling by 1/spacing overflows float32 (CI RuntimeWarning)
-    # and yields inf/NaN steps. Mask + clip keeps the gradient inside the
-    # vessel and finite. Conversion to world mm^-1 is:
-    #     grad_world = D @ diag(1/spacing) @ grad_grid
+    # and yields inf/NaN steps. Mask + clip keeps the values finite, and the
+    # masked gradient never differences across the vessel wall.
     arrival = np.clip(
         np.asarray(
             sitk.GetArrayFromImage(output_mask).transpose(2, 1, 0),
@@ -1380,8 +1554,12 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         -1.0e6,
         1.0e6,
     )
-    gradient = world_frame_gradient(
-        arrival, segmentation.GetSpacing(), segmentation.GetDirection())
+    inside_np = np.asarray(
+        sitk.GetArrayFromImage(segmentation).transpose(2, 1, 0)) != 0
+    gradient = masked_world_frame_gradient(
+        arrival, inside_np, distance_map_surf_np,
+        segmentation.GetSpacing(), segmentation.GetDirection())
+    del arrival
     if verbose:
         # Calculate and print gradient magnitude statistics
         gradient_magnitude = np.sqrt(np.sum(gradient**2, axis=0))
@@ -1398,7 +1576,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                                 segmentation,
                                                 seed_np, target_np,
                                                 relax_factor=relax_factor,
-                                                verbose=verbose)
+                                                verbose=verbose,
+                                                inside_np=inside_np)
         if not success and move_target_if_fail:
             print("\n   Trying to move target inside segmentation")
             pot_point = calc_points_target(max_surf, distance_map_surf,
@@ -1411,7 +1590,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                                         segmentation,
                                                         seed_np, pot_point,
                                                         relax_factor=relax_factor,
-                                                        verbose=verbose)
+                                                        verbose=verbose,
+                                                        inside_np=inside_np)
         # Add points to list
         points_list.append(points)
         success_list.append(success)
@@ -2496,15 +2676,17 @@ def find_end_clusters(cluster_map):
 
 
 def cluster_map(segmentation, return_wave_distance_map=False,
-                out_dir=None, write_files=False, verbose=False):
+                out_dir=None, write_files=False, verbose=False,
+                seed=None):
     """
     Function to cluster a distance map of a segmentation into integer values.
 
     The segmentation is converted to a inverted distance map
     (high value inside).
-    The maximum value in the distance map is found.
-    The index of the maximum value is used as the seed point for
-    the fast marching method.
+    The fast march starts at ``seed`` (a physical point) when it lands on a
+    vessel voxel. Otherwise it starts at the maximum of the distance map.
+    The returned seed is the voxel the march started from, so a caller
+    that backtracks the returned wave must walk back to that seed.
     The wave distance map is calculated using the fast marching method
     and the seed point.
     The wave distance map is converted to integers.
@@ -2555,16 +2737,24 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     index = np.where(dist_map_np == max_value)
     # If multiple max values, take first; use .item() so we pass scalars not 0-d/1-d arrays
     z0, y0, x0 = index[0][0], index[1][0], index[2][0]
+    if seed is not None:
+        seed_index = _point_index(segmentation, seed)
+        if (seed_index is not None
+                and _index_in_bounds(seed_index, segmentation.GetSize())
+                and segmentation.GetPixel(seed_index) != 0):
+            z0, y0, x0 = (np.int64(seed_index[0]), np.int64(seed_index[1]),
+                          np.int64(seed_index[2]))
+        else:
+            print("Seed is outside the vessel; starting the fast march "
+                  "at the widest voxel")
     # Create fast marching filter
     fast_marching = sitk.FastMarchingImageFilter()
     fast_marching.AddTrialPoint((z0.item(), y0.item(), x0.item()))
     fast_marching.SetStoppingValue(max_time_steps)
-    # Create speed image by masking distance map with segmentation
-    speed_image = sitk.Mask(distance_map, segmentation)
-    # And rescale to 0.0001-max_value
-    speed_image = sitk.RescaleIntensity(speed_image, 0.00001, float(max_value))
-    # And raise all values to the power of 0.5
-    speed_image = sitk.Pow(speed_image, 0.5)
+    # Constant speed inside the mask. A radius-weighted speed is slowest on
+    # the wall, so the last wavefront clusters are wall patches rather than
+    # the geometric tips. Local cap traces do not use this speed image.
+    speed_image = sitk.Cast(sitk.NotEqual(segmentation, 0), sitk.sitkFloat32)
     print("Done preprocessing speed image")
 
     # Calculate wave distance map
@@ -2734,6 +2924,15 @@ def cluster_map(segmentation, return_wave_distance_map=False,
                                 cluster_map_np=cluster_map_np,
                                 distance_map_np=distance_map_np)
     print(f"Time to get end points: {time.time() - time_start:0.2f}")
+
+    # distance_map_masked is the inscribed radius shifted by +1 mm.
+    radius_np = np.maximum(distance_map_np - 1.0, 0.0)
+    n_raw = sum(point is not None for point in end_points)
+    end_points = snap_end_points_to_lumen(
+        end_points, radius_np, segmentation.GetSpacing(),
+        segmentation.GetDirection())
+    if len(end_points) != n_raw:
+        print(f"Dropped {n_raw - len(end_points)} wall targets below one voxel")
 
     # Convert end points to physical points
     end_points_phys = [segmentation.TransformIndexToPhysicalPoint(
@@ -3112,6 +3311,84 @@ def get_end_points(cluster_map_img, end_clusters, distance_map_masked,
     }
 
     return [label_to_point.get(int(c), None) for c in end_clusters]
+
+
+def snap_end_points_to_lumen(end_points, radius_np, spacing, direction=None):
+    """Move automatic targets onto the local lumen and drop wall specks.
+
+    Each end index is replaced by the maximum-inscribed-radius voxel inside
+    a ball of one vessel diameter (at least three voxels). The ball is what
+    keeps a distal tip from walking up a taper to a fatter ostium. Ties stay
+    on the queried cross-section by keeping the candidate closest to the
+    original point. A snap whose radius is still below one voxel is dropped.
+
+    Parameters
+    ----------
+    end_points : sequence
+        Index points, ``(x, y, z)``, in the same layout as ``radius_np``.
+        ``None`` entries are ignored.
+    radius_np : np.ndarray
+        Inscribed radius in physical units, 0 outside the vessel.
+    spacing : sequence of float
+        Image spacing.
+    direction : sequence of float, optional
+        Image direction matrix, length 9. Identity when omitted.
+
+    Returns
+    -------
+    list of np.ndarray
+        Kept lumen indices.
+    """
+    spacing = np.asarray(spacing, dtype=np.float64).reshape(3)
+    if direction is None:
+        direction = np.eye(3)
+    else:
+        direction = np.asarray(direction, dtype=np.float64).reshape(3, 3)
+    radius_np = np.asarray(radius_np, dtype=np.float64)
+    if radius_np.size == 0 or float(np.max(radius_np)) <= 0.0:
+        return []
+    max_radius = float(np.max(radius_np))
+    ball = max(2.0 * max_radius, 3.0 * float(np.max(spacing)))
+    min_radius = float(np.min(spacing))
+    half = np.ceil(ball / np.maximum(spacing, 1e-12)).astype(int) + 1
+    shape = radius_np.shape
+    snapped = []
+    for point in end_points:
+        if point is None:
+            continue
+        ix, iy, iz = (int(point[0]), int(point[1]), int(point[2]))
+        x0 = max(0, ix - int(half[0]))
+        x1 = min(shape[0], ix + int(half[0]) + 1)
+        y0 = max(0, iy - int(half[1]))
+        y1 = min(shape[1], iy + int(half[1]) + 1)
+        z0 = max(0, iz - int(half[2]))
+        z1 = min(shape[2], iz + int(half[2]) + 1)
+        xs = np.arange(x0, x1)
+        ys = np.arange(y0, y1)
+        zs = np.arange(z0, z1)
+        ii, jj, kk = np.meshgrid(xs, ys, zs, indexing="ij")
+        delta = np.stack((
+            (ii - ix) * spacing[0],
+            (jj - iy) * spacing[1],
+            (kk - iz) * spacing[2],
+        ), axis=0)
+        phys = np.tensordot(direction, delta, axes=(1, 0))
+        dist = np.sqrt(np.sum(phys * phys, axis=0))
+        window = radius_np[x0:x1, y0:y1, z0:z1]
+        valid = (dist <= ball) & (window > 0.0)
+        if not np.any(valid):
+            continue
+        peak = float(window[valid].max())
+        if peak < min_radius:
+            continue
+        candidates = valid & (np.abs(window - peak) <= 1e-6)
+        cand_dist = np.where(candidates, dist, np.inf)
+        flat = int(np.argmin(cand_dist))
+        local = np.unravel_index(flat, window.shape)
+        snapped.append(np.array(
+            (x0 + int(local[0]), y0 + int(local[1]), z0 + int(local[2])),
+            dtype=np.int64))
+    return snapped
 
 
 def calc_multi_component_centerlines(segmentation, nr_seeds=None,

@@ -26,6 +26,7 @@ from seqseg.modules import sitk_functions as sf
 from seqseg.modules.datasets import get_testing_samples
 from seqseg.pipeline.classic import run_classic_batch
 from seqseg.pipeline.plus import run_plus_batch
+from seqseg.pipeline.predict import run_global_prediction
 from seqseg.pipeline.single_trace import prepare_single_image_dataset
 from seqseg.pipeline.post import (
     bootstrap_simvascular_project,
@@ -554,6 +555,49 @@ def _cmd_trace_single(ns: argparse.Namespace) -> None:
     print(f"{((time.time() - t0) / 60):.2f} min\n")
 
 
+def _cmd_run_global(ns: argparse.Namespace) -> None:
+    model_folder = os.path.abspath(os.path.expanduser(ns.model_folder))
+    if not os.path.isdir(model_folder):
+        print(
+            f"seqseg run global: model folder not found: {model_folder}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    outdir = os.path.abspath(os.path.expanduser(ns.outdir))
+    image = None
+    image_dir = None
+    if ns.image:
+        image = os.path.abspath(os.path.expanduser(ns.image))
+        if not os.path.isfile(image):
+            print(
+                f"seqseg run global: image not found: {image}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+    else:
+        image_dir = os.path.abspath(os.path.expanduser(ns.image_dir))
+        if not os.path.isdir(image_dir):
+            print(
+                f"seqseg run global: image folder not found: {image_dir}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+    try:
+        run_global_prediction(
+            model_folder=model_folder,
+            outdir=outdir,
+            image=image,
+            image_dir=image_dir,
+            img_ext=ns.img_ext,
+            fold=ns.fold,
+            scale=ns.scale,
+            force_cpu=bool(ns.force_cpu),
+        )
+    except FileNotFoundError as e:
+        print(f"seqseg run global: {e}", file=sys.stderr)
+        sys.exit(2)
+
+
 def _cmd_doctor(ns: argparse.Namespace) -> None:
     import importlib
 
@@ -849,7 +893,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     run_grp = sub.add_parser(
         "run",
-        help="Run segmentation and vessel tracing (batch, plus, or single volume)",
+        help="Run segmentation and vessel tracing (batch, plus, single, or global)",
     )
     run_sub = run_grp.add_subparsers(dest="run_cmd", required=True)
 
@@ -963,6 +1007,42 @@ def _build_parser() -> argparse.ArgumentParser:
         "unless JSON is edited after staging",
     )
     p_single.set_defaults(_handler=_cmd_trace_single)
+
+    p_global = run_sub.add_parser(
+        "global",
+        help="Whole-volume nnU-Net prediction (one image or a folder)",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    global_src = p_global.add_mutually_exclusive_group(required=True)
+    global_src.add_argument("--image", type=str, help="Input volume path")
+    global_src.add_argument(
+        "--image-dir",
+        type=str,
+        help="Folder of input volumes (not a SeqSeg dataset)",
+    )
+    p_global.add_argument("--outdir", required=True, type=str)
+    p_global.add_argument(
+        "--model-folder",
+        required=True,
+        type=str,
+        help="nnU-Net trainer folder (…/nnUNetTrainer__nnUNetPlans__3d_fullres)",
+    )
+    p_global.add_argument("--fold", default="all", type=str)
+    p_global.add_argument("--scale", default=1.0, type=float)
+    p_global.add_argument(
+        "--img-ext",
+        default=None,
+        type=str,
+        help="Volume extension when using --image-dir (for example .nii.gz)",
+    )
+    p_global.add_argument(
+        "-cpu",
+        "--cpu",
+        dest="force_cpu",
+        action="store_true",
+        help="Force nnU-Net inference on CPU even if a GPU is available",
+    )
+    p_global.set_defaults(_handler=_cmd_run_global)
 
     post = sub.add_parser("post", help="Post-process existing outputs")
     post_sub = post.add_subparsers(dest="post_cmd", required=True)
