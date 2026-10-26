@@ -348,12 +348,11 @@ def trace_centerline(
     inside_branch = 0                                          # Counter for steps inside existing vessels
     i = 0                                                      # Global step counter (chronological order)
     # Main tracing loop: continue while there are potential branches to explore
-    while vessel_tree.potential_branches and i < (max_step_size + 1):
+    while vessel_tree.potential_branches and i < max_step_size:
 
         # Progress reporting: print step number and timestamp
-        if i in range(0, max_step_size, max_step_size*0 + 1):
-            print(f"\n*** Step number {i} ***")
-            print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        print(f"\n*** Step number {i} ***")
+        print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
         # Debug breakpoint: pause execution at specified step for inspection
         if debug and i >= debug_step:
