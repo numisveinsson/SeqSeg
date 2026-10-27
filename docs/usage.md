@@ -116,7 +116,7 @@ Other common commands:
 | -------- | ------- |
 | `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
 | `seqseg run global` | Whole-volume nnU-Net prediction from a trainer folder and an image or image folder |
-| `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg |
+| `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg. `-global_seg_dir` supplies those masks instead of predicting them |
 | `seqseg run continue` | Continue a case from `{case_dir}/checkpoint` for more steps, optionally with new seeds |
 | `seqseg paths init` / `set` / `show` | Save default nnU-Net / data / out dirs (`~/.seqseg/paths.yaml`) |
 | `seqseg train prepare` | Extract patches or whole volumes, create an nnU-Net dataset, and preprocess |
@@ -188,6 +188,24 @@ seqseg run batch -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, dat
 seqseg run batch -data_dir data/ -start_seg /path/to/initial_seg.mha
 ```
 Tracing is unchanged; the SeqSeg result is merged (union) into the initial mask.
+
+#### SeqSeg Plus from an existing global segmentation:
+```bash
+seqseg run plus batch \
+    -data_dir /path/to/data/ \
+    -global_seg_dir /path/to/global_segs/ \
+    -nnunet_results_path /path/to/nnUNet_results/ \
+    -seqseg_train_dataset Dataset010_SEQCOROASOCACT \
+    -img_ext .mha \
+    -outdir results/
+```
+For each case the folder is searched in this order:
+
+1. `{case}_segmentation.mha`, and `{case}_probability.mha` when that file is present (the files `seqseg run global` writes)
+2. `{case}` plus `-img_ext` (for example `case.mha`)
+3. `{case}_probability.mha` alone, thresholded at 0.5 for the binary mask used to place seeds
+
+The mask is the global sweep: seeds, sweep surfaces, and the tracing prior come from it. SeqSeg weights are still required. `-global_train_dataset` is ignored. `-start_seg` still merges an extra mask into the result. `seqseg run continue` reloads the checkpoint and does not read this folder again.
 
 #### Continue a stopped run:
 ```bash

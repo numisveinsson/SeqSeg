@@ -34,7 +34,7 @@ def run_plus_batch(
     seqseg_fold: str,
     seqseg_test_name: str,
     seqseg_scale: float,
-    dir_model_weights_global: str,
+    dir_model_weights_global: Optional[str] = None,
     global_fold: str,
     global_scale: float,
     img_format: str,
@@ -55,9 +55,14 @@ def run_plus_batch(
     simvascular: bool = False,
     force_cpu: bool = False,
     start_seg_path: Optional[str] = None,
+    global_seg_dir: Optional[str] = None,
     config_name: Optional[str] = None,
     start_time_global: float,
 ) -> None:
+    if not global_seg_dir and not dir_model_weights_global:
+        raise ValueError(
+            "Global model weights or global_seg_dir is required"
+        )
     testing_samples, directory_data = get_testing_samples(seqseg_dataset, data_dir)
     cent_max_spacing = global_config.get("CENT_MAX_SPACING", None)
     if cent_max_spacing is not None and float(cent_max_spacing) <= 0:
@@ -83,13 +88,22 @@ def run_plus_batch(
                 img_format,
             )
 
-        pred_sweep, prob_pred_sweep = run_global_segmentation(
-            dir_image=dir_image,
-            model_folder=dir_model_weights_global,
-            fold=global_fold,
-            scale=global_scale,
-            force_cpu=force_cpu,
-        )
+        if global_seg_dir:
+            ref_image_for_seg = sitk.ReadImage(dir_image)
+            binary_path, probability_path = sf.resolve_global_seg_files(
+                global_seg_dir, case, img_format
+            )
+            pred_sweep, prob_pred_sweep = sf.load_global_segmentation(
+                binary_path, probability_path, ref_image_for_seg
+            )
+        else:
+            pred_sweep, prob_pred_sweep = run_global_segmentation(
+                dir_image=dir_image,
+                model_folder=dir_model_weights_global,
+                fold=global_fold,
+                scale=global_scale,
+                force_cpu=force_cpu,
+            )
         sitk.WriteImage(pred_sweep, dir_output0 + "/" + case + "_sweep_seg.mha")
         sweep_surface = vf.evaluate_surface(pred_sweep, 1)
         vf.write_vtk_polydata(

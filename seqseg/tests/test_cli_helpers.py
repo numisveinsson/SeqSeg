@@ -242,6 +242,16 @@ def test_parser_run_plus_batch_start_seg():
     assert ns.start_seg == "/tmp/init.mha"
 
 
+def test_parser_run_plus_batch_global_seg_dir():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        ["run", "plus", "batch", "--global-seg-dir", "/tmp/segs"]
+    )
+    assert ns.global_seg_dir == "/tmp/segs"
+    ns_off = parser.parse_args(["run", "plus", "batch"])
+    assert ns_off.global_seg_dir is None
+
+
 def test_parser_run_plus_batch_cpu_flag():
     parser = _build_parser()
     ns = parser.parse_args(["run", "plus", "batch", "--cpu"])

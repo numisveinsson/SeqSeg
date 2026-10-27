@@ -198,6 +198,20 @@ def _add_plus_trace_args(p: argparse.ArgumentParser) -> None:
         type=str,
         default="Dataset012_COROASOCACT",
     )
+    p.add_argument(
+        "-global_seg_dir",
+        "--global_seg_dir",
+        "--global-seg-dir",
+        dest="global_seg_dir",
+        default=None,
+        type=str,
+        help=(
+            "Folder of per-case global segmentations. Skips the global "
+            "nnU-Net prediction and does not use global weights. "
+            "Accepts {case}_segmentation.mha with optional "
+            "{case}_probability.mha, or {case}{img_ext}"
+        ),
+    )
 
 
 def _seqseg_version() -> str:
@@ -356,19 +370,35 @@ def _cmd_trace_plus_batch(ns: argparse.Namespace) -> None:
             scale=ns.seqseg_scale,
         )
     )
-    dir_model_weights_global = _resolve_run_weights(
-        NnUNetModelSpec(
-            train_dataset=ns.global_train_dataset,
-            nnunet_type=ns.global_test_name,
-            results_path=ns.nnunet_results_path,
-            fold=ns.global_fold,
-            scale=ns.global_scale,
+    global_seg_dir = getattr(ns, "global_seg_dir", None)
+    if global_seg_dir:
+        global_seg_dir = os.path.abspath(os.path.expanduser(global_seg_dir))
+        if not os.path.isdir(global_seg_dir):
+            print(
+                "seqseg run plus batch: global segmentation directory not found: "
+                f"{global_seg_dir}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        dir_model_weights_global = None
+    else:
+        dir_model_weights_global = _resolve_run_weights(
+            NnUNetModelSpec(
+                train_dataset=ns.global_train_dataset,
+                nnunet_type=ns.global_test_name,
+                results_path=ns.nnunet_results_path,
+                fold=ns.global_fold,
+                scale=ns.global_scale,
+            )
         )
-    )
     print("Using nnUNet model weights from:")
     print(dir_model_weights_seqseg)
-    print("Using nnUNet model weights for global segmentation from:")
-    print(dir_model_weights_global)
+    if global_seg_dir:
+        print("Using global segmentations from:")
+        print(global_seg_dir)
+    else:
+        print("Using nnUNet model weights for global segmentation from:")
+        print(dir_model_weights_global)
 
     testing_samples, directory_data = get_testing_samples(ns.seqseg_train_dataset, data_dir)
     print("Testing samples about to run:")
@@ -410,6 +440,7 @@ def _cmd_trace_plus_batch(ns: argparse.Namespace) -> None:
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
         start_seg_path=ns.start_seg,
+        global_seg_dir=global_seg_dir,
         config_name=ns.config_name,
         start_time_global=t0,
     )

@@ -354,6 +354,115 @@ def resample_to_reference(image, reference, is_label=True):
     )
 
 
+def resolve_global_seg_files(seg_dir, case, img_ext):
+    """Find the global mask for one case.
+
+    Search order:
+
+    1. ``{case}_segmentation.mha``, plus ``{case}_probability.mha`` when present
+    2. ``{case}{img_ext}``
+    3. ``{case}_probability.mha`` alone
+
+    Returns ``(binary_path, probability_path)``. Either path may be ``None``,
+    but not both. Raises ``FileNotFoundError`` listing the paths that were tried.
+    """
+    root = os.path.abspath(os.path.expanduser(str(seg_dir)))
+    if not os.path.isdir(root):
+        raise FileNotFoundError(
+            f"Global segmentation directory not found: {root}"
+        )
+    segmentation = os.path.join(root, f"{case}_segmentation.mha")
+    probability = os.path.join(root, f"{case}_probability.mha")
+    named = os.path.join(root, f"{case}{img_ext}") if img_ext else None
+
+    if os.path.isfile(segmentation):
+        prob = probability if os.path.isfile(probability) else None
+        return segmentation, prob
+    if named is not None and os.path.isfile(named):
+        return named, None
+    if os.path.isfile(probability):
+        return None, probability
+
+    tried = [segmentation]
+    if named is not None:
+        tried.append(named)
+    tried.append(probability)
+    listing = "\n  ".join(tried)
+    raise FileNotFoundError(
+        f"No global segmentation for case {case!r} in {root}. Tried:\n  {listing}"
+    )
+
+
+def _clip_probability(image, reference_image):
+    """Float32 image in ``[0, 1]`` on ``reference_image``'s grid."""
+    arr = np.clip(
+        sitk.GetArrayFromImage(image).astype(np.float32, copy=False),
+        0.0,
+        1.0,
+    )
+    out = sitk.GetImageFromArray(arr)
+    out.CopyInformation(reference_image)
+    return out
+
+
+def load_global_segmentation(binary_path, probability_path, reference_image):
+    """Load a global mask and optional probability onto ``reference_image``.
+
+    A label mask is resampled with nearest neighbor. Foreground is any voxel
+    greater than 0, stored as a 0/1 ``UInt8`` image. When no probability file
+    is given, that mask is the assembly prior. A probability file is resampled
+    linearly and clipped to ``[0, 1]``; it is the assembly prior and is not
+    replaced by the binary mask. A probability file alone is thresholded at
+    0.5 to make the binary mask.
+
+    Returns ``(binary, probability)``.
+    """
+    if binary_path is None and probability_path is None:
+        raise ValueError("A binary mask or a probability image is required")
+
+    binary = None
+    probability = None
+    if binary_path is not None:
+        print(f"Loading global segmentation: {binary_path}")
+        label = sitk.ReadImage(binary_path)
+        if not geometry_matches(label, reference_image):
+            print(
+                "Global segmentation grid does not match the image; "
+                "resampling onto the image grid"
+            )
+            label = resample_to_reference(
+                label, reference_image, is_label=True
+            )
+        mask = (sitk.GetArrayFromImage(label) > 0).astype(np.uint8)
+        binary = sitk.GetImageFromArray(mask)
+        binary.CopyInformation(reference_image)
+
+    if probability_path is not None:
+        print(f"Loading global probability: {probability_path}")
+        prob = sitk.ReadImage(probability_path)
+        if not geometry_matches(prob, reference_image):
+            print(
+                "Global probability grid does not match the image; "
+                "resampling onto the image grid"
+            )
+            prob = resample_to_reference(
+                prob, reference_image, is_label=False
+            )
+        probability = _clip_probability(prob, reference_image)
+
+    if binary is None:
+        binary_img = sitk.BinaryThreshold(
+            probability,
+            lowerThreshold=0.5,
+            upperThreshold=1.0,
+        )
+        binary = sitk.Cast(binary_img, sitk.sitkUInt8)
+        binary.CopyInformation(reference_image)
+    if probability is None:
+        probability = as_probability_image(binary)
+    return binary, probability
+
+
 def load_start_segmentation(path, reference_image):
     """
     Load a starting segmentation and place it on ``reference_image``'s grid.

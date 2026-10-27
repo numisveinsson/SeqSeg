@@ -1,0 +1,59 @@
+# Coronary config with retracing prevention on.
+# Same settings as global_coro.yaml except PREVENT_RETRACE.
+# if we are tracing a segmentation or predicting a segmentation as we go
+# True if we have a segmentation, False if we are predicting
+SEGMENTATION: False # usually False
+
+DEBUG: False
+DEBUG_STEP: 100
+
+ANIMATION: True # to write out animation files
+ANIMATION_STEPS: 3 # write out animation every x steps
+
+RETRACE: False # retrace strategry
+TIME_ANALYSIS: False # if we want to write out how long each step take
+TREE_ANALYSIS: False
+
+VOLUME_SIZE_RATIO: 5.5 # default 5, 5.5 for coronaries, 4 for segs
+MAGN_RADIUS: 1
+ADD_RADIUS: 0.3
+MAX_PERC_ENLARGE: 0.33 # if percent of blood in a given volume goes above this, we try enlarging volume, default 0.33 for coronaries
+MIN_RADIUS: 0.3 # mm (keep in mm)
+MIN_RES: 5
+CENTERLINE_EXTRACTION_VMTK: False # if we want to extract centerline using VMTK
+CENTERLINE_MERGE_METHOD: clean # clean (vtkCleanPolyData) or tree
+TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
+
+NR_CHANCES: 3
+NR_ALLOW_RETRACE_STEPS: 10
+PREVENT_RETRACE: True
+SORT_NEXT: True
+MERGE_NEXT: False
+
+ASSEMBLY_EVERY_N: 20 # add to assembly every N steps
+USE_BUFFER: True # buffer the assembly (so not to mess with retrace prevention)
+BUFFER_N: 20 # add to assembly steps buff_N steps ago
+WEIGHTED_ASSEMBLY: True # if assembly should be weighted
+WEIGHT_TYPE: gaussian # type of weighting for assembly
+CENT_MAX_SPACING: 0.3 # mm; max spacing per dim for final assembly (refine only)
+
+FORCEFUL_SIDEBRANCH: False
+FORCEFUL_SIDEBRANCH_MAGN_RADIUS: 1.1
+
+MEGA_SUBVOLUME: False # extract centerline from previous N steps, instead of just 1
+NR_MEGA_SUB: 3 # how many steps to assemble into mega subvolume
+
+STOP_PRE: True # whether to stop tracing prematurely, if True then options below will be used
+STOP_RADIUS: 0.4 # (mm) 0.48 if radius goes below, stop tracing
+MAX_STEPS_BRANCH: 100 # max num of steps per branch, stop when reached
+
+RESTART_BRANCH: True
+
+# SimVascular: after each completed branch, write one .ctgr contour group (2D
+# contours along that branch's .pth) using the live global probability assembly.
+SIMVASCULAR_CONTOURS: True
+SIMVASCULAR_CONTOUR_ISO: 0.5
+SIMVASCULAR_CONTOUR_STRIDE: 2
+SIMVASCULAR_CONTOUR_HALF_EXTENT_MM: 50.0
+# closest_to_path | largest — see simvascular_contour.py
+SIMVASCULAR_CONTOUR_COMPONENT: closest_to_path
