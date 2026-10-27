@@ -121,6 +121,7 @@ def initialize_json(test_case, dir_output, dir_cent, dir_data, unit,
                                     np.array(seed[1]),
                                     seed[2], 0)
             step['connection'] = [0, 0]
+            step['init_seed'] = True
             potential_branches.append(step)
             initial_seeds.append(np.array(seed[1]))
             if write_samples:
@@ -177,6 +178,7 @@ def create_pots(num_seeds, old_seeds, old_radiuss,
         init_step = create_step_dict(old_seeds[i], old_radiuss[i],
                                      initial_seeds[i], initial_radiuss[i], 0)
         init_step['connection'] = [0, 0]
+        init_step['init_seed'] = True
         potential_branches.append(init_step)
 
     return potential_branches

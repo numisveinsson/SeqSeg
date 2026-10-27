@@ -107,6 +107,7 @@ def seeds_to_potential_branches(
             raise ValueError("old_point and new_point must have length 3")
         step = create_step_dict(old, r, new, r, None)
         step["connection"] = [0, 0]
+        step["init_seed"] = True
         out.append(step)
     return out
 

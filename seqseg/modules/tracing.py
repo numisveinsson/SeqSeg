@@ -38,6 +38,20 @@ from .nnunet import initialize_predictor
 sys.stdout.flush()
 
 
+def _pop_unused_init_seed(vessel_tree):
+    """Return the next initialization seed that has not been traced yet.
+
+    Seeds stay in ``potential_branches`` alongside bifurcations. Sorting by
+    radius and then popping index 1 leaves the largest entry, so an unused
+    seed larger than the side branches is never started.
+    """
+    traced = {id(step) for step in vessel_tree.steps}
+    for idx, pot in enumerate(vessel_tree.potential_branches):
+        if pot.get("init_seed") and id(pot) not in traced:
+            return vessel_tree.potential_branches.pop(idx)
+    return None
+
+
 @dataclass
 class TracingContext:
     """Keyword-style bundle for :func:`trace_centerline_from_context`."""
@@ -1168,15 +1182,25 @@ def trace_centerline(
                 else:
                     vessel_tree.shuffle_potential()  # Random order
 
-                # Continue with next available branch
-                if len(vessel_tree.potential_branches) == 1:
-                    break  # No more branches to process
-                next_step = vessel_tree.potential_branches.pop(1)
-                if next_step['point'][0] == vessel_tree.steps[0]['point'][0]:
-                    if len(vessel_tree.potential_branches) > 1:
-                        next_step = vessel_tree.potential_branches.pop(1)
-                    else:
+                # Initialization seeds are traced before bifurcations found
+                # along the way. The largest remaining potential is otherwise
+                # left in place (pop index 1), so a second seed with a bigger
+                # radius than the side branches never starts.
+                next_step = _pop_unused_init_seed(vessel_tree)
+                if next_step is not None:
+                    print(
+                        "Taking initialization seed before bifurcations, "
+                        f"radius {next_step['radius']:.3f}"
+                    )
+                else:
+                    if len(vessel_tree.potential_branches) == 1:
                         break  # No more branches to process
+                    next_step = vessel_tree.potential_branches.pop(1)
+                    if next_step['point'][0] == vessel_tree.steps[0]['point'][0]:
+                        if len(vessel_tree.potential_branches) > 1:
+                            next_step = vessel_tree.potential_branches.pop(1)
+                        else:
+                            break  # No more branches to process
 
                 branch += 1
                 vessel_tree.add_branch(next_step['connection'][1], i)

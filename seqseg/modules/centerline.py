@@ -3156,21 +3156,21 @@ def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=F
     if nr_seeds is None:
         nr_seeds = num_components
         if verbose:
-            print(f"  No seed count specified, creating one seed per component ({nr_seeds} seeds)")
+            print(f"  No source-point count specified, placing one centerline source point per connected body ({nr_seeds})")
     else:
         original_nr_seeds = nr_seeds
         nr_seeds = min(nr_seeds, num_components)
         
         if verbose:
             if original_nr_seeds > num_components:
-                print(f"  Requested {original_nr_seeds} seeds, but only {num_components} disconnected bodies found")
-                print(f"  Adjusting to create {nr_seeds} seeds (one per disconnected body)")
+                print(f"  Requested {original_nr_seeds} centerline source points, but only {num_components} connected bodies found")
+                print(f"  Placing {nr_seeds} centerline source points, one per connected body")
             else:
-                print(f"  Creating {nr_seeds} seeds from largest components")
+                print(f"  Placing {nr_seeds} centerline source points, one in each of the largest connected bodies")
         
         # Also provide a warning even when not verbose
         elif original_nr_seeds > num_components:
-            print(f"Warning: Requested {original_nr_seeds} seeds, but only found {num_components} disconnected bodies. Creating {nr_seeds} seeds.")
+            print(f"Warning: Requested {original_nr_seeds} centerline source points, but only found {num_components} connected bodies. Placing {nr_seeds}.")
     
     # Calculate surface distance map for the entire segmentation
     distance_map = distance_map_from_seg(segmentation)
@@ -3228,7 +3228,7 @@ def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=F
                 print(f"      Component had {len(component_indices)} indices but no valid distance values")
     
     if verbose:
-        print(f"  Successfully created {len(seeds)} seeds")
+        print(f"  Placed {len(seeds)} centerline source points")
     
     # Write seeds as polydata for visualization/debugging
     if len(seeds) > 0:
@@ -3501,7 +3501,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
         
     # Step 1: Create seeds from disconnected bodies
     if verbose:
-        print("Step 1: Analyzing disconnected bodies and creating seeds...")
+        print("Step 1: Placing one centerline source point in each of the largest connected bodies...")
     
     seeds, component_info = create_seeds_from_disconnected_bodies(
         segmentation, nr_seeds=nr_seeds, verbose=verbose)
@@ -3527,7 +3527,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
         }
     
     if verbose:
-        print(f"Step 2: Calculating centerlines for {len(seeds)} seeds...")
+        print(f"Step 2: Extracting a centerline from each of {len(seeds)} source points...")
     
     # Step 2: Calculate centerlines for each seed
     centerlines = []
@@ -3537,7 +3537,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     
     for i, seed in enumerate(seeds):
         if verbose:
-            print(f"  Processing seed {i+1}/{len(seeds)}: {seed}")
+            print(f"  Centerline source point {i+1}/{len(seeds)}: {seed}")
             
         # Add seed validation and diagnostics
         try:
