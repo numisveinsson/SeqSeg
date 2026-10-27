@@ -22,6 +22,7 @@ __all__ = (
     "seeds_to_potential_branches",
     "TracingOptions",
     "run_tracing",
+    "continue_tracing",
 )
 
 
@@ -110,4 +111,8 @@ def __getattr__(name: str):
         from seqseg.api import run_tracing
 
         return run_tracing
+    if name == "continue_tracing":
+        from seqseg.api import continue_tracing
+
+        return continue_tracing
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

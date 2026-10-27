@@ -76,6 +76,33 @@ def test_parser_run_single_required_flags():
     assert ns.force_cpu is False
 
 
+def test_parser_run_continue_flags():
+    parser = _build_parser()
+    ns = parser.parse_args(
+        [
+            "run",
+            "continue",
+            "--case-dir",
+            "/tmp/out/3d_fullres_case001",
+            "--extra-steps",
+            "50",
+            "--seed",
+            "1",
+            "2",
+            "3",
+            "0.5",
+            "--max-n-branches",
+            "200",
+        ]
+    )
+    assert ns.run_cmd == "continue"
+    assert ns.case_dir == "/tmp/out/3d_fullres_case001"
+    assert ns.extra_steps == 50
+    assert ns.seed == [[1.0, 2.0, 3.0, 0.5]]
+    assert ns.max_n_branches == 200
+    assert ns.max_n_steps_per_branch is None
+
+
 def test_parser_run_batch_cpu_flag():
     parser = _build_parser()
     ns = parser.parse_args(

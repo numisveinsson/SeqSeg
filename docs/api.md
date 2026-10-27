@@ -71,6 +71,22 @@ prob = result.assembly.assembly
 | `inside_pts` | Points classified inside the vessel |
 | `vessel_tree` | Assembled tree |
 | `n_steps_taken` | Steps actually taken |
+| `stop_reason` | `max_steps`, `max_branches`, or `exhausted` |
+| `loop_state` | Counters used to continue this run |
+
+## Continue a run
+
+`continue_tracing(case_dir, extra_steps, seeds=None)` reloads `{case_dir}/checkpoint` and takes more steps. `seeds` accept the same forms as `run_tracing`. They start after the open branch ends. The usual output files are rewritten with the new step count and the checkpoint is replaced.
+
+```python
+from seqseg.api import branch_seed_at_point, continue_tracing
+
+result = continue_tracing(
+    "results/3d_fullres_case001",
+    extra_steps=100,
+    seeds=[branch_seed_at_point([1.2, 3.4, 5.6], 0.4)],
+)
+```
 
 ## Seeds
 

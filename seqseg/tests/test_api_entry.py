@@ -10,6 +10,7 @@ from seqseg.api import (
     BranchSeed,
     TracingOptions,
     branch_seed_at_point,
+    continue_tracing,
     run_tracing,
     seeds_to_potential_branches,
 )
@@ -103,3 +104,5 @@ def test_lazy_seqseg_exports_run_tracing():
     fn = seqseg.run_tracing
     assert callable(fn)
     assert fn.__module__ == "seqseg.api"
+    assert callable(seqseg.continue_tracing)
+    assert seqseg.continue_tracing is continue_tracing

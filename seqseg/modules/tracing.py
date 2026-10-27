@@ -1,8 +1,8 @@
 import time
 import pdb
 import sys
-from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Union
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Optional, Sequence, Union
 
 import numpy as np
 import SimpleITK as sitk
@@ -52,6 +52,35 @@ def _pop_unused_init_seed(vessel_tree):
     return None
 
 
+def _queue_resume_seeds(vessel_tree, resume_mode, i, branch, new_seeds):
+    """Add ``new_seeds`` to a restored tree.
+
+    With ``resume_mode == "pending_step"`` step ``i`` has not been traced yet,
+    so seeds wait in ``potential_branches`` until the open branch ends. With
+    ``"needs_new_branch"`` step ``i`` already failed and ended the tree, so the
+    first seed becomes the next branch at index ``i``.
+
+    Returns ``(branch, started_new_branch, run_loop)``.
+    """
+    seeds = list(new_seeds or [])
+    if resume_mode != "needs_new_branch":
+        vessel_tree.potential_branches.extend(seeds)
+        return branch, False, True
+    if not seeds:
+        print("Previous run already finished the tree and no new seeds "
+              "were given; nothing to continue")
+        return branch, False, False
+    next_step = seeds.pop(0)
+    branch += 1
+    vessel_tree.add_branch(next_step['connection'][1], i)
+    if i < len(vessel_tree.steps):
+        vessel_tree.steps[i] = next_step
+    else:
+        vessel_tree.steps.append(next_step)
+    vessel_tree.potential_branches.extend(seeds)
+    return branch, True, True
+
+
 @dataclass
 class TracingContext:
     """Keyword-style bundle for :func:`trace_centerline_from_context`."""
@@ -74,6 +103,9 @@ class TracingContext:
     disk_io: bool = True
     simvascular: bool = False
     force_cpu: bool = False
+    resume_state: Any = None
+    new_seeds: Optional[Sequence[dict]] = None
+    save_resume_state: bool = False
 
 
 @dataclass
@@ -85,6 +117,8 @@ class TracingResult:
     assembly: Any
     vessel_tree: Any
     n_steps_taken: int
+    stop_reason: str = "exhausted"
+    loop_state: dict = field(default_factory=dict)
 
 
 def trace_centerline_from_context(ctx: TracingContext) -> TracingResult:
@@ -141,6 +175,9 @@ def trace_centerline_from_context(ctx: TracingContext) -> TracingResult:
         disk_io=ctx.disk_io,
         simvascular=ctx.simvascular,
         force_cpu=ctx.force_cpu,
+        resume_state=ctx.resume_state,
+        new_seeds=ctx.new_seeds,
+        save_resume_state=ctx.save_resume_state,
     )
     return TracingResult(*tup)
 
@@ -164,6 +201,9 @@ def trace_centerline(
     disk_io=True,
     simvascular=False,
     force_cpu=False,
+    resume_state=None,
+    new_seeds=None,
+    save_resume_state=False,
 ):
     """
     Trace vessel centerlines using sequential segmentation and tracking.
@@ -221,10 +261,20 @@ def trace_centerline(
         (``.pth``, ``.ctgr``) under ``output_folder/simvascular/``.
     force_cpu : bool, optional
         If True, run nnU-Net inference on CPU even when a GPU is available.
+    resume_state : seqseg.modules.checkpoint.ResumeState, optional
+        Continue a previous run: the saved tree, assembly, and loop counters
+        replace the fresh ones and ``potential_branches`` is ignored.
+        ``max_step_size`` is still the absolute step cap.
+    new_seeds : list of step dicts, optional
+        With ``resume_state``, initialization seeds to add to the restored tree.
+    save_resume_state : bool, optional
+        Keep the assembly from before the final buffer flush in ``loop_state``
+        so :func:`seqseg.modules.checkpoint.save_checkpoint` can write it.
     Returns:
     --------
     tuple
-        (centerlines, surfaces, points, inside_pts, assembly_segs, vessel_tree, n_steps)
+        (centerlines, surfaces, points, inside_pts, assembly_segs, vessel_tree,
+        n_steps, stop_reason, loop_state)
     """
 
     # Convert unit scaling: cm requires 0.1 factor, mm uses 1.0
@@ -310,9 +360,12 @@ def trace_centerline(
         reader_im = reader_seg
 
     # Initialize data structures for tracking vessel tree and global segmentation
-    init_step = potential_branches[0]                           # First branch point to start tracing
-    vessel_image_label = image_file if isinstance(image_file, str) else "<sitk.Image>"
-    vessel_tree = VesselTree(case, vessel_image_label, init_step, potential_branches)
+    if resume_state is not None:
+        vessel_tree = resume_state.vessel_tree
+    else:
+        init_step = potential_branches[0]                       # First branch point to start tracing
+        vessel_image_label = image_file if isinstance(image_file, str) else "<sitk.Image>"
+        vessel_tree = VesselTree(case, vessel_image_label, init_step, potential_branches)
 
     if (seg_file is not None) and trace_seg:
         if isinstance(seg_file, sitk.Image):
@@ -341,6 +394,8 @@ def trace_centerline(
             weight_type=weight_type,
             start_seg=start_seg,
         )
+    if resume_state is not None:
+        resume_state.apply_to(assembly_segs)
 
     # Load neural network model (nnU-Net) for vessel segmentation prediction
     if not (seg_file and trace_seg):
@@ -361,8 +416,34 @@ def trace_centerline(
     num_steps_direction = 0                                     # Steps taken in current direction
     inside_branch = 0                                          # Counter for steps inside existing vessels
     i = 0                                                      # Global step counter (chronological order)
+    run_loop = True
+    stop_reason = None
+
+    if resume_state is not None:
+        i = resume_state.i
+        branch = resume_state.branch
+        num_steps_direction = resume_state.num_steps_direction
+        inside_branch = resume_state.inside_branch
+        simvascular_path_counter = resume_state.simvascular_path_counter
+        list_centerlines = list(resume_state.centerlines)
+        list_surfaces = list(resume_state.surfaces)
+        list_points = list(resume_state.points)
+        list_inside_pts = list(resume_state.inside_pts)
+        print(f"Resuming at step {i}, branch {branch}, "
+              f"mode {resume_state.resume_mode}, cap {max_step_size}")
+        branch, new_branch, run_loop = _queue_resume_seeds(
+            vessel_tree, resume_state.resume_mode, i, branch, new_seeds)
+        if new_branch:
+            num_steps_direction = 0
+            if len(vessel_tree.branches) > max_n_branches:
+                print(f"Max number of branches reached: {max_n_branches}")
+                run_loop = False
+                stop_reason = 'max_branches'
+        elif not run_loop:
+            stop_reason = 'exhausted'
+
     # Main tracing loop: continue while there are potential branches to explore
-    while vessel_tree.potential_branches and i < max_step_size:
+    while run_loop and vessel_tree.potential_branches and i < max_step_size:
 
         # Progress reporting: print step number and timestamp
         print(f"\n*** Step number {i} ***")
@@ -1219,7 +1300,24 @@ def trace_centerline(
                 # Check if end prematurely
                 if len(vessel_tree.branches) > max_n_branches:
                     print(f"Max number of branches reached: {max_n_branches}")
+                    stop_reason = 'max_branches'
                     break
+
+    if stop_reason is None:
+        if i >= max_step_size and i < len(vessel_tree.steps):
+            stop_reason = 'max_steps'
+        else:
+            stop_reason = 'exhausted'
+    loop_state = {
+        'i': i,
+        'branch': branch,
+        'num_steps_direction': num_steps_direction,
+        'inside_branch': inside_branch,
+        'simvascular_path_counter': simvascular_path_counter,
+        'resume_mode': ('pending_step'
+                        if stop_reason in ('max_steps', 'max_branches')
+                        else 'needs_new_branch'),
+    }
 
     # Write out remaining unprocessed potential branch points for analysis
     if len(vessel_tree.potential_branches) > 0:
@@ -1240,6 +1338,17 @@ def trace_centerline(
 
     # Final cleanup: add remaining segmentations to global assembly
     if use_buffer:
+        if save_resume_state:
+            # A resumed run must see the assembly without these buffered
+            # crops, otherwise retrace prevention treats the open branch's
+            # own last steps as already segmented.
+            loop_state['pre_flush'] = {
+                'assembly': assembly_segs.assembly,
+                'number_updates': assembly_segs.number_updates.copy(),
+                'n_updates': (assembly_segs.n_updates.copy()
+                              if assembly_segs.weighted else None),
+                'pending': [],
+            }
         print("Adding rest of segs to global")
         # Process remaining valid segmentations in reverse order
         check = 2
@@ -1254,6 +1363,10 @@ def trace_centerline(
                                             ['img_size']),
                                            (1/vessel_tree.steps[-check]
                                             ['radius'])**2)  # Smaller radii get higher weight
+            if save_resume_state:
+                loop_state['pre_flush']['pending'].append(
+                    (vessel_tree.steps[-check],
+                     vessel_tree.steps[-check]['prob_predicted_vessel']))
             vessel_tree.steps[-check]['prob_predicted_vessel'] = None  # Free memory
             check += 1
 
@@ -1264,4 +1377,6 @@ def trace_centerline(
             list_inside_pts,     # Points that were detected inside vessels
             assembly_segs,       # Global segmentation assembly object
             vessel_tree,         # Complete tree structure with all steps
-            i)                   # Final step counter
+            i,                   # Final step counter
+            stop_reason,         # 'max_steps', 'max_branches', or 'exhausted'
+            loop_state)          # Counters needed to continue this run

@@ -117,6 +117,7 @@ Other common commands:
 | `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
 | `seqseg run global` | Whole-volume nnU-Net prediction from a trainer folder and an image or image folder |
 | `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg |
+| `seqseg run continue` | Continue a case from `{case_dir}/checkpoint` for more steps, optionally with new seeds |
 | `seqseg paths init` / `set` / `show` | Save default nnU-Net / data / out dirs (`~/.seqseg/paths.yaml`) |
 | `seqseg train prepare` | Extract patches or whole volumes, create an nnU-Net dataset, and preprocess |
 | `seqseg train nnunet` | Train with nnU-Net (`--c` continues from the latest checkpoint) |
@@ -188,6 +189,23 @@ seqseg run batch -data_dir data/ -start_seg /path/to/initial_seg.mha
 ```
 Tracing is unchanged; the SeqSeg result is merged (union) into the initial mask.
 
+#### Continue a stopped run:
+```bash
+seqseg run continue --case-dir results/3d_fullres_case001 --extra-steps 100
+```
+Every run writes `{case_dir}/checkpoint/`. Continue reloads that state and takes `X` more steps from the next unprocessed step. Image, model, config, unit, and scale come from the checkpoint. New products are written with the new step count (`…_300_steps.mha` next to `…_200_steps.mha`) and the checkpoint is replaced so you can continue again.
+
+Add seeds without retracing finished branches. They wait until the open branch ends, then start before queued bifurcations:
+
+```bash
+seqseg run continue --case-dir results/3d_fullres_case001 --extra-steps 100 \
+    --seed 1.2 3.4 5.6 0.4 --seed 2.0 1.0 0.5 0.3
+```
+
+`--seeds-json` accepts a `seeds.json` (the entry named like the case), a single case object, or a bare list of `[old_point, new_point, radius]` triples. If the previous run already finished the tree, extra steps do nothing unless you give new seeds. If it stopped on `-max_n_branches`, pass `--max-n-branches` higher than the saved cap.
+
+Runs that finished before this feature have no checkpoint and cannot be continued.
+
 ## Command Line Arguments
 
 Arguments for `seqseg run batch`:
@@ -217,6 +235,17 @@ Arguments for `seqseg run batch`:
 | `start_seg` | str | - | Optional initial segmentation; SeqSeg output is merged into it |
 | `simvascular` | int | `0` | Write SimVascular project under each case (`0`/`1`) |
 
+Arguments for `seqseg run continue`:
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `case-dir` | str | required | Case output folder that holds `checkpoint/` |
+| `extra-steps` | int | required | Steps to add on top of the steps already taken |
+| `seed` | X Y Z R | - | New seed (repeat for multiple). Traced after the open branch ends |
+| `seeds-json` | str | - | New seeds as `[old_point, new_point, radius]` triples |
+| `max-n-branches` | int | checkpoint | Raise the branch cap |
+| `max-n-steps-per-branch` | int | checkpoint | Change the per-branch cap |
+
 ## Output Files
 
 SeqSeg generates several output files for each processed case. Filenames include `{test_name}` (e.g. `3d_fullres`):
@@ -230,6 +259,8 @@ SeqSeg generates several output files for each processed case. Filenames include
 | `{case}_prob_seg_*.mha` | Probabilistic segmentation |
 
 Per-case working directory (e.g. `results/3d_fullres_{case}/`):
+
+- `checkpoint/`: State needed by `seqseg run continue` (tree, assembly, counters)
 
 **For debugging** (when `write_steps=1`):
 - `volumes/`: Local image patches

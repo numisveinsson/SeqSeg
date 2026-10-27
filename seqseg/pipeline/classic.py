@@ -14,6 +14,7 @@ from seqseg.modules import sitk_functions as sf
 from seqseg.modules import vtk_functions as vf
 from seqseg.modules.assembly import calc_centerline_global
 from seqseg.modules.capping import cap_surface
+from seqseg.modules.checkpoint import seeds_to_lists, try_save_checkpoint
 from seqseg.modules.simvascular import (
     write_simvascular_model,
     write_simvascular_proj,
@@ -52,6 +53,7 @@ def run_classic_batch(
     simvascular: bool = False,
     force_cpu: bool = False,
     start_seg_path: Optional[str] = None,
+    config_name: Optional[str] = None,
     start_time_global: float,
 ) -> None:
     """Run classic tracing for ``testing_samples[start:stop]``."""
@@ -140,212 +142,282 @@ def run_classic_batch(
             write_samples=write_samples,
             simvascular=simvascular,
             force_cpu=force_cpu,
+            save_resume_state=True,
         )
         tr = trace_centerline_from_context(ctx)
-        centerlines = tr.centerlines
-        surfaces = tr.surfaces
-        points = tr.points
-        inside_pts = tr.inside_pts
-        assembly_obj = tr.assembly
-        vessel_tree = tr.vessel_tree
-        n_steps_taken = tr.n_steps_taken
 
-        print(
-            "\nTotal calculation time is:"
-            + f"{((time.time() - start_time_global) / 60):.2f} min\n"
+        manifest = {
+            "pipeline": "classic",
+            "case": case,
+            "idx": idx,
+            "test_name": test_name,
+            "image_file": os.path.abspath(dir_image),
+            "seg_file": os.path.abspath(dir_seg) if dir_seg else None,
+            "model_folder": os.path.abspath(dir_model_weights),
+            "fold": fold,
+            "config_name": config_name,
+            "unit": unit,
+            "scale": scale,
+            "write_samples": bool(write_samples),
+            "simvascular": bool(simvascular),
+            "force_cpu": bool(force_cpu),
+            "calc_global_centerline": bool(calc_global_centerline),
+            "cap_surface_cent": bool(cap_surface_cent),
+            "assembly_threshold": assembly_threshold,
+            "max_n_steps": max_step_size,
+            "max_n_branches": max_n_branches,
+            "max_n_steps_per_branch": max_n_steps_per_branch,
+            "initial_seeds": seeds_to_lists(initial_seeds),
+        }
+        try_save_checkpoint(dir_output, tr, manifest, global_config, start_seg)
+
+        finish_classic_case(
+            tr,
+            case=case,
+            idx=idx,
+            test_name=test_name,
+            dir_output=dir_output,
+            dir_output0=dir_output0,
+            start_seg=start_seg,
+            initial_seeds=initial_seeds,
+            global_config=global_config,
+            unit=unit,
+            write_samples=write_samples,
+            take_time=take_time,
+            calc_global_centerline=calc_global_centerline,
+            cap_surface_cent=cap_surface_cent,
+            assembly_threshold=assembly_threshold,
+            simvascular=simvascular,
+            start_time_global=start_time_global,
         )
-
-        if take_time:
-            vessel_tree.time_analysis()
-
-        if global_config["TREE_ANALYSIS"]:
-            vessel_tree.create_tree_polydata_v1(dir_output)
-            vessel_tree.create_tree_polydata_v2(dir_output)
-            vessel_tree.plot_radius_distribution(dir_output)
-
-        assembly = assembly_obj.assembly
-        if start_seg is not None:
-            assembly = sf.merge_probability_with_start(assembly, start_seg)
-        n_udpates = None
-        if write_samples:
-            n_udpates = assembly_obj.get_n_updates_image()
-
-        if cent_max_spacing is not None:
-            target_spacing = sf.capped_target_spacing(
-                assembly.GetSpacing(), cent_max_spacing, unit
-            )
-            if target_spacing is not None:
-                fitted = sf.fit_spacing_to_max_voxels(
-                    assembly.GetSize(),
-                    assembly.GetSpacing(),
-                    target_spacing,
-                )
-                if fitted is None:
-                    print(
-                        "Skipping assembly upsample: even a coarsened grid "
-                        f"would exceed {sf.DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
-                    )
-                else:
-                    if any(
-                        abs(a - b) > 1e-12
-                        for a, b in zip(fitted, target_spacing)
-                    ):
-                        print(
-                            "Relaxed assembly spacing from "
-                            f"{target_spacing} to {fitted} to stay <= "
-                            f"{sf.DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
-                        )
-                    target_spacing = fitted
-                    print(
-                        f"Resampling final assembly to spacing <= "
-                        f"{float(cent_max_spacing)} mm: {target_spacing}"
-                    )
-                    assembly = sf.resample_to_spacing(
-                        assembly, target_spacing, is_label=False
-                    )
-                    if write_samples:
-                        n_udpates = sf.resample_to_spacing(
-                            n_udpates, target_spacing, is_label=True
-                        )
-
-        assembly_binary = sitk.BinaryThreshold(
-            assembly,
-            lowerThreshold=assembly_threshold,
-            upperThreshold=1,
-        )
-
-        sitk.WriteImage(
-            assembly_binary,
-            dir_output + "/" + case + "_binary_seg_" + test_name + "_" + str(idx) + ".mha",
-        )
-        if write_samples:
-            sitk.WriteImage(
-                assembly,
-                dir_output + "/" + case + "_prob_seg_" + test_name + "_" + str(idx) + ".mha",
-            )
-            sitk.WriteImage(
-                n_udpates,
-                dir_output + "/" + case + "_n_updates_" + test_name + "_" + str(idx) + ".mha",
-            )
-
-        assembly_obj.calc_ratio_updates()
-
-        assembly_binary = sf.keep_component_seeds(assembly_binary, initial_seeds)
-        if start_seg is not None:
-            assembly_binary = sf.merge_binary_with_start(
-                assembly_binary, start_seg, threshold=assembly_threshold
-            )
-
-        sitk.WriteImage(
-            assembly_binary,
-            dir_output0
-            + "/"
-            + case
-            + "_segmentation_"
-            + test_name
-            + "_"
-            + str(n_steps_taken)
-            + "_steps"
-            + ".mha",
-        )
-
-        assembly_surface = vf.evaluate_surface(assembly_binary, 1)
-
-        vf.write_vtk_polydata(
-            assembly_surface,
-            dir_output + "/" + case + "_surface_mesh_nonsmooth_" + test_name + "_"
-            + str(n_steps_taken) + "_steps" + ".vtp",
-        )
-
-        surface_smooth = vf.taubin_smooth_polydata(
-            assembly_surface, it=75, mu1=0.5, mu2=0.51
-        )
-        surface_smooth = vf.compute_polydata_normals(surface_smooth)
-        vf.write_vtk_polydata(
-            surface_smooth,
-            dir_output0 + "/" + case + "_surface_mesh_" + test_name + "_"
-            + str(n_steps_taken) + "_steps" + ".vtp",
-        )
-        if simvascular:
-            write_simvascular_model(
-                surface_smooth,
-                os.path.join(dir_output, "simvascular"),
-                case,
-            )
-
-        if len(centerlines) > 0:
-            final_surface = vf.appendPolyData(surfaces)
-            final_centerline = vf.appendPolyData(centerlines)
-            final_points = vf.appendPolyData(points)
-
-            vf.write_vtk_polydata(
-                final_surface,
-                dir_output + "/all_" + case + "_" + test_name + "_" + str(idx) + "_"
-                + str(n_steps_taken) + "_surfaces.vtp",
-            )
-            vf.write_vtk_polydata(
-                final_centerline,
-                dir_output + "/all_" + case + "_" + test_name + "_" + str(idx) + "_"
-                + str(n_steps_taken) + "_centerlines.vtp",
-            )
-            vf.write_vtk_polydata(
-                final_points,
-                dir_output + "/all_" + case + "_" + test_name + "_" + str(idx) + "_"
-                + str(n_steps_taken) + "_points.vtp",
-            )
-
-        if calc_global_centerline:
-            global_centerline, targets, success = calc_centerline_global(
-                assembly_binary,
-                initial_seeds,
-                nr_seeds=len(initial_seeds),
-                merge_method=global_config.get("CENTERLINE_MERGE_METHOD", "clean"),
-            )
-
-            if success or len(targets) > 0:
-                vf.write_vtk_polydata(
-                    global_centerline,
-                    dir_output0 + "/" + case + "_centerline_" + test_name + "_"
-                    + str(n_steps_taken) + "_steps" + ".vtp",
-                )
-
-                targets_pd = vf.points2polydata([target.tolist() for target in targets])
-                vf.write_vtk_polydata(
-                    targets_pd,
-                    dir_output + "/" + case + "_" + test_name + "_" + str(idx) + "_"
-                    + str(n_steps_taken) + "_targets.vtp",
-                )
-
-                if cap_surface_cent:
-                    capped_surface, capped_seg = cap_surface(
-                        pred_surface=assembly_surface,
-                        centerline=global_centerline,
-                        pred_seg=assembly_binary,
-                        file_name=case,
-                        outdir=dir_output,
-                        targets=targets,
-                    )
-
-                    vf.write_vtk_polydata(
-                        capped_surface,
-                        dir_output + "/" + case + "_" + test_name + "_" + str(idx) + "_"
-                        + str(n_steps_taken) + "_capped_surface.vtp",
-                    )
-                    sitk.WriteImage(
-                        capped_seg,
-                        dir_output + "/" + case + "_" + test_name + "_"
-                        + str(n_steps_taken) + "_capped_seg.mha",
-                    )
-
-        if global_config["PREVENT_RETRACE"]:
-            if len(inside_pts) > 0:
-                final_inside_pts = vf.appendPolyData(inside_pts)
-                vf.write_vtk_polydata(
-                    final_inside_pts,
-                    dir_output + "/final_" + case + "_" + test_name + "_" + str(idx) + "_"
-                    + str(n_steps_taken) + "_inside_points.vtp",
-                )
 
         if not global_config["DEBUG"]:
             sys.stdout.close()
             sys.stdout = sys.__stdout__
+
+
+def finish_classic_case(
+    tr,
+    *,
+    case: str,
+    idx,
+    test_name: str,
+    dir_output: str,
+    dir_output0: str,
+    start_seg: Optional[sitk.Image],
+    initial_seeds: Sequence,
+    global_config: Mapping[str, Any],
+    unit: str,
+    write_samples: bool,
+    take_time: bool,
+    calc_global_centerline: bool,
+    cap_surface_cent: bool,
+    assembly_threshold: float,
+    simvascular: bool,
+    start_time_global: float,
+) -> None:
+    """Write segmentation, surfaces, and centerlines for one traced case."""
+    cent_max_spacing = global_config.get("CENT_MAX_SPACING", None)
+    centerlines = tr.centerlines
+    surfaces = tr.surfaces
+    points = tr.points
+    inside_pts = tr.inside_pts
+    assembly_obj = tr.assembly
+    vessel_tree = tr.vessel_tree
+    n_steps_taken = tr.n_steps_taken
+
+    print(
+        "\nTotal calculation time is:"
+        + f"{((time.time() - start_time_global) / 60):.2f} min\n"
+    )
+
+    if take_time:
+        vessel_tree.time_analysis()
+
+    if global_config["TREE_ANALYSIS"]:
+        vessel_tree.create_tree_polydata_v1(dir_output)
+        vessel_tree.create_tree_polydata_v2(dir_output)
+        vessel_tree.plot_radius_distribution(dir_output)
+
+    assembly = assembly_obj.assembly
+    if start_seg is not None:
+        assembly = sf.merge_probability_with_start(assembly, start_seg)
+    n_udpates = None
+    if write_samples:
+        n_udpates = assembly_obj.get_n_updates_image()
+
+    if cent_max_spacing is not None:
+        target_spacing = sf.capped_target_spacing(
+            assembly.GetSpacing(), cent_max_spacing, unit
+        )
+        if target_spacing is not None:
+            fitted = sf.fit_spacing_to_max_voxels(
+                assembly.GetSize(),
+                assembly.GetSpacing(),
+                target_spacing,
+            )
+            if fitted is None:
+                print(
+                    "Skipping assembly upsample: even a coarsened grid "
+                    f"would exceed {sf.DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
+                )
+            else:
+                if any(
+                    abs(a - b) > 1e-12
+                    for a, b in zip(fitted, target_spacing)
+                ):
+                    print(
+                        "Relaxed assembly spacing from "
+                        f"{target_spacing} to {fitted} to stay <= "
+                        f"{sf.DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
+                    )
+                target_spacing = fitted
+                print(
+                    f"Resampling final assembly to spacing <= "
+                    f"{float(cent_max_spacing)} mm: {target_spacing}"
+                )
+                assembly = sf.resample_to_spacing(
+                    assembly, target_spacing, is_label=False
+                )
+                if write_samples:
+                    n_udpates = sf.resample_to_spacing(
+                        n_udpates, target_spacing, is_label=True
+                    )
+
+    assembly_binary = sitk.BinaryThreshold(
+        assembly,
+        lowerThreshold=assembly_threshold,
+        upperThreshold=1,
+    )
+
+    sitk.WriteImage(
+        assembly_binary,
+        dir_output + "/" + case + "_binary_seg_" + test_name + "_" + str(idx) + ".mha",
+    )
+    if write_samples:
+        sitk.WriteImage(
+            assembly,
+            dir_output + "/" + case + "_prob_seg_" + test_name + "_" + str(idx) + ".mha",
+        )
+        sitk.WriteImage(
+            n_udpates,
+            dir_output + "/" + case + "_n_updates_" + test_name + "_" + str(idx) + ".mha",
+        )
+
+    assembly_obj.calc_ratio_updates()
+
+    assembly_binary = sf.keep_component_seeds(assembly_binary, initial_seeds)
+    if start_seg is not None:
+        assembly_binary = sf.merge_binary_with_start(
+            assembly_binary, start_seg, threshold=assembly_threshold
+        )
+
+    sitk.WriteImage(
+        assembly_binary,
+        dir_output0
+        + "/"
+        + case
+        + "_segmentation_"
+        + test_name
+        + "_"
+        + str(n_steps_taken)
+        + "_steps"
+        + ".mha",
+    )
+
+    assembly_surface = vf.evaluate_surface(assembly_binary, 1)
+
+    vf.write_vtk_polydata(
+        assembly_surface,
+        dir_output + "/" + case + "_surface_mesh_nonsmooth_" + test_name + "_"
+        + str(n_steps_taken) + "_steps" + ".vtp",
+    )
+
+    surface_smooth = vf.taubin_smooth_polydata(
+        assembly_surface, it=75, mu1=0.5, mu2=0.51
+    )
+    surface_smooth = vf.compute_polydata_normals(surface_smooth)
+    vf.write_vtk_polydata(
+        surface_smooth,
+        dir_output0 + "/" + case + "_surface_mesh_" + test_name + "_"
+        + str(n_steps_taken) + "_steps" + ".vtp",
+    )
+    if simvascular:
+        write_simvascular_model(
+            surface_smooth,
+            os.path.join(dir_output, "simvascular"),
+            case,
+        )
+
+    if len(centerlines) > 0:
+        final_surface = vf.appendPolyData(surfaces)
+        final_centerline = vf.appendPolyData(centerlines)
+        final_points = vf.appendPolyData(points)
+
+        vf.write_vtk_polydata(
+            final_surface,
+            dir_output + "/all_" + case + "_" + test_name + "_" + str(idx) + "_"
+            + str(n_steps_taken) + "_surfaces.vtp",
+        )
+        vf.write_vtk_polydata(
+            final_centerline,
+            dir_output + "/all_" + case + "_" + test_name + "_" + str(idx) + "_"
+            + str(n_steps_taken) + "_centerlines.vtp",
+        )
+        vf.write_vtk_polydata(
+            final_points,
+            dir_output + "/all_" + case + "_" + test_name + "_" + str(idx) + "_"
+            + str(n_steps_taken) + "_points.vtp",
+        )
+
+    if calc_global_centerline:
+        global_centerline, targets, success = calc_centerline_global(
+            assembly_binary,
+            initial_seeds,
+            nr_seeds=len(initial_seeds),
+            merge_method=global_config.get("CENTERLINE_MERGE_METHOD", "clean"),
+        )
+
+        if success or len(targets) > 0:
+            vf.write_vtk_polydata(
+                global_centerline,
+                dir_output0 + "/" + case + "_centerline_" + test_name + "_"
+                + str(n_steps_taken) + "_steps" + ".vtp",
+            )
+
+            targets_pd = vf.points2polydata([target.tolist() for target in targets])
+            vf.write_vtk_polydata(
+                targets_pd,
+                dir_output + "/" + case + "_" + test_name + "_" + str(idx) + "_"
+                + str(n_steps_taken) + "_targets.vtp",
+            )
+
+            if cap_surface_cent:
+                capped_surface, capped_seg = cap_surface(
+                    pred_surface=assembly_surface,
+                    centerline=global_centerline,
+                    pred_seg=assembly_binary,
+                    file_name=case,
+                    outdir=dir_output,
+                    targets=targets,
+                )
+
+                vf.write_vtk_polydata(
+                    capped_surface,
+                    dir_output + "/" + case + "_" + test_name + "_" + str(idx) + "_"
+                    + str(n_steps_taken) + "_capped_surface.vtp",
+                )
+                sitk.WriteImage(
+                    capped_seg,
+                    dir_output + "/" + case + "_" + test_name + "_"
+                    + str(n_steps_taken) + "_capped_seg.mha",
+                )
+
+    if global_config["PREVENT_RETRACE"]:
+        if len(inside_pts) > 0:
+            final_inside_pts = vf.appendPolyData(inside_pts)
+            vf.write_vtk_polydata(
+                final_inside_pts,
+                dir_output + "/final_" + case + "_" + test_name + "_" + str(idx) + "_"
+                + str(n_steps_taken) + "_inside_points.vtp",
+            )

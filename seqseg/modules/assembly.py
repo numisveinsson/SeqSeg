@@ -268,6 +268,20 @@ class VesselTree:
         self.potential_branches = pot_branches
         self.caps = []
 
+    @classmethod
+    def from_state(cls, case, image, steps, branches, bifurcations,
+                   potential_branches, caps):
+        """Rebuild a tree from saved fields without re-wiring connections."""
+        tree = cls.__new__(cls)
+        tree.name = case
+        tree.image = image
+        tree.steps = steps
+        tree.branches = branches
+        tree.bifurcations = bifurcations
+        tree.potential_branches = potential_branches
+        tree.caps = caps
+        return tree
+
     def add_step(self, i, step, branch):
         self.steps.append(step)
         self.branches[branch].append(i)

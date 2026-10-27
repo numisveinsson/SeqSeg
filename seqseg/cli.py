@@ -24,7 +24,9 @@ from seqseg.config_models import (
 )
 from seqseg.modules import sitk_functions as sf
 from seqseg.modules.datasets import get_testing_samples
+from seqseg.modules.checkpoint import has_checkpoint
 from seqseg.pipeline.classic import run_classic_batch
+from seqseg.pipeline.continue_run import run_continue, seeds_from_json, seeds_from_xyzr
 from seqseg.pipeline.plus import run_plus_batch
 from seqseg.pipeline.predict import run_global_prediction
 from seqseg.pipeline.single_trace import prepare_single_image_dataset
@@ -324,6 +326,7 @@ def _cmd_trace_batch(ns: argparse.Namespace) -> None:
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
         start_seg_path=ns.start_seg,
+        config_name=ns.config_name,
         start_time_global=t0,
     )
     print("\nTotal calculation time for all cases is: ")
@@ -407,6 +410,7 @@ def _cmd_trace_plus_batch(ns: argparse.Namespace) -> None:
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
         start_seg_path=ns.start_seg,
+        config_name=ns.config_name,
         start_time_global=t0,
     )
     print("\nTotal calculation time is: ")
@@ -549,9 +553,58 @@ def _cmd_trace_single(ns: argparse.Namespace) -> None:
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
         start_seg_path=getattr(ns, "start_seg", None),
+        config_name=ns.config_name,
         start_time_global=t0,
     )
     print("\nTotal calculation time for run single: ")
+    print(f"{((time.time() - t0) / 60):.2f} min\n")
+
+
+def _cmd_trace_continue(ns: argparse.Namespace) -> None:
+    faulthandler.enable()
+    t0 = time.time()
+    case_dir = os.path.abspath(os.path.expanduser(ns.case_dir))
+    if not has_checkpoint(case_dir):
+        print(
+            f"seqseg run continue: no checkpoint in {case_dir}/checkpoint. "
+            "Only runs made with a SeqSeg version that writes checkpoints "
+            "can be continued.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    if ns.extra_steps < 0:
+        print("seqseg run continue: --extra-steps must be >= 0", file=sys.stderr)
+        sys.exit(2)
+
+    seeds: List[list] = []
+    try:
+        if ns.seeds_json:
+            if not os.path.isfile(ns.seeds_json):
+                print(f"--seeds-json not found: {ns.seeds_json}", file=sys.stderr)
+                sys.exit(2)
+            with open(os.path.join(case_dir, "checkpoint", "manifest.json"),
+                      encoding="utf-8") as f:
+                case = json.load(f).get("case")
+            seeds += seeds_from_json(ns.seeds_json, case)
+        if ns.seed:
+            seeds += seeds_from_xyzr(
+                [list(map(float, s)) for s in ns.seed],
+                tangent=tuple(ns.tangent),
+                seed_step=ns.seed_step,
+            )
+    except ValueError as e:
+        print(f"seqseg run continue: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    run_continue(
+        case_dir,
+        ns.extra_steps,
+        seeds=seeds,
+        max_n_branches=ns.max_n_branches,
+        max_n_steps_per_branch=ns.max_n_steps_per_branch,
+        force_cpu=True if ns.force_cpu else None,
+    )
+    print("\nTotal calculation time for run continue: ")
     print(f"{((time.time() - t0) / 60):.2f} min\n")
 
 
@@ -1007,6 +1060,73 @@ def _build_parser() -> argparse.ArgumentParser:
         "unless JSON is edited after staging",
     )
     p_single.set_defaults(_handler=_cmd_trace_single)
+
+    p_continue = run_sub.add_parser(
+        "continue",
+        help="Continue a traced case from its checkpoint for more steps",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p_continue.add_argument(
+        "--case-dir",
+        required=True,
+        type=str,
+        help="Case output folder holding checkpoint/ (e.g. <outdir>/3d_fullres_case001)",
+    )
+    p_continue.add_argument(
+        "--extra-steps",
+        required=True,
+        type=int,
+        help="Steps to add on top of the steps already taken",
+    )
+    p_continue.add_argument(
+        "--seed",
+        action="append",
+        nargs=4,
+        type=float,
+        metavar=("X", "Y", "Z", "R"),
+        help="New seed traced after the open branch ends (repeat for multiple)",
+    )
+    p_continue.add_argument(
+        "--tangent",
+        nargs=3,
+        type=float,
+        default=[0.0, 0.0, 1.0],
+        metavar=("TX", "TY", "TZ"),
+        help="Used with --seed to place the paired old point",
+    )
+    p_continue.add_argument(
+        "--seed-step",
+        default=1.0,
+        type=float,
+        help="Physical step along --tangent for old-point when using --seed",
+    )
+    p_continue.add_argument(
+        "--seeds-json",
+        default=None,
+        type=str,
+        help="New seeds as [old_point, new_point, radius] triples: a seeds.json "
+        "(entry matching the case), one case object, or a bare list",
+    )
+    p_continue.add_argument(
+        "--max-n-branches",
+        default=None,
+        type=int,
+        help="Raise the branch cap (default: value from the checkpoint)",
+    )
+    p_continue.add_argument(
+        "--max-n-steps-per-branch",
+        default=None,
+        type=int,
+        help="Change the per-branch cap (default: value from the checkpoint)",
+    )
+    p_continue.add_argument(
+        "-cpu",
+        "--cpu",
+        dest="force_cpu",
+        action="store_true",
+        help="Force nnU-Net inference on CPU even if a GPU is available",
+    )
+    p_continue.set_defaults(_handler=_cmd_trace_continue)
 
     p_global = run_sub.add_parser(
         "global",

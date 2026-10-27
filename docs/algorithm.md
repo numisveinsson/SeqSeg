@@ -24,7 +24,7 @@ SeqSeg employs a **sequential tracking approach** that combines:
 
 Patch size follows the local radius (`VOLUME_SIZE_RATIO` in the YAML config, about 4.9 for aortas and 5.5 for coronaries). Stopping radius and retrace limits are the other YAML knobs; they are listed in [Configuration](configuration.md). Seed coordinates tell the trace where to start and which way to walk ([Usage](usage.md)).
 
-The command-line caps `-max_n_steps` (default 1000), `-max_n_branches` (default 100), and `-max_n_steps_per_branch` (default 100) end the run even if the vessel continues. The [tutorial](../seqseg/tutorial/tutorial.md) sets these much lower so the example finishes in a few minutes.
+The command-line caps `-max_n_steps` (default 1000), `-max_n_branches` (default 100), and `-max_n_steps_per_branch` (default 100) end the run even if the vessel continues. The [tutorial](../seqseg/tutorial/tutorial.md) sets these much lower so the example finishes in a few minutes. A stopped run writes `{case_dir}/checkpoint/`; `seqseg run continue --case-dir … --extra-steps X` resumes from the next step (see [Usage](usage.md)).
 
 ## Training Strategy
 

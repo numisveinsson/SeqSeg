@@ -204,3 +204,36 @@ def run_tracing(
         force_cpu=opts.force_cpu,
     )
     return trace_centerline_from_context(ctx)
+
+
+def continue_tracing(
+    case_dir: str,
+    extra_steps: int,
+    seeds: Optional[Sequence[Union[BranchSeed, Mapping[str, Any], Sequence[Any]]]] = None,
+    *,
+    max_n_branches: Optional[int] = None,
+    max_n_steps_per_branch: Optional[int] = None,
+    force_cpu: Optional[bool] = None,
+) -> TracingResult:
+    """
+    Continue a CLI/batch run from ``{case_dir}/checkpoint`` for ``extra_steps`` steps.
+
+    ``seeds`` accept the same forms as :func:`seeds_to_potential_branches`;
+    they are traced as new initialization seeds once the open branch ends.
+    Outputs are rewritten with the new step count and the checkpoint is
+    replaced, so the run can be continued again.
+    """
+    from seqseg.pipeline.continue_run import run_continue
+
+    triples = [
+        [s["old point"], s["point"], s["radius"]]
+        for s in seeds_to_potential_branches(seeds or [])
+    ]
+    return run_continue(
+        case_dir,
+        extra_steps,
+        seeds=triples,
+        max_n_branches=max_n_branches,
+        max_n_steps_per_branch=max_n_steps_per_branch,
+        force_cpu=force_cpu,
+    )
