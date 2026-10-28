@@ -113,6 +113,14 @@ seqseg train prepare \
 
 Extracted patches (or whole volumes) are staged in `nnUNet_raw/DatasetXXX_*/_seqseg_extracted` and hardlinked into that dataset's `imagesTr` and `labelsTr`. Prepare then deletes the subvolume folders and leaves `done.txt`, `info_*.txt`, and `*_Sample_stats.csv`. A later `seqseg train prepare` with the same dataset skips extraction when `done.txt` already lists every case, and skips conversion when the raw images are already there. It then runs `nnUNetv2_plan_and_preprocess` for `3d_fullres`. Prepare runs it through `python -m seqseg.pipeline.nnunet_cli`, which takes the same arguments and finds the training files in one listing of `imagesTr`. nnU-Net's own lookup searches that folder once per case, which takes hours with hundreds of thousands of patches. Do not list the files under `dataset` in `dataset.json` for this: nnU-Net sends dataset.json to every preprocessing job, and a long list slows preprocessing to about one case per second. `--dataset-number` and `-dataset_number` are aliases of `--dataset-id`.
 
+Prepare writes `splits_final.json` into the raw dataset before planning when `PATIENT_LEVEL_FOLDS` is true in the sampler YAML (`default_mm` turns it on). Set `PATIENT_LEVEL_FOLDS: false` in that config, or in an overlay, to leave fold assignment to nnU-Net. An existing `splits_final.json` is left in place when the toggle is off; delete it if nnU-Net should build a new patch split. With the toggle on, the folds hold out patients: every patch from one patient is on one side of a fold, and the validation Dice for `--fold 0` (or 1-4) is a patient-held-out score. With at least five patients there are five folds; with two to four patients there is one fold per patient. Datasets prepared together that contain the same patients, such as CT and MR, hold out the same people in fold 0. nnU-Net copies the file into `nnUNet_preprocessed` and uses it for training. A single patient cannot be held out, so prepare leaves the split unwritten.
+
+`--validation-prop` still sorts some centerlines into a `{modality}_val` folder. Those files are not copied into `imagesTr`, so they are not nnU-Net cases and they are not the fold validation set. Leave `--validation-prop` unset.
+
+`--fold all` trains on every case and also scores every case. Quote Dice from a numbered fold. A final set that never enters a fold is `TEST_CASES` in the sampler YAML, extracted with `--testing` and converted with `--also-test`. Those volumes land in `imagesTs`. nnU-Net does not train or validate on `imagesTs`.
+
+If `splits_final.json` is nnU-Net's default patch split, prepare replaces it. Checkpoints from that split mixed patches from the same patient into training and validation, so those folds need a new training run. A hand-written split that matches neither that default nor the patient split is left in place and prepare stops.
+
 ### Dataset folder name
 
 The folder is `Dataset`, the id with at least three digits, `_`, the name, and the modality in uppercase. That is the name nnU-Net looks up from `--dataset-id`:
@@ -140,7 +148,7 @@ You can call the sampler steps yourself, or use the sampler commands `vss-sample
 seqseg train nnunet --dataset-id 999 --fold 0
 ```
 
-This only trains. Preprocessing already ran in `seqseg train prepare`. The default configuration is `3d_fullres`.
+This only trains. Preprocessing already ran in `seqseg train prepare`. The default configuration is `3d_fullres`. Fold validation uses the patient holdout in `splits_final.json`.
 
 The trainer is chosen from the plans. Small patches can produce a plan that downsamples at most once (`n_stages` of 2 or fewer). nnU-Net's deep supervision makes every loss NaN on such a plan, so `seqseg train nnunet` trains it with `nnUNetTrainerNoDeepSupervision` and prints that it did. Other plans use `nnUNetTrainer`. `--trainer` overrides the choice.
 

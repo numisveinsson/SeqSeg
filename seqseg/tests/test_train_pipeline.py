@@ -23,6 +23,7 @@ from seqseg.pipeline.train import (
     _link_or_copy,
     _load_sampler_config,
     _normalize_img_ext,
+    _patient_level_folds_enabled,
     _pick_config_file,
     _reduction_or_nan,
     _resolve_img_ext,
@@ -34,6 +35,7 @@ from seqseg.pipeline.train import (
     default_training_trainer,
     expected_nnunet_dataset_name,
     prepare_training_dataset,
+    resolve_path,
     run_nnunet_training,
 )
 
@@ -49,6 +51,13 @@ def _stub_nnunet_preprocess_runners(monkeypatch):
     monkeypatch.setattr(
         "seqseg.pipeline.train._run_nnunet_preprocess_only", only
     )
+    # Do not consult the developer's real nnUNet_preprocessed during prepare.
+    def _resolve(key, explicit=None, path_file=None):
+        if key == "nnunet_preprocessed" and explicit is None:
+            return None
+        return resolve_path(key, explicit, path_file)
+
+    monkeypatch.setattr("seqseg.pipeline.train.resolve_path", _resolve)
     return plan, only
 
 
@@ -284,6 +293,7 @@ def test_bundled_sampler_configs_have_required_keys(name, tmp_path, monkeypatch)
     assert missing == []
     assert loaded["TEST_CASES"] == []
     assert loaded["BAD_CASES"] == []
+    assert loaded["PATIENT_LEVEL_FOLDS"] is True
 
 
 def test_default_cm_overrides_unit_dependent_keys(tmp_path, monkeypatch):
@@ -303,6 +313,22 @@ def test_sampler_overlay_merges_onto_seqseg_default(tmp_path, monkeypatch):
     assert loaded["SEQSEG_ONLY_KEY"] == 7
     assert loaded["MOVE_DIST"] == 8
     assert loaded["MAX_SAMPLES"] == 12
+
+
+def test_patient_level_folds_toggle():
+    assert _patient_level_folds_enabled({}) is True
+    assert _patient_level_folds_enabled({"PATIENT_LEVEL_FOLDS": True}) is True
+    assert _patient_level_folds_enabled({"PATIENT_LEVEL_FOLDS": False}) is False
+    assert _patient_level_folds_enabled({"PATIENT_LEVEL_FOLDS": "false"}) is False
+
+
+def test_patient_level_folds_overlay_can_turn_off(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "mine.yaml").write_text("PATIENT_LEVEL_FOLDS: false\n")
+    loaded = _load_sampler_config("mine")
+    assert loaded["PATIENT_LEVEL_FOLDS"] is False
+    assert _patient_level_folds_enabled(loaded) is False
 
 
 def test_cap_from_sampler_config_cli_overrides_yaml():
@@ -1061,6 +1087,81 @@ def test_prepare_done_cases_skip_extraction_and_conversion(
     assert result.removed_staging is False
     assert (staging / "done.txt").is_file()
     assert (staging / "info_ct.txt").is_file()
+
+
+def test_prepare_reuse_writes_patient_level_splits(
+    tmp_path, _stub_nnunet_preprocess_runners
+):
+    raw = tmp_path / "nn" / "nnUNet_raw"
+    dataset = raw / "Dataset999_MYDATACT"
+    staging = _managed_staging(raw)
+    staging.mkdir(parents=True)
+    (staging / "done.txt").write_text("case1\n")
+    (dataset / "imagesTr").mkdir(parents=True)
+    (dataset / "labelsTr").mkdir()
+    (dataset / "imagesTr" / "a.nii.gz").write_bytes(b"x")
+    (dataset / "labelsTr" / "a.nii.gz").write_bytes(b"x")
+    (dataset / "name_mapping.txt").write_text(
+        "# nnunet_name -> original_path\n"
+        "imagesTr/mydatact_001_0000.nii.gz -> ct_train/alpha_0_0.nii.gz\n"
+        "labelsTr/mydatact_001.nii.gz -> ct_train_masks/alpha_0_0.nii.gz\n"
+        "imagesTr/mydatact_002_0000.nii.gz -> ct_train/alpha_1_0.nii.gz\n"
+        "labelsTr/mydatact_002.nii.gz -> ct_train_masks/alpha_1_0.nii.gz\n"
+        "imagesTr/mydatact_003_0000.nii.gz -> ct_train/beta_0_0.nii.gz\n"
+        "labelsTr/mydatact_003.nii.gz -> ct_train_masks/beta_0_0.nii.gz\n"
+    )
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(MagicMock(), MagicMock()),
+    ):
+        prepare_training_dataset(
+            _make_training_data(tmp_path),
+            name="MYDATA",
+            dataset_number=999,
+            nnunet_raw=str(raw),
+        )
+
+    splits = json.loads((dataset / "splits_final.json").read_text())
+    assert len(splits) == 2
+    for fold in splits:
+        train = set(fold["train"])
+        val = set(fold["val"])
+        assert train.isdisjoint(val)
+        assert train | val == {"mydatact_001", "mydatact_002", "mydatact_003"}
+        alpha = {"mydatact_001", "mydatact_002"}
+        assert train == alpha or val == alpha
+
+
+def test_prepare_skips_patient_splits_when_config_disables_them(
+    tmp_path, _stub_nnunet_preprocess_runners, capsys
+):
+    raw = tmp_path / "nn" / "nnUNet_raw"
+    dataset = raw / "Dataset999_MYDATACT"
+    staging = _managed_staging(raw)
+    staging.mkdir(parents=True)
+    (staging / "done.txt").write_text("case1\n")
+    (dataset / "imagesTr").mkdir(parents=True)
+    (dataset / "labelsTr").mkdir()
+    (dataset / "imagesTr" / "a.nii.gz").write_bytes(b"x")
+    (dataset / "labelsTr" / "a.nii.gz").write_bytes(b"x")
+    (dataset / "name_mapping.txt").write_text(
+        "imagesTr/mydatact_001_0000.nii.gz -> ct_train/alpha_0_0.nii.gz\n"
+        "imagesTr/mydatact_002_0000.nii.gz -> ct_train/beta_0_0.nii.gz\n"
+    )
+    with patch(
+        "seqseg.pipeline.train._require_sampler",
+        return_value=(MagicMock(), MagicMock()),
+    ):
+        prepare_training_dataset(
+            _make_training_data(tmp_path),
+            name="MYDATA",
+            dataset_number=999,
+            nnunet_raw=str(raw),
+            config={"PATIENT_LEVEL_FOLDS": False},
+        )
+
+    assert not (dataset / "splits_final.json").exists()
+    assert "PATIENT_LEVEL_FOLDS is false" in capsys.readouterr().out
 
 
 def test_prepare_done_cases_with_volumes_still_convert(tmp_path):
