@@ -77,16 +77,18 @@ def run_plus_batch(
             )
         )
 
-        if resample_spacing is not None:
-            os.makedirs(dir_output, exist_ok=True)
-            dir_image, dir_seg = sf.maybe_resample_volume_paths(
-                dir_image,
-                dir_seg,
-                resample_spacing,
-                dir_output,
-                case,
-                img_format,
-            )
+        model_specs = [(dir_model_weights_seqseg, seqseg_scale)]
+        if dir_model_weights_global:
+            model_specs.append((dir_model_weights_global, global_scale))
+        dir_image, dir_seg = sf.resample_inputs_for_case(
+            dir_image,
+            dir_seg,
+            dir_output,
+            case,
+            img_format,
+            model_specs,
+            explicit_spacing=resample_spacing,
+        )
 
         if global_seg_dir:
             ref_image_for_seg = sitk.ReadImage(dir_image)

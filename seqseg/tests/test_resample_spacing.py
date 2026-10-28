@@ -89,3 +89,173 @@ def test_fit_spacing_returns_none_if_original_already_over_budget():
         max_voxels=1_000,
     )
     assert fitted is None
+
+
+def _plans(spacing, transpose=None, configuration="3d_fullres"):
+    plans = {
+        "configurations": {
+            configuration: {"spacing": list(spacing)},
+        }
+    }
+    if transpose is not None:
+        plans["transpose_forward"] = list(transpose)
+    return plans
+
+
+def test_plan_spacing_identity_transpose_is_reversed_sitk_order():
+    from seqseg.modules.sitk_functions import plan_spacing_to_image_units
+
+    # plans.json stores (z, y, x). SimpleITK order is (x, y, z).
+    got = plan_spacing_to_image_units(
+        [1.5, 0.7, 0.5], [0, 1, 2], (1.0, 1.0, 2.0), scale=1.0
+    )
+    assert got == pytest.approx([0.5, 0.7, 1.5])
+
+
+def test_plan_spacing_divides_by_scale_into_image_units():
+    from seqseg.modules.sitk_functions import plan_spacing_to_image_units
+
+    # 0.05 cm model spacing, image header in mm, -scale 0.1.
+    got = plan_spacing_to_image_units(
+        [0.05, 0.05, 0.05], [0, 1, 2], (1.0, 1.0, 1.0), scale=0.1
+    )
+    assert got == pytest.approx([0.5, 0.5, 0.5])
+
+
+def test_plan_spacing_follows_transpose_forward():
+    from seqseg.modules.sitk_functions import plan_spacing_to_image_units
+
+    got = plan_spacing_to_image_units(
+        [0.4, 1.5, 0.8], [2, 0, 1], (1.0, 2.0, 3.0), scale=1.0
+    )
+    assert got == pytest.approx([0.4, 0.8, 1.5])
+
+
+def test_plan_spacing_2d_keeps_through_plane_axis():
+    from seqseg.modules.sitk_functions import plan_spacing_to_image_units
+
+    got = plan_spacing_to_image_units(
+        [0.5, 0.5], [0, 1, 2], (1.0, 1.0, 2.0), scale=1.0
+    )
+    assert got == pytest.approx([0.5, 0.5, 2.0])
+
+
+def test_finer_axis_spacing_keeps_native_where_it_is_finer():
+    from seqseg.modules.sitk_functions import (
+        automatic_resample_spacing,
+        finer_axis_spacing,
+    )
+
+    assert finer_axis_spacing((0.3, 0.8, 1.0), (0.5, 0.5, 0.5)) == pytest.approx(
+        [0.3, 0.5, 0.5]
+    )
+    assert finer_axis_spacing((0.2, 0.2, 0.2), (0.5, 0.5, 0.5)) is None
+    target, ideal = automatic_resample_spacing(
+        (0.3, 0.8, 1.0), (8, 8, 8), [(0.5, 0.5, 0.5)]
+    )
+    assert target == pytest.approx([0.3, 0.5, 0.5])
+    assert ideal == pytest.approx([0.3, 0.5, 0.5])
+
+
+def test_automatic_resample_spacing_respects_voxel_budget():
+    from seqseg.modules.sitk_functions import automatic_resample_spacing
+
+    target, ideal = automatic_resample_spacing(
+        (0.65, 0.65, 1.0),
+        (512, 512, 258),
+        [(0.03, 0.03, 0.03)],
+    )
+    assert ideal == pytest.approx([0.03, 0.03, 0.03])
+    assert target is not None
+    n_vox = int(np.prod(resampled_grid_size((512, 512, 258), (0.65, 0.65, 1.0), target)))
+    assert n_vox <= DEFAULT_MAX_RESAMPLE_VOXELS
+    assert any(t < s for t, s in zip(target, (0.65, 0.65, 1.0)))
+
+
+def test_model_spacing_reads_plans_json(tmp_path):
+    import json
+
+    from seqseg.modules.sitk_functions import model_spacing_in_image_units
+
+    folder = tmp_path / "nnUNetTrainer__nnUNetPlans__3d_fullres"
+    folder.mkdir()
+    (folder / "plans.json").write_text(
+        json.dumps(_plans([0.05, 0.05, 0.08], transpose=[0, 1, 2]))
+    )
+    got = model_spacing_in_image_units(folder, (1.0, 1.0, 2.0), scale=0.1)
+    assert got == pytest.approx([0.8, 0.5, 0.5])
+
+
+def test_resample_inputs_uses_finer_model_spacing(tmp_path):
+    import json
+
+    from seqseg.modules.sitk_functions import resample_inputs_for_case
+
+    img_path = tmp_path / "case.mha"
+    img = sitk.Image(4, 4, 4, sitk.sitkFloat32)
+    img.SetSpacing((1.0, 1.0, 2.0))
+    sitk.WriteImage(img, str(img_path))
+    folder = tmp_path / "nnUNetTrainer__nnUNetPlans__3d_fullres"
+    folder.mkdir()
+    (folder / "plans.json").write_text(
+        json.dumps(_plans([1.0, 0.5, 0.5], transpose=[0, 1, 2]))
+    )
+    out = tmp_path / "out"
+    image_out, seg_out = resample_inputs_for_case(
+        str(img_path),
+        None,
+        str(out),
+        "case",
+        ".mha",
+        [(str(folder), 1.0)],
+    )
+    assert seg_out is None
+    assert image_out != str(img_path)
+    resampled = sitk.ReadImage(image_out)
+    assert resampled.GetSpacing() == pytest.approx((0.5, 0.5, 1.0))
+    assert tuple(resampled.GetSize()) == (8, 8, 8)
+
+
+def test_resample_inputs_keeps_native_when_image_is_finer(tmp_path):
+    import json
+
+    from seqseg.modules.sitk_functions import resample_inputs_for_case
+
+    img_path = tmp_path / "case.mha"
+    img = sitk.Image(4, 4, 4, sitk.sitkFloat32)
+    img.SetSpacing((0.2, 0.2, 0.2))
+    sitk.WriteImage(img, str(img_path))
+    folder = tmp_path / "nnUNetTrainer__nnUNetPlans__3d_fullres"
+    folder.mkdir()
+    (folder / "plans.json").write_text(
+        json.dumps(_plans([0.5, 0.5, 0.5]))
+    )
+    image_out, _seg = resample_inputs_for_case(
+        str(img_path),
+        None,
+        str(tmp_path / "out"),
+        "case",
+        ".mha",
+        [(str(folder), 1.0)],
+    )
+    assert image_out == str(img_path)
+
+
+def test_resample_inputs_explicit_spacing_overrides_model(tmp_path):
+    from seqseg.modules.sitk_functions import resample_inputs_for_case
+
+    img_path = tmp_path / "case.mha"
+    img = sitk.Image(4, 4, 4, sitk.sitkFloat32)
+    img.SetSpacing((1.0, 1.0, 1.0))
+    sitk.WriteImage(img, str(img_path))
+    image_out, _seg = resample_inputs_for_case(
+        str(img_path),
+        None,
+        str(tmp_path / "out"),
+        "case",
+        ".mha",
+        [],
+        explicit_spacing=(0.5, 0.5, 0.5),
+    )
+    resampled = sitk.ReadImage(image_out)
+    assert resampled.GetSpacing() == pytest.approx((0.5, 0.5, 0.5))

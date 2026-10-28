@@ -144,7 +144,11 @@ def _add_classic_trace_args(p: argparse.ArgumentParser) -> None:
         type=float,
         default=None,
         metavar="S",
-        help="Isotropic spacing or sx sy sz before SeqSeg",
+        help=(
+            "Override input spacing before tracing (one isotropic value, or "
+            "sx sy sz in image-header units). Omit to use, on each axis, the "
+            "finer of the native spacing and the model spacing from plans.json"
+        ),
     )
     p.add_argument(
         "-simvascular",
@@ -580,7 +584,9 @@ def _cmd_trace_single(ns: argparse.Namespace) -> None:
         calc_global_centerline=bool(ns.extract_global_centerline),
         cap_surface_cent=bool(ns.cap_surface_cent),
         assembly_threshold=ns.assembly_threshold,
-        resample_spacing=None,
+        resample_spacing=sf.parse_resample_spacing_arg(
+            getattr(ns, "resample_spacing", None)
+        ),
         simvascular=bool(ns.simvascular),
         force_cpu=bool(ns.force_cpu),
         start_seg_path=getattr(ns, "start_seg", None),
@@ -1039,6 +1045,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_single.add_argument("--extract-global-centerline", default=0, type=int)
     p_single.add_argument("--cap-surface-cent", default=0, type=int)
     p_single.add_argument("--assembly-threshold", default=0.5, type=float)
+    p_single.add_argument(
+        "--resample-spacing",
+        nargs="+",
+        type=float,
+        default=None,
+        metavar="S",
+        help=(
+            "Override input spacing before tracing (one isotropic value, or "
+            "sx sy sz in image-header units). Omit to use, on each axis, the "
+            "finer of the native spacing and the model spacing from plans.json"
+        ),
+    )
     p_single.add_argument(
         "--simvascular",
         default=0,

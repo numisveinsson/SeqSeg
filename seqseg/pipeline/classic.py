@@ -74,15 +74,15 @@ def run_classic_batch(
         )
 
         create_case_directories(dir_output, write_samples, simvascular=simvascular)
-        if resample_spacing is not None:
-            dir_image, dir_seg = sf.maybe_resample_volume_paths(
-                dir_image,
-                dir_seg,
-                resample_spacing,
-                dir_output,
-                case,
-                img_format,
-            )
+        dir_image, dir_seg = sf.resample_inputs_for_case(
+            dir_image,
+            dir_seg,
+            dir_output,
+            case,
+            img_format,
+            [(dir_model_weights, scale)],
+            explicit_spacing=resample_spacing,
+        )
         if simvascular:
             vf.write_image_as_vti(
                 dir_image,

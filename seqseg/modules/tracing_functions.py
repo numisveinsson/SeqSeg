@@ -13,6 +13,211 @@ sys.stdout.flush()
 class SkipThisStepError(Exception):
     pass
 
+
+def _finite_point(value):
+    point = np.asarray(value, dtype=float).reshape(-1)
+    if point.shape[0] != 3 or not np.all(np.isfinite(point)):
+        return None
+    return point
+
+
+def _unit_vector(value):
+    vector = _finite_point(value)
+    if vector is None:
+        return None
+    norm = float(np.linalg.norm(vector))
+    if norm < 1e-12:
+        return None
+    return vector / norm
+
+
+def retrace_stop_action(branch_ids, kind="retrace"):
+    """How a centerline hit should end this branch.
+
+    A loop keeps the branch that left and came back, including a short one.
+    A retrace keeps the prefix once a step has been traced, and discards a
+    branch whose first step is the hit.
+    """
+    if kind == "loop":
+        return "keep_prefix"
+    if len(branch_ids) > 2:
+        return "keep_prefix"
+    return "discard_empty"
+
+
+def _perp_distance(point, origin, tangent):
+    offset = np.asarray(point, dtype=float) - np.asarray(origin, dtype=float)
+    along = float(np.dot(offset, tangent))
+    return float(np.linalg.norm(offset - along * tangent))
+
+
+def _branch_left_axis(vessel_tree, branch, sample_point, sample_tangent,
+                      sample_radius, radius_factor, tip_ids):
+    """Whether ``branch`` has a step off this sample's centerline axis.
+
+    The live tip is ignored. Leaving the lumen and meeting the centerline
+    again is a loop, not a rewalk of the same path.
+    """
+    branches = vessel_tree.branches
+    steps = vessel_tree.steps
+    if branch is None or not (0 <= branch < len(branches)):
+        return False
+    limit = float(radius_factor) * float(sample_radius)
+    for step_id in branches[branch]:
+        if step_id in tip_ids or step_id < 0 or step_id >= len(steps):
+            continue
+        point = _finite_point(steps[step_id].get("point"))
+        if point is None:
+            continue
+        if _perp_distance(point, sample_point, sample_tangent) > limit:
+            return True
+    return False
+
+
+def is_centerline_retrace(vessel_tree,
+                          point,
+                          tangent,
+                          branch=None,
+                          connector_step=None,
+                          radius_factor=0.75,
+                          align_deg=35.0,
+                          tip_ignore_steps=4,
+                          birth_ignore_factor=1.0,
+                          allow_loops=True):
+    """Whether ``point`` is rewalking a centerline this tree already committed.
+
+    A loop that leaves a centerline and comes back is not a retrace. Use
+    ``centerline_retrace_kind`` when that closure should end the branch
+    without deleting it.
+    """
+    return centerline_retrace_kind(
+        vessel_tree,
+        point,
+        tangent,
+        branch=branch,
+        connector_step=connector_step,
+        radius_factor=radius_factor,
+        align_deg=align_deg,
+        tip_ignore_steps=tip_ignore_steps,
+        birth_ignore_factor=birth_ignore_factor,
+        allow_loops=allow_loops,
+    ) == "retrace"
+
+
+def centerline_retrace_kind(vessel_tree,
+                            point,
+                            tangent,
+                            branch=None,
+                            connector_step=None,
+                            radius_factor=0.75,
+                            align_deg=35.0,
+                            tip_ignore_steps=4,
+                            birth_ignore_factor=1.0,
+                            allow_loops=True):
+    """Classify ``point`` against committed centerlines.
+
+    Returns ``"retrace"``, ``"loop"``, or ``None``.
+
+    Both of these have to hold for some committed sample:
+
+    - distance is less than ``radius_factor`` times that sample's radius
+    - the tangent is within ``align_deg`` of the sample or its opposite
+
+    The live tip of ``branch`` is ignored, so the next step is not a hit on
+    itself. When ``connector_step`` is set, parent samples within
+    ``birth_ignore_factor`` parent-radii of that connector are ignored, so a
+    child can leave the ostium. Pass ``connector_step`` explicitly for a
+    queued bifurcation. For a branch already in the tree, the connector is
+    ``branches[branch][0]``.
+
+    With ``allow_loops``, a hit after this branch has left that sample's axis
+    is ``"loop"``: the branch is kept. A hit that never left the axis is
+    ``"retrace"``.
+    """
+    here = _finite_point(point)
+    direction = _unit_vector(tangent)
+    if here is None or direction is None:
+        return None
+
+    align = min(90.0, max(0.0, float(align_deg)))
+    cos_limit = float(np.cos(np.deg2rad(align)))
+    tip_n = max(0, int(tip_ignore_steps))
+    radius_factor = float(radius_factor)
+    birth_ignore_factor = float(birth_ignore_factor)
+
+    branches = vessel_tree.branches
+    steps = vessel_tree.steps
+    tip_ids = set()
+    # ``ids[-0:]`` is the whole list, so a zero window must stay empty.
+    if (tip_n > 0 and branch is not None
+            and 0 <= branch < len(branches)):
+        tip_ids = set(branches[branch][-tip_n:])
+
+    if connector_step is None and branch not in (None, 0):
+        if 0 <= branch < len(branches) and branches[branch]:
+            connector_step = branches[branch][0]
+
+    birth_center = None
+    birth_limit = 0.0
+    parent_ids = set()
+    if connector_step is not None and 0 <= int(connector_step) < len(steps):
+        connector_step = int(connector_step)
+        birth_center = _finite_point(steps[connector_step].get("point"))
+        parent_radius = float(steps[connector_step].get("radius") or 0.0)
+        birth_limit = birth_ignore_factor * max(parent_radius, 0.0)
+        on_child = (
+            branch not in (None, 0)
+            and branches[branch]
+            and connector_step == branches[branch][0]
+        )
+        if on_child:
+            for other_idx, other_ids in enumerate(branches):
+                if other_idx == branch:
+                    continue
+                if connector_step in other_ids:
+                    parent_ids.update(other_ids)
+                    break
+        elif branch is not None and 0 <= branch < len(branches):
+            parent_ids.update(branches[branch])
+    if birth_center is None:
+        parent_ids = set()
+
+    seen = set()
+    found_loop = False
+    for ids in branches:
+        for step_id in ids:
+            if step_id in seen or step_id in tip_ids:
+                continue
+            if step_id < 0 or step_id >= len(steps):
+                continue
+            seen.add(step_id)
+            sample = steps[step_id]
+            sample_point = _finite_point(sample.get("point"))
+            if sample_point is None:
+                continue
+            if step_id in parent_ids:
+                if np.linalg.norm(sample_point - birth_center) <= birth_limit:
+                    continue
+            sample_radius = float(sample.get("radius") or 0.0)
+            if sample_radius <= 0.0:
+                continue
+            if np.linalg.norm(here - sample_point) >= radius_factor * sample_radius:
+                continue
+            sample_tangent = _unit_vector(sample.get("tangent"))
+            if sample_tangent is None:
+                continue
+            if abs(float(np.dot(direction, sample_tangent))) < cos_limit:
+                continue
+            if allow_loops and _branch_left_axis(
+                    vessel_tree, branch, sample_point, sample_tangent,
+                    sample_radius, radius_factor, tip_ids):
+                found_loop = True
+                continue
+            return "retrace"
+    if found_loop:
+        return "loop"
+    return None
+
 def get_smoothing_params(radius,
                          scale_unit,
                          mega_sub=False,

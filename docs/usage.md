@@ -93,6 +93,8 @@ Other ways to initialize:
 
 `-unit` (`cm` or `mm`) is the unit of the seed coordinates and the seed radius. It should match the image header. `-scale` multiplies the voxel spacing passed to nnU-Net. Use `-scale 0.1` with `-unit mm` when the image spacing is in millimeters and the model was trained with spacing in centimeters.
 
+By default the input is resampled so each axis is the finer of the image spacing and the model spacing in `plans.json` (converted with `-scale`). An axis already finer than the model stays at the image spacing. `-resample_spacing` overrides that: one value is isotropic spacing, or three values are `sx sy sz`, in image-header units. `seqseg run plus batch` uses the finer spacing across the global and SeqSeg models. The same default applies to `seqseg run single` (`--resample-spacing`).
+
 ## Basic Usage
 
 `seqseg run batch` on an aorta MR case:
@@ -240,6 +242,7 @@ Arguments for `seqseg run batch`:
 | `outdir` | str | required | Output directory for results. Saved `seqseg paths` value is used when omitted |
 | `unit` | str | `cm` | Image coordinate units (`mm`, `cm`) |
 | `scale` | float | `1.0` | Multiplies voxel spacing passed to nnU-Net. `0.1` converts mm spacing to cm |
+| `resample_spacing` | float(s) | finer of image and model | Override input spacing (one isotropic value, or `sx sy sz`). Omit to resample each axis to the finer of the native spacing and the model spacing |
 | `max_n_steps` | int | `1000` | Maximum tracking steps. The tutorial sets this to `10` so the demo finishes quickly |
 | `max_n_steps_per_branch` | int | `100` | Maximum steps per vessel branch |
 | `max_n_branches` | int | `100` | Maximum number of branches to follow |

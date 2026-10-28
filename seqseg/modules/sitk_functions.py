@@ -1,5 +1,6 @@
 # Functions to bind SITK functionality
 
+import json
 import os
 
 import SimpleITK as sitk
@@ -227,7 +228,9 @@ def parse_resample_spacing_arg(spacing_arg):
     Returns
     -------
     tuple[float, float, float] | None
-        SimpleITK spacing order, or None if resampling is disabled.
+        SimpleITK spacing order, or None when the flag is omitted.
+        Omitted means each axis uses the finer of the native spacing and
+        the model spacing.
     """
     if not spacing_arg:
         return None
@@ -239,6 +242,228 @@ def parse_resample_spacing_arg(spacing_arg):
     raise ValueError(
         '--resample_spacing expects 1 value (isotropic) or 3 values '
         f'(sx, sy, sz in SimpleITK order); got {len(spacing_arg)} values.'
+    )
+
+
+def _configuration_name(model_folder):
+    """Last path component's nnU-Net configuration, e.g. ``3d_fullres``."""
+    folder = os.path.basename(os.path.normpath(str(model_folder)))
+    return folder.split("__")[-1]
+
+
+def load_nnunet_plans(model_folder):
+    """Read ``plans.json`` from an nnU-Net trainer folder."""
+    folder = os.path.abspath(os.path.expanduser(str(model_folder)))
+    path = os.path.join(folder, "plans.json")
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"nnU-Net plans.json not found in {folder}. "
+            "The model folder should be a trainer directory such as "
+            "nnUNetTrainer__nnUNetPlans__3d_fullres."
+        )
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def plan_spacing_to_image_units(plan_spacing, transpose_forward, image_spacing, scale):
+    """
+    Convert an nnU-Net configuration spacing to SimpleITK image-header units.
+
+    ``plan_spacing`` is in the transposed axis order stored in ``plans.json``
+    and in the units the network was trained with. ``scale`` is the factor
+    applied to image spacing before it is passed to nnU-Net, so dividing by
+    ``scale`` returns image-header units. Order is SimpleITK ``(x, y, z)``.
+
+    A 2D plan lists only the two in-plane spacings. The through-plane axis
+    (the first axis after ``transpose_forward``) keeps the image spacing.
+    """
+    scale = float(scale)
+    if scale <= 0:
+        raise ValueError(f"scale must be > 0, got {scale}")
+    image_spacing = [float(s) for s in image_spacing]
+    if len(image_spacing) != 3:
+        raise ValueError(
+            f"image_spacing must have 3 values, got {image_spacing}"
+        )
+    # props order matches what tracing passes to nnU-Net: reversed SimpleITK.
+    props = [s * scale for s in image_spacing[::-1]]
+    transpose_forward = [int(i) for i in transpose_forward]
+    if sorted(transpose_forward) != [0, 1, 2]:
+        raise ValueError(
+            "transpose_forward must be a permutation of 0, 1, 2; "
+            f"got {transpose_forward}"
+        )
+    transposed_native = [props[i] for i in transpose_forward]
+    plan_spacing = [float(s) for s in plan_spacing]
+    if len(plan_spacing) == 3:
+        target_transposed = plan_spacing
+    elif len(plan_spacing) == 2:
+        target_transposed = [transposed_native[0]] + plan_spacing
+    else:
+        raise ValueError(
+            f"plans spacing must have 2 or 3 values, got {plan_spacing}"
+        )
+    target_props = [None] * 3
+    for new_i, old_i in enumerate(transpose_forward):
+        target_props[old_i] = target_transposed[new_i]
+    return [s / scale for s in target_props[::-1]]
+
+
+def model_spacing_in_image_units(model_folder, image_spacing, scale):
+    """
+    Model target spacing in SimpleITK order and image-header units.
+
+    Read from ``plans.json`` for the configuration named by the trainer
+    folder (``3d_fullres``, ``2d``, ...).
+    """
+    plans = load_nnunet_plans(model_folder)
+    configuration = _configuration_name(model_folder)
+    configs = plans.get("configurations") or {}
+    if configuration not in configs:
+        available = ", ".join(repr(k) for k in sorted(configs)) or "(none)"
+        raise ValueError(
+            f"plans.json in {model_folder} has no configuration "
+            f"{configuration!r}. Available: {available}"
+        )
+    plan_spacing = configs[configuration].get("spacing")
+    if not plan_spacing:
+        raise ValueError(
+            f"configuration {configuration!r} in {model_folder} has no spacing"
+        )
+    transpose = plans.get("transpose_forward", [0, 1, 2])
+    return plan_spacing_to_image_units(
+        plan_spacing, transpose, image_spacing, scale
+    )
+
+
+def finer_axis_spacing(native, *candidates, atol=1e-8):
+    """
+    Per-axis minimum of ``native`` and each candidate spacing.
+
+    Returns the target spacing, or ``None`` when no axis is finer than
+    ``native``.
+    """
+    target = [float(s) for s in native]
+    if len(target) != 3:
+        raise ValueError(f"native spacing must have 3 values, got {target}")
+    for cand in candidates:
+        cand = [float(s) for s in cand]
+        if len(cand) != 3:
+            raise ValueError(f"candidate spacing must have 3 values, got {cand}")
+        target = [min(a, b) for a, b in zip(target, cand)]
+    native_f = [float(s) for s in native]
+    if not any(t < n - atol for t, n in zip(target, native_f)):
+        return None
+    return target
+
+
+def automatic_resample_spacing(
+    image_spacing,
+    image_size,
+    model_spacings,
+    max_voxels=DEFAULT_MAX_RESAMPLE_VOXELS,
+):
+    """
+    Spacing to resample an input to, before tracing.
+
+    Each axis is the finer of the native spacing and every model spacing
+    (SimpleITK order, image-header units). The target is then coarsened so
+    the grid stays within ``max_voxels``, and never coarser than native.
+
+    Returns
+    -------
+    tuple[list[float] | None, list[float] | None]
+        ``(target, ideal)``. ``target`` is what to resample to, or ``None``
+        to keep the native grid. ``ideal`` is the uncapped finer spacing, or
+        ``None`` when the native grid is already as fine as the models.
+    """
+    ideal = finer_axis_spacing(image_spacing, *model_spacings)
+    if ideal is None:
+        return None, None
+    fitted = fit_spacing_to_max_voxels(
+        image_size, image_spacing, ideal, max_voxels=max_voxels
+    )
+    if fitted is None or finer_axis_spacing(image_spacing, fitted) is None:
+        return None, ideal
+    return fitted, ideal
+
+
+def resample_inputs_for_case(
+    dir_image,
+    dir_seg,
+    out_dir,
+    stem,
+    img_ext,
+    model_specs,
+    explicit_spacing=None,
+):
+    """
+    Resample a case image (and truth) before tracing.
+
+    ``explicit_spacing`` is used as given (SimpleITK order, image-header
+    units). When it is omitted, each axis uses the finer of the native
+    spacing and the target spacing of each ``(model_folder, scale)`` pair.
+
+    Returns the image and segmentation paths to trace. Original dataset
+    files are not modified.
+    """
+    if explicit_spacing is not None:
+        os.makedirs(out_dir, exist_ok=True)
+        return maybe_resample_volume_paths(
+            dir_image,
+            dir_seg,
+            explicit_spacing,
+            out_dir,
+            stem,
+            img_ext,
+        )
+
+    if not model_specs:
+        raise ValueError(
+            "model_specs is required when resample spacing is not set"
+        )
+
+    reader = read_image(dir_image)
+    native = [float(s) for s in reader.GetSpacing()]
+    model_spacings = []
+    for folder, scale in model_specs:
+        spacing = model_spacing_in_image_units(folder, native, scale)
+        name = os.path.basename(os.path.normpath(str(folder)))
+        print(
+            f"Model target spacing ({name}) in image units (x, y, z): "
+            f"{spacing}"
+        )
+        model_spacings.append(spacing)
+
+    target, ideal = automatic_resample_spacing(
+        native, reader.GetSize(), model_spacings
+    )
+    if target is None:
+        if ideal is None:
+            print(f"Keeping native image spacing (x, y, z): {native}")
+        else:
+            print(
+                "Keeping native image spacing "
+                f"{native}: resampling to {ideal} would exceed "
+                f"{DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
+            )
+        return dir_image, dir_seg
+
+    if any(abs(a - b) > 1e-12 for a, b in zip(target, ideal)):
+        print(
+            "Relaxed input spacing from "
+            f"{ideal} to {target} to stay <= "
+            f"{DEFAULT_MAX_RESAMPLE_VOXELS:,} voxels"
+        )
+    print(f"Resampling input from {native} to {target} (x, y, z)")
+    os.makedirs(out_dir, exist_ok=True)
+    return maybe_resample_volume_paths(
+        dir_image,
+        dir_seg,
+        target,
+        out_dir,
+        stem,
+        img_ext,
     )
 
 
