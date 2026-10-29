@@ -1339,8 +1339,116 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     return points, success
 
 
+# Centerline grids are isotropic. Three voxels across the inscribed radius
+# keeps the lumen wide enough for the finite-difference gradient. The
+# spacing clamp refuses both a one-voxel tube and a needlessly fine grid,
+# and the voxel budget caps the float64 gradient.
+_VOXELS_PER_RADIUS = 3.0
+_MIN_SPACING_MM = 0.35
+_MAX_SPACING_MM = 1.0
+_MAX_CENTERLINE_VOXELS = 20_000_000
+_GRID_SIZE_TOLERANCE = 0.10
+
+
+def centerline_grid_size(size, spacing, radius_mm):
+    """Choose an isotropic centerline grid from the inscribed radius.
+
+    Parameters
+    ----------
+    size : sequence of int
+        Current voxel counts, one per axis.
+    spacing : sequence of float
+        Current spacing in millimeters, one per axis.
+    radius_mm : float
+        Maximum inscribed radius in millimeters. A non-positive or
+        non-finite radius keeps the input grid.
+
+    Returns
+    -------
+    new_size : tuple of int
+    new_spacing : tuple of float
+        Millimeters. Equal to ``spacing`` when the input grid is kept.
+    target_spacing : float or None
+        Spacing the radius and voxel budget asked for, before the
+        10% size check. None when the radius does not define a grid.
+    resample : bool
+        False when ``new_size`` is the input size.
+    """
+    size_in = tuple(int(v) for v in np.asarray(size, dtype=np.int64).reshape(3))
+    spacing_in = tuple(
+        float(v) for v in np.asarray(spacing, dtype=np.float64).reshape(3))
+    radius = float(radius_mm)
+    if not np.isfinite(radius) or radius <= 0.0:
+        return size_in, spacing_in, None, False
+
+    size_f = np.asarray(size_in, dtype=np.float64)
+    spacing_f = np.asarray(spacing_in, dtype=np.float64)
+    extent = size_f * spacing_f
+    target = float(np.clip(
+        radius / _VOXELS_PER_RADIUS, _MIN_SPACING_MM, _MAX_SPACING_MM))
+    extent_prod = float(np.prod(extent))
+    if extent_prod > 0.0 and target > 0.0:
+        if extent_prod / (target ** 3) > _MAX_CENTERLINE_VOXELS:
+            target = (extent_prod / _MAX_CENTERLINE_VOXELS) ** (1.0 / 3.0)
+    new_size = np.maximum(1, np.rint(extent / target)).astype(np.int64)
+    # Rounding can land a hair over the budget the closed form aimed at.
+    while (int(np.prod(new_size, dtype=np.int64)) > _MAX_CENTERLINE_VOXELS
+           and target < 1.0e6):
+        target *= 1.01
+        new_size = np.maximum(1, np.rint(extent / target)).astype(np.int64)
+    if np.all(np.abs(new_size.astype(np.float64) - size_f)
+              <= _GRID_SIZE_TOLERANCE * np.maximum(size_f, 1.0)):
+        return size_in, spacing_in, float(target), False
+    return (tuple(int(v) for v in new_size),
+            (float(target), float(target), float(target)),
+            float(target), True)
+
+
+def resample_for_centerline(segmentation, verbose=False):
+    """Resample ``segmentation`` onto the centerline grid.
+
+    The inscribed-radius distance map (positive inside) is returned when
+    the grid is unchanged, so the caller can skip a second distance
+    transform. A resampled image returns ``None`` for that map.
+
+    Returns
+    -------
+    segmentation : sitk.Image
+    distance_map : sitk.Image or None
+    was_resampled : bool
+    """
+    distance = distance_map_from_seg(segmentation) * -1
+    radius = float(sitk.GetArrayViewFromImage(distance).max())
+    old_size = tuple(int(v) for v in segmentation.GetSize())
+    old_spacing = tuple(float(v) for v in segmentation.GetSpacing())
+    new_size, new_spacing, target, resample = centerline_grid_size(
+        old_size, old_spacing, radius)
+    n_voxels = int(np.prod(new_size, dtype=np.int64))
+    if verbose:
+        target_text = "n/a" if target is None else f"{target:.4f} mm"
+        print(
+            f"    Centerline grid: size {old_size} spacing {old_spacing} "
+            f"radius {radius:.3f} mm target spacing {target_text} "
+            f"-> size {new_size} ({n_voxels} voxels)"
+        )
+    if not resample:
+        return segmentation, distance, False
+
+    resampled = sitk.Resample(
+        segmentation,
+        list(new_size),
+        sitk.Transform(),
+        sitk.sitkNearestNeighbor,
+        segmentation.GetOrigin(),
+        list(new_spacing),
+        segmentation.GetDirection(),
+        0,
+        segmentation.GetPixelID())
+    return resampled, None, True
+
+
 def calc_centerline_fmm(segmentation, seed=None, targets=None,
-                        min_res=300, out_dir=None, write_files=False,
+                        out_dir=None, write_files=False,
                         move_target_if_fail=False,
                         relax_factor=1, return_target=False,
                         return_target_all=False,
@@ -1381,27 +1489,11 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     """
     output = None
     original_segmentation = segmentation
-    was_resampled = False
     if verbose:
         print(f"Resolution of segmentation: {segmentation.GetSize()}")
 
-    # Resample if segmentation resolution is too low
-    if segmentation.GetSize()[2] < min_res:
-        print(f"    Resampling segmentation from size {segmentation.GetSize()} to size {min_res}")
-        # Divide spacing so that the size is at least 50
-        divide = segmentation.GetSize()[2] / min_res
-        segmentation = sitk.Resample(segmentation,
-                                     [int(x/divide) for x in segmentation
-                                      .GetSize()],
-                                     sitk.Transform(),
-                                     sitk.sitkNearestNeighbor,
-                                     segmentation.GetOrigin(),
-                                     [x*divide for x in segmentation
-                                      .GetSpacing()],
-                                     segmentation.GetDirection(), 0,
-                                     segmentation.GetPixelID())
-        was_resampled = True
-        print(f"    New size: {segmentation.GetSize()}")
+    segmentation, distance_map_surf, was_resampled = resample_for_centerline(
+        segmentation, verbose=verbose)
 
     # Keep user-provided index coordinates anatomically consistent with
     # the resampled grid by mapping old-index -> physical -> new-index.
@@ -1424,10 +1516,9 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                     segmentation.TransformPhysicalPointToIndex(target_phys))
                 targets_resampled.append(target_resampled)
             targets = targets_resampled
-    # Create distance map
-    distance_map_surf = distance_map_from_seg(segmentation)
-    # Switch sign of distance map
-    distance_map_surf = distance_map_surf * -1
+    # The radius check already built this map when the grid was kept.
+    if distance_map_surf is None:
+        distance_map_surf = distance_map_from_seg(segmentation) * -1
     distance_map_surf_np = sitk.GetArrayFromImage(distance_map_surf).transpose(2, 1, 0)
     # Get maximum value of distance map
     max_surf = distance_map_surf_np.max()
@@ -3392,7 +3483,7 @@ def snap_end_points_to_lumen(end_points, radius_np, spacing, direction=None):
 
 
 def calc_multi_component_centerlines(segmentation, nr_seeds=None,
-                                   min_res=300, out_dir=None, write_files=False,
+                                   out_dir=None, write_files=False,
                                    move_target_if_fail=False, relax_factor=1,
                                    verbose=False, return_failed=False,
                                    post_process_kwargs=None):
@@ -3403,7 +3494,9 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     This function:
     1. Analyzes the segmentation to find disconnected bodies
     2. Creates optimal seed points for each disconnected body
-    3. Calculates centerlines using fast marching method for each seed
+    3. Calculates centerlines using fast marching method for each seed.
+       Each component's grid is chosen from its inscribed radius and a
+       voxel budget; see :func:`centerline_grid_size`.
     4. Combines all centerlines into a unified polydata structure
     
     Parameters
@@ -3414,9 +3507,6 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
         Number of seeds to generate. If None, creates one seed per disconnected body.
         If the requested number exceeds the number of disconnected bodies, it will be
         automatically reduced to match the number of available bodies with a warning.
-    min_res : int, optional
-        Minimum resolution for centerline calculation. If segmentation resolution
-        is lower, it will be resampled. Defaults to 300.
     out_dir : str, optional
         Output directory for intermediate files. Defaults to None.
     write_files : bool, optional
@@ -3592,7 +3682,6 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
                 segmentation_body, 
                 seed=seed,
                 targets=None,  # Let calc_centerline_fmm find targets automatically
-                min_res=min_res,
                 out_dir=out_dir,
                 write_files=write_files,
                 move_target_if_fail=move_target_if_fail,
@@ -3944,7 +4033,6 @@ if __name__ == '__main__':
             centerline_multi, success_info = calc_multi_component_centerlines(
                 segmentation,
                 nr_seeds=None,
-                min_res=700,
                 out_dir=out_dir,
                 write_files=write_files,
                 move_target_if_fail=False,

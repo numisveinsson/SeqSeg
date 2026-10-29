@@ -1004,7 +1004,6 @@ def calc_centerline_global(predicted_vessels, initial_seeds,
     centerline_poly, success_info = calc_multi_component_centerlines(
         predicted_vessels,
         nr_seeds=nr_seeds,
-        min_res=500,
         out_dir=None,
         write_files=False,
         move_target_if_fail=False,
