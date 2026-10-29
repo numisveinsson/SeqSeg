@@ -67,6 +67,8 @@ def test_tracing_options_defaults():
     assert opts.max_n_steps == 1000
     assert opts.fold == "all"
     assert opts.force_cpu is False
+    assert opts.unit == "mm"
+    assert opts.scale == 1.0
 
 
 def test_run_tracing_builds_context_and_calls_tracing(monkeypatch):

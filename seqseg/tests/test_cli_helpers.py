@@ -356,6 +356,39 @@ def test_parser_run_single_cpu_flag():
         ]
     )
     assert ns.force_cpu is True
+    assert ns.unit == "mm"
+
+
+def test_parser_unit_defaults_to_mm():
+    parser = _build_parser()
+    batch = parser.parse_args(["run", "batch"])
+    assert batch.unit == "mm"
+    plus = parser.parse_args(["run", "plus", "batch"])
+    assert plus.unit == "mm"
+    post = parser.parse_args(
+        [
+            "post",
+            "global-centerline",
+            "single",
+            "--seg",
+            "/tmp/seg.mha",
+            "--out",
+            "/tmp/out.vtp",
+        ]
+    )
+    assert post.unit == "mm"
+    post_batch = parser.parse_args(
+        [
+            "post",
+            "global-centerline",
+            "batch",
+            "--seg-dir",
+            "/tmp/segs",
+            "--seg-glob",
+            "*.mha",
+        ]
+    )
+    assert post_batch.unit == "mm"
 
 
 def test_parser_init_dataset():
