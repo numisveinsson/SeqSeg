@@ -21,6 +21,12 @@ from seqseg.modules.simvascular import (
 )
 from seqseg.modules.tracing import trace_centerline_from_context, TracingContext
 from seqseg.pipeline.directories import create_case_directories
+from seqseg.pipeline.done import (
+    case_name_from_sample,
+    mark_case_done,
+    read_done_cases,
+    skip_if_done,
+)
 
 
 def run_classic_batch(
@@ -61,7 +67,12 @@ def run_classic_batch(
     if cent_max_spacing is not None and float(cent_max_spacing) <= 0:
         raise ValueError("CENT_MAX_SPACING must be > 0 (mm)")
 
+    done = read_done_cases(dir_output0)
     for i, test_case in enumerate(testing_samples[start:stop]):
+        case_name = case_name_from_sample(test_case)
+        if skip_if_done(done, case_name):
+            continue
+
         print(
             f"\nProcessing test case {i + start + 1} of {len(testing_samples)}: "
             f"{test_case}"
@@ -190,6 +201,7 @@ def run_classic_batch(
             simvascular=simvascular,
             start_time_global=start_time_global,
         )
+        mark_case_done(dir_output0, done, case_name)
 
         if not global_config["DEBUG"]:
             sys.stdout.close()

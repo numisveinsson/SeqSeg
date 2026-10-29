@@ -23,6 +23,12 @@ from seqseg.modules.simvascular import (
 from seqseg.modules.sweep import run_global_segmentation
 from seqseg.modules.tracing import TracingContext, trace_centerline_from_context
 from seqseg.pipeline.directories import create_case_directories
+from seqseg.pipeline.done import (
+    case_name_from_sample,
+    mark_case_done,
+    read_done_cases,
+    skip_if_done,
+)
 
 
 def run_plus_batch(
@@ -68,7 +74,12 @@ def run_plus_batch(
     if cent_max_spacing is not None and float(cent_max_spacing) <= 0:
         raise ValueError("CENT_MAX_SPACING must be > 0 (mm)")
 
+    done = read_done_cases(dir_output0)
     for test_case in testing_samples[start:stop]:
+        case_name = case_name_from_sample(test_case)
+        if skip_if_done(done, case_name):
+            continue
+
         print(f"\n{test_case}\n")
 
         dir_output, dir_image, dir_seg, dir_cent, case, idx, json_file_present = (
@@ -236,6 +247,7 @@ def run_plus_batch(
             simvascular=simvascular,
             start_time_global=start_time_global,
         )
+        mark_case_done(dir_output0, done, case_name)
 
         if not global_config.get("DEBUG", False):
             sys.stdout.close()
