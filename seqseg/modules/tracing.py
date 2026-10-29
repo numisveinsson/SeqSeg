@@ -745,6 +745,7 @@ def trace_centerline(
                  success) = calc_centerline_fmm(predicted_vessel,
                                                 seed,
                                                 targets,
+                                                global_grid=False,
                                                 post_process_kwargs={
                                                     'merge_method': global_config.get(
                                                         'CENTERLINE_MERGE_METHOD',

@@ -1342,7 +1342,8 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     size = seg_img.GetSize()
 
     if current_index is None or not _index_in_bounds(current_index, size):
-        print("   Fail: Reached border, breaking")
+        if verbose:
+            print("   Fail: Reached border, breaking")
         points = [current, seed]
         return points, False
 
@@ -1352,7 +1353,8 @@ def backtracking_gradient(gradient, distance_map_surf_np,
         projected = _project_toward_seed(
             current_index, distance_map_surf_np, inside_np, seg_img, seed)
         if projected is None:
-            print("   Fail: Left segmentation, breaking")
+            if verbose:
+                print("   Fail: Left segmentation, breaking")
             return [current, seed], False
         current, current_index = projected
 
@@ -1382,9 +1384,11 @@ def backtracking_gradient(gradient, distance_map_surf_np,
                     cand_index is None
                     or not _index_in_bounds(cand_index, size))
                 if left_image:
-                    print("   Fail: Reached border, breaking")
+                    if verbose:
+                        print("   Fail: Reached border, breaking")
                 else:
-                    print("   Fail: Left segmentation, breaking")
+                    if verbose:
+                        print("   Fail: Left segmentation, breaking")
                 success = False
                 break
 
@@ -1392,7 +1396,8 @@ def backtracking_gradient(gradient, distance_map_surf_np,
         if moved < 1e-8:
             stall += 1
             if stall > 3:
-                print("   Fail: Left segmentation, breaking")
+                if verbose:
+                    print("   Fail: Left segmentation, breaking")
                 success = False
                 break
         else:
@@ -1404,7 +1409,8 @@ def backtracking_gradient(gradient, distance_map_surf_np,
         points.append(current.copy())
 
     if len(points) == max_number_points:
-        print("   Fail: Reached max number of points")
+        if verbose:
+            print("   Fail: Reached max number of points")
         success = False
     elif success and verbose:
         print(f"   Success: {len(points)} points")
@@ -1414,12 +1420,10 @@ def backtracking_gradient(gradient, distance_map_surf_np,
     return points, success
 
 
-# Prefer an isotropic grid of about 260 million voxels when that is finer
-# than the segmentation. Never exceed 260 million voxels. On the S-008
-# crop, 250 million still dropped distal tips and 260 million kept every
-# end cluster.
-_TARGET_CENTERLINE_VOXELS = 260_000_000
-_MAX_CENTERLINE_VOXELS = 260_000_000
+# Prefer an isotropic grid of about 150 million voxels when that is finer
+# than the segmentation. Never exceed 150 million voxels.
+_TARGET_CENTERLINE_VOXELS = 150_000_000
+_MAX_CENTERLINE_VOXELS = 150_000_000
 
 
 def _isotropic_grid(extent, n_voxels):
@@ -1496,6 +1500,41 @@ def centerline_grid_size(size, spacing):
         chosen_spacing[0]), True
 
 
+_LOCAL_CENTERLINE_MIN_RES = 40
+
+
+def resample_local_centerline(segmentation, min_res=_LOCAL_CENTERLINE_MIN_RES,
+                              verbose=False):
+    """Resample a local patch so every axis has at least ``min_res`` voxels.
+
+    Every axis is scaled by the same factor, taken from the smallest axis.
+    A patch whose smallest axis is already at least ``min_res`` is returned
+    unchanged.
+    """
+    size = segmentation.GetSize()
+    sizes = [int(v) for v in size]
+    smallest = min(sizes) if sizes else 0
+    if smallest >= int(min_res) or smallest <= 0:
+        return segmentation, False
+    divide = smallest / float(min_res)
+    if verbose:
+        print(
+            f"    Resampling segmentation from size {tuple(sizes)}"
+            f" so its smallest axis is {int(min_res)}"
+        )
+    resampled = sitk.Resample(
+        segmentation,
+        [int(x / divide) for x in size],
+        sitk.Transform(),
+        sitk.sitkNearestNeighbor,
+        segmentation.GetOrigin(),
+        [x * divide for x in segmentation.GetSpacing()],
+        segmentation.GetDirection(),
+        0,
+        segmentation.GetPixelID())
+    return resampled, True
+
+
 def resample_for_centerline(segmentation, verbose=False):
     """Resample ``segmentation`` onto the centerline grid.
 
@@ -1540,6 +1579,7 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                         verbose=False, return_failed=False,
                         return_success_list=False,
                         post_process_kwargs=None,
+                        global_grid=False,
                         ):
     """
     Function to calculate the centerline of a segmentation
@@ -1566,6 +1606,10 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         ``tree_merge_decimate_max_points_per_branch=None`` to disable
         pre-merge arc-length decimation. Default remains vtkClean-based merge
         (``merge_method='clean'``).
+    global_grid : bool, optional
+        When True, resample onto the global voxel budget (about 150 million
+        voxels, and never more). When False, the local trace grid is used:
+        scale the patch only if any axis is below 40 voxels.
 
     Returns
     -------
@@ -1577,8 +1621,12 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     if verbose:
         print(f"Resolution of segmentation: {segmentation.GetSize()}")
 
-    segmentation, was_resampled = resample_for_centerline(
-        segmentation, verbose=verbose)
+    if global_grid:
+        segmentation, was_resampled = resample_for_centerline(
+            segmentation, verbose=verbose)
+    else:
+        segmentation, was_resampled = resample_local_centerline(
+            segmentation, verbose=verbose)
 
     # Keep user-provided index coordinates anatomically consistent with
     # the resampled grid by mapping old-index -> physical -> new-index.
@@ -1615,14 +1663,16 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
 
     # If seed and targets are not defined, use create using cluster map
     if seed is None and targets is None:
-        print("Need to create seed and targets")
+        if verbose:
+            print("Need to create seed and targets")
         seed, targets, output = cluster_map(segmentation,
                                             return_wave_distance_map=True,
                                             out_dir=out_dir,
                                             write_files=write_files,
                                             verbose=verbose)
     elif seed is None:
-        print(f"Need to create seed, targets given: {targets}")
+        if verbose:
+            print(f"Need to create seed, targets given: {targets}")
         index = np.where(distance_map_surf_np == max_surf)
         # have same format as targets
         if isinstance(targets[0], np.ndarray):
@@ -1634,7 +1684,8 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
             # else list of indices
             seed = [int(index[0][0]), int(index[1][0]), int(index[2][0])]
     elif targets is None:
-        print(f"Need to create targets, seed given: {seed}")
+        if verbose:
+            print(f"Need to create targets, seed given: {seed}")
         if isinstance(seed, np.ndarray):
             seed_phys = seed
         else:
@@ -1747,12 +1798,14 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
                                                 verbose=verbose,
                                                 inside_np=inside_np)
         if not success and move_target_if_fail:
-            print("\n   Trying to move target inside segmentation")
+            if verbose:
+                print("\n   Trying to move target inside segmentation")
             pot_point = calc_points_target(max_surf, distance_map_surf,
                                            target_np)
 
             if pot_point is not None:
-                print(f"    New target: {pot_point}")
+                if verbose:
+                    print(f"    New target: {pot_point}")
                 points, success = backtracking_gradient(gradient,
                                                         distance_map_surf_np,
                                                         segmentation,
@@ -1768,12 +1821,14 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
     centerline = create_centerline_polydata(points_list,
                                             success_list,
                                             distance_map_surf,
-                                            return_failed=return_failed)
+                                            return_failed=return_failed,
+                                            verbose=verbose)
     _pp = {'verbose': verbose}
     _pp.update(post_process_kwargs or {})
     centerline = post_process_centerline(centerline, **_pp)
 
-    print(f"    Centerline calculated, success ratio: {success_list.count(True)} / {len(success_list)}")
+    if verbose:
+        print(f"    Centerline calculated, success ratio: {success_list.count(True)} / {len(success_list)}")
 
     # If success is all False, return False
     if not success_list.count(True):
@@ -1828,7 +1883,7 @@ def calc_points_target(max_surf, distance_map_surf, target_np,
 
 
 def create_centerline_polydata(points_list, success_list, distance_map_surf,
-                               return_failed=False):
+                               return_failed=False, verbose=False):
     """
     Function to create a vtk polydata from a list of points.
     Each list of points is a path from seed to target and is stored as a line.
@@ -1904,7 +1959,8 @@ def create_centerline_polydata(points_list, success_list, distance_map_surf,
         elif return_failed:
             # If return_failed is True, still add the line
             lines.InsertNextCell(line)
-            print(f"Failed to reach target {ind+1}, still adding line with {len(points_path)} points.")
+            if verbose:
+                print(f"Failed to reach target {ind+1}, still adding line with {len(points_path)} points.")
 
     # Add points, lines and radii to polydata
     centerline.SetPoints(points)
@@ -2913,8 +2969,9 @@ def cluster_map(segmentation, return_wave_distance_map=False,
             z0, y0, x0 = (np.int64(seed_index[0]), np.int64(seed_index[1]),
                           np.int64(seed_index[2]))
         else:
-            print("Seed is outside the vessel; starting the fast march "
-                  "at the widest voxel")
+            if verbose:
+                print("Seed is outside the vessel; starting the fast march "
+                      "at the widest voxel")
     # Create fast marching filter
     fast_marching = sitk.FastMarchingImageFilter()
     fast_marching.AddTrialPoint((z0.item(), y0.item(), x0.item()))
@@ -2923,11 +2980,13 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     # the wall, so the last wavefront clusters are wall patches rather than
     # the geometric tips. Local cap traces do not use this speed image.
     speed_image = sitk.Cast(sitk.NotEqual(segmentation, 0), sitk.sitkFloat32)
-    print("Done preprocessing speed image")
+    if verbose:
+        print("Done preprocessing speed image")
 
     # Calculate wave distance map
     wave_distance_map_output = fast_marching.Execute(speed_image)
-    print("Done fast marching")
+    if verbose:
+        print("Done fast marching")
     # Only keep values inside the segmentation
     wave_distance_map = sitk.Mask(wave_distance_map_output, segmentation)
     # Convert wave distance map to integers
@@ -2942,7 +3001,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
         sitk.WriteImage(wave_distance_map_output,
                         os.path.join(out_dir,
                                      'wave_distance_map_output.mha'))
-    print("Converted wave distance map to integers")
+    if verbose:
+        print("Converted wave distance map to integers")
 
     # Get unique values in wave distance map (cached NumPy view reused below)
     wave_distance_map_np = sitk.GetArrayFromImage(wave_distance_map).transpose(2, 1, 0)
@@ -2979,7 +3039,7 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     cluster_count = 1
     if np.any(active_mask):
         shape = bucket_ids.shape
-        # 260 million voxels fit in int32. A larger crop keeps int64 indices.
+        # The global voxel budget fits in int32. A larger crop keeps int64 indices.
         index_dtype = (np.int32 if bucket_ids.size <= np.iinfo(np.int32).max
                        else np.int64)
         flat_indices = np.arange(bucket_ids.size, dtype=index_dtype).reshape(shape)
@@ -3073,8 +3133,9 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     cluster_map_img = sitk.GetImageFromArray(np.transpose(cluster_map_np, (2, 1, 0)))
     cluster_map_img.CopyInformation(wave_distance_map)
 
-    print(f"Cluster count: {cluster_count}")
-    print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
+    if verbose:
+        print(f"Cluster count: {cluster_count}")
+        print(f"Time to create cluster map: {time.time() - time_start:0.2f}")
 
     # Write image
     if out_dir and write_files:
@@ -3083,9 +3144,10 @@ def cluster_map(segmentation, return_wave_distance_map=False,
 
     time_start = time.time()
     end_clusters = find_end_clusters(cluster_map_np)
-    print(f"Time to find end clusters: {time.time() - time_start:0.2f}")
-    print(f"End clusters: {end_clusters}")
-    print(f"Number of end clusters: {len(end_clusters)}")
+    if verbose:
+        print(f"Time to find end clusters: {time.time() - time_start:0.2f}")
+        print(f"End clusters: {end_clusters}")
+        print(f"Number of end clusters: {len(end_clusters)}")
 
     distance_map_np = sitk.GetArrayFromImage(distance_map_masked).transpose(
         2, 1, 0)
@@ -3095,7 +3157,8 @@ def cluster_map(segmentation, return_wave_distance_map=False,
                                 distance_map_masked,
                                 cluster_map_np=cluster_map_np,
                                 distance_map_np=distance_map_np)
-    print(f"Time to get end points: {time.time() - time_start:0.2f}")
+    if verbose:
+        print(f"Time to get end points: {time.time() - time_start:0.2f}")
 
     # distance_map_masked is the inscribed radius shifted by +1 mm.
     radius_np = np.maximum(distance_map_np - 1.0, 0.0)
@@ -3103,7 +3166,7 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     end_points = snap_end_points_to_lumen(
         end_points, radius_np, segmentation.GetSpacing(),
         segmentation.GetDirection())
-    if len(end_points) != n_raw:
+    if len(end_points) != n_raw and verbose:
         print(f"Dropped {n_raw - len(end_points)} wall targets below one voxel")
 
     # Convert end points to physical points
@@ -3576,9 +3639,9 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     1. Analyzes the segmentation to find disconnected bodies
     2. Creates optimal seed points for each disconnected body
     3. Calculates centerlines using fast marching method for each seed.
-       Each component's grid is the native grid or an isotropic 260 million
+       Each component's grid is the native grid or an isotropic 150 million
        voxel grid, whichever has more voxels, and is never larger than
-       260 million voxels. See :func:`centerline_grid_size`.
+       150 million voxels. See :func:`centerline_grid_size`.
     4. Combines all centerlines into a unified polydata structure
     
     Parameters
@@ -3771,6 +3834,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
                 verbose=verbose,
                 return_failed=return_failed,
                 return_success_list=True,
+                global_grid=True,
                 post_process_kwargs=post_process_kwargs,
             )
             
