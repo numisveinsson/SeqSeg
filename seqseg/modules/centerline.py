@@ -598,6 +598,113 @@ def gradient_matrix(x):
     return gradients
 
 
+def _index_gradient_into(values, axis, out):
+    """Match ``np.gradient`` along one axis (edge order 1) into ``out``."""
+    out.fill(0)
+    n = values.shape[axis]
+    if n < 2:
+        return
+    sl = [slice(None)] * 3
+    sl_other = [slice(None)] * 3
+    sl[axis] = 0
+    sl_other[axis] = 1
+    out[tuple(sl)] = values[tuple(sl_other)] - values[tuple(sl)]
+    sl[axis] = -1
+    sl_other[axis] = -2
+    out[tuple(sl)] = values[tuple(sl)] - values[tuple(sl_other)]
+    if n > 2:
+        center = [slice(None)] * 3
+        left = [slice(None)] * 3
+        right = [slice(None)] * 3
+        center[axis] = slice(1, -1)
+        left[axis] = slice(0, -2)
+        right[axis] = slice(2, None)
+        out[tuple(center)] = np.float32(0.5) * (
+            values[tuple(right)] - values[tuple(left)])
+
+
+def _fill_masked_axis(component, values, inside, axis, inv_spacing):
+    """One-sided or central difference, using only inside neighbors."""
+    n = values.shape[axis]
+    if n < 2:
+        return
+    lower_sl = [slice(None)] * 3
+    upper_sl = [slice(None)] * 3
+    lower_sl[axis] = slice(0, n - 1)
+    upper_sl[axis] = slice(1, n)
+    lower_sl = tuple(lower_sl)
+    upper_sl = tuple(upper_sl)
+    diff = values[upper_sl] - values[lower_sl]
+    pair = inside[upper_sl] & inside[lower_sl]
+
+    lower = component[lower_sl]
+    lower[pair] = diff[pair]
+    if n > 2:
+        mid_sl = [slice(None)] * 3
+        mid_sl[axis] = slice(1, n - 1)
+        back = [slice(None)] * 3
+        fwd = [slice(None)] * 3
+        back[axis] = slice(0, -1)
+        fwd[axis] = slice(1, None)
+        back = tuple(back)
+        fwd = tuple(fwd)
+        both = pair[back] & pair[fwd]
+        only_back = pair[back] & ~pair[fwd]
+        mid = component[tuple(mid_sl)]
+        mid[both] = np.float32(0.5) * (diff[fwd][both] + diff[back][both])
+        mid[only_back] = diff[back][only_back]
+    last_sl = [slice(None)] * 3
+    last_pair = [slice(None)] * 3
+    last_sl[axis] = -1
+    last_pair[axis] = -1
+    last = component[tuple(last_sl)]
+    keep = pair[tuple(last_pair)]
+    last[keep] = diff[tuple(last_pair)][keep]
+    component *= np.float32(inv_spacing)
+
+
+def _fill_exterior_inward(grad, inward, exterior, inside, inv_spacing,
+                          direction_matrix):
+    """Write the normalized inward nudge into exterior voxels of ``grad``."""
+    inward = np.asarray(inward, dtype=np.float32)
+    deriv = np.empty(inward.shape, dtype=np.float32)
+    identity = np.allclose(direction_matrix, np.eye(3))
+    if identity:
+        for axis in range(3):
+            _index_gradient_into(inward, axis, deriv)
+            deriv *= np.float32(inv_spacing[axis])
+            grad[axis][exterior] = deriv[exterior]
+        samples = [grad[axis][exterior] for axis in range(3)]
+    else:
+        samples = [
+            np.zeros(int(exterior.sum()), dtype=np.float32) for _ in range(3)]
+        direction_f = np.asarray(direction_matrix, dtype=np.float32)
+        for axis in range(3):
+            _index_gradient_into(inward, axis, deriv)
+            deriv *= np.float32(inv_spacing[axis])
+            sampled = deriv[exterior]
+            for row in range(3):
+                coeff = direction_f[row, axis]
+                if coeff != 0:
+                    samples[row] += coeff * sampled
+        for axis in range(3):
+            grad[axis][exterior] = samples[axis]
+    del deriv
+    norm = np.sqrt(samples[0] * samples[0]
+                   + samples[1] * samples[1]
+                   + samples[2] * samples[2])
+    norm[norm < np.float32(1e-12)] = np.float32(1)
+    interior = [grad[axis][inside] for axis in range(3)]
+    interior_mag = np.sqrt(interior[0] * interior[0]
+                           + interior[1] * interior[1]
+                           + interior[2] * interior[2])
+    interior_mag = interior_mag[interior_mag > 0]
+    scale = (np.float32(np.median(interior_mag)) if interior_mag.size
+             else np.float32(1))
+    for axis in range(3):
+        grad[axis][exterior] = -scale * samples[axis] / norm
+
+
 def masked_world_frame_gradient(arrival, inside_mask, inward_field,
                                 spacing, direction):
     """World-frame arrival gradient that ignores neighbors outside the mask.
@@ -613,61 +720,29 @@ def masked_world_frame_gradient(arrival, inside_mask, inward_field,
     the lumen (the inscribed distance, negative outside). A sample that
     interpolates against an exterior voxel is then nudged back inside
     without that nudge outweighing the motion along the vessel.
+
+    The result is float32. Arrival values are finite (the caller clips the
+    fast-marching sentinel), so each axis is differenced from one slab
+    instead of a pair of full-crop copies.
     """
     inside = np.asarray(inside_mask, dtype=bool)
-    values = np.asarray(arrival, dtype=np.float64)
+    values = np.asarray(arrival, dtype=np.float32)
     spacing = np.asarray(spacing, dtype=np.float64).reshape(3)
     inv_spacing = 1.0 / np.maximum(spacing, np.finfo(np.float64).tiny)
-    grad = np.zeros((3,) + values.shape, dtype=np.float64)
+    grad = np.zeros((3,) + values.shape, dtype=np.float32)
 
     for axis in range(3):
-        n = values.shape[axis]
-        if n < 2:
-            continue
-        lo = [slice(None)] * 3
-        hi = [slice(None)] * 3
-        lo[axis] = slice(0, n - 1)
-        hi[axis] = slice(1, n)
-        lo = tuple(lo)
-        hi = tuple(hi)
-        diff = values[hi] - values[lo]
-        pair_inside = inside[hi] & inside[lo]
-
-        forward = np.zeros(values.shape, dtype=np.float64)
-        has_forward = np.zeros(values.shape, dtype=bool)
-        forward[lo] = diff
-        has_forward[lo] = pair_inside
-        backward = np.zeros(values.shape, dtype=np.float64)
-        has_backward = np.zeros(values.shape, dtype=bool)
-        backward[hi] = diff
-        has_backward[hi] = pair_inside
-        del diff, pair_inside
-
-        component = grad[axis]
-        both = has_forward & has_backward
-        component[both] = 0.5 * (forward[both] + backward[both])
-        only_f = has_forward & ~has_backward
-        component[only_f] = forward[only_f]
-        only_b = has_backward & ~has_forward
-        component[only_b] = backward[only_b]
-        component *= inv_spacing[axis]
-        del forward, backward, has_forward, has_backward, both, only_f, only_b
+        _fill_masked_axis(grad[axis], values, inside, axis, inv_spacing[axis])
 
     direction_matrix = np.asarray(direction, dtype=np.float64).reshape(3, 3)
     if not np.allclose(direction_matrix, np.eye(3)):
-        grad = np.tensordot(direction_matrix, grad, axes=([1], [0]))
+        grad = np.tensordot(
+            direction_matrix.astype(np.float32), grad, axes=([1], [0]))
 
     exterior = ~inside
     if np.any(exterior):
-        inward = world_frame_gradient(inward_field, spacing, direction)
-        inward_ext = inward[:, exterior]
-        del inward
-        norm = np.linalg.norm(inward_ext, axis=0)
-        norm[norm < 1e-12] = 1.0
-        interior_mag = np.linalg.norm(grad[:, inside], axis=0)
-        interior_mag = interior_mag[interior_mag > 0]
-        scale = float(np.median(interior_mag)) if interior_mag.size else 1.0
-        grad[:, exterior] = -scale * inward_ext / norm
+        _fill_exterior_inward(
+            grad, inward_field, exterior, inside, inv_spacing, direction_matrix)
     return grad
 
 
@@ -1641,18 +1716,12 @@ def calc_centerline_fmm(segmentation, seed=None, targets=None,
         sitk.WriteImage(segmentation,
                         os.path.join(out_dir, 'segmentation_from_fmm.mha'))
     # Gradient of the masked arrival-time map. Unreached FastMarching
-    # voxels keep ITK's float32 LargeValue (~1e38); differentiating that
-    # field and scaling by 1/spacing overflows float32 (CI RuntimeWarning)
-    # and yields inf/NaN steps. Mask + clip keeps the values finite, and the
-    # masked gradient never differences across the vessel wall.
-    arrival = np.clip(
-        np.asarray(
-            sitk.GetArrayFromImage(output_mask).transpose(2, 1, 0),
-            dtype=np.float64,
-        ),
-        -1.0e6,
-        1.0e6,
-    )
+    # voxels keep ITK's float32 LargeValue (~1e38). The clip removes that
+    # sentinel before the differences, so the stored gradient is float32.
+    # The masked gradient never differences across the vessel wall.
+    wave = sitk.GetArrayFromImage(output_mask).transpose(2, 1, 0)
+    arrival = np.clip(np.asarray(wave, dtype=np.float32), -1.0e6, 1.0e6)
+    del wave, output, output_mask
     inside_np = np.asarray(
         sitk.GetArrayFromImage(segmentation).transpose(2, 1, 0)) != 0
     gradient = masked_world_frame_gradient(
@@ -2910,12 +2979,16 @@ def cluster_map(segmentation, return_wave_distance_map=False,
     cluster_count = 1
     if np.any(active_mask):
         shape = bucket_ids.shape
-        flat_indices = np.arange(bucket_ids.size, dtype=np.int64).reshape(shape)
+        # 260 million voxels fit in int32. A larger crop keeps int64 indices.
+        index_dtype = (np.int32 if bucket_ids.size <= np.iinfo(np.int32).max
+                       else np.int64)
+        flat_indices = np.arange(bucket_ids.size, dtype=index_dtype).reshape(shape)
         active_flats = flat_indices[active_mask]
         active_bucket_ids = bucket_ids[active_mask].astype(np.int32, copy=False)
 
-        full_to_active = np.full(bucket_ids.size, -1, dtype=np.int64)
-        full_to_active[active_flats] = np.arange(active_flats.size, dtype=np.int64)
+        full_to_active = np.full(bucket_ids.size, -1, dtype=index_dtype)
+        full_to_active[active_flats] = np.arange(
+            active_flats.size, dtype=index_dtype)
 
         # Half-neighborhood offsets for 26-connectivity.
         neighbor_offsets = (

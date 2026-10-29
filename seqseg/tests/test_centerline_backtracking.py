@@ -64,6 +64,32 @@ def test_snap_end_point_stays_on_the_local_cross_section():
         [np.array([2, 2, 2])], speck, (1.0, 1.0, 1.0)) == []
 
 
+def test_masked_gradient_of_a_clipped_field_is_float32():
+    shape = (12, 10, 8)
+    xs = np.arange(shape[0], dtype=np.float64)[:, None, None]
+    arrival = np.clip(np.broadcast_to(xs, shape).copy(), -1.0e6, 1.0e6)
+    inside = np.zeros(shape, dtype=bool)
+    inside[1:-1, 1:-1, 1:-1] = True
+    inward = np.where(inside, 1.0, -1.0)
+    spacing = (0.5, 0.5, 0.5)
+    grad = masked_world_frame_gradient(
+        arrival, inside, inward, spacing, _IDENTITY)
+    assert grad.dtype == np.float32
+    # df/d(index) = 1 and spacing is 0.5 mm, so the lumen gradient is 2 per mm.
+    np.testing.assert_allclose(grad[0, 2:-2, 2:-2, 2:-2], 2.0, atol=1e-5)
+    np.testing.assert_allclose(grad[1, 2:-2, 2:-2, 2:-2], 0.0, atol=1e-5)
+    np.testing.assert_allclose(grad[2, 2:-2, 2:-2, 2:-2], 0.0, atol=1e-5)
+
+    plain = world_frame_gradient(inward, spacing, _IDENTITY)
+    outside = (0, 4, 4)
+    assert not inside[outside]
+    sample = plain[:, outside[0], outside[1], outside[2]]
+    norm = np.linalg.norm(sample)
+    expected = -2.0 * sample / (norm if norm >= 1e-12 else 1.0)
+    np.testing.assert_allclose(
+        grad[:, outside[0], outside[1], outside[2]], expected, atol=1e-5)
+
+
 def test_masked_gradient_follows_a_thin_tube_at_the_wall():
     seg = _tube(radius=1.0)
     image = _image_from_xyz(seg)
