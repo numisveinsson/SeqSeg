@@ -168,39 +168,52 @@ def test_automatic_targets_reach_a_seed_away_from_the_widest_voxel():
     assert all(successes)
 
 
-def test_centerline_grid_keeps_a_fine_isotropic_crop():
-    """A 0.5 mm crop with a 1.18 mm radius is already within 10% of the target."""
+def test_centerline_grid_refines_the_s008_crop_to_260_million():
     size, spacing, _target, resample = centerline_grid_size(
-        (320, 289, 184), (0.5, 0.5, 0.5), 1.18)
-    assert resample is False
-    assert size == (320, 289, 184)
-    assert spacing == (0.5, 0.5, 0.5)
+        (325, 294, 252), (0.39453125, 0.39453125, 0.4))
+    assert resample is True
+    assert size == (715, 647, 562)
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert abs(spacing[0] - 0.179) < 0.01
+    assert int(np.prod(size)) <= 260_000_000
+    assert size[0] > 325 and size[2] > 252
+
+
+def test_centerline_grid_refines_a_half_millimeter_crop_to_260_million():
+    size, spacing, _target, resample = centerline_grid_size(
+        (320, 289, 184), (0.5, 0.5, 0.5))
+    assert resample is True
+    assert size == (786, 710, 452)
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert abs(spacing[0] - 0.204) < 0.01
+    assert int(np.prod(size)) <= 260_000_000
 
 
 def test_centerline_grid_refines_a_thick_slice_axis():
     size, spacing, _target, resample = centerline_grid_size(
-        (256, 256, 40), (0.7, 0.7, 3.0), 2.0)
+        (256, 256, 40), (0.7, 0.7, 3.0))
     assert resample is True
-    assert size == (269, 269, 180)
-    assert int(np.prod(size)) <= 20_000_000
+    assert size == (722, 722, 484)
+    assert int(np.prod(size)) <= 260_000_000
     assert spacing[0] == spacing[1] == spacing[2]
-    assert spacing[2] < 1.0
+    assert spacing[2] < 0.7
 
 
-def test_centerline_grid_coarsens_to_the_voxel_budget():
+def test_centerline_grid_caps_a_billion_voxels_at_260_million():
     size, spacing, _target, resample = centerline_grid_size(
-        (1000, 1000, 1000), (0.5, 0.5, 0.5), 3.0)
+        (1000, 1000, 1000), (0.5, 0.5, 0.5))
     assert resample is True
-    assert int(np.prod(size)) <= 20_000_000
-    assert spacing[0] > 1.0
-    assert size[0] < 1000
+    assert size == (638, 638, 638)
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert abs(spacing[0] - 0.783) < 0.01
+    assert int(np.prod(size)) <= 260_000_000
 
 
-def test_centerline_grid_keeps_the_input_when_radius_is_non_positive():
-    for radius in (0.0, -1.0, float("nan")):
-        size, spacing, target, resample = centerline_grid_size(
-            (40, 30, 20), (0.8, 0.8, 2.0), radius)
-        assert resample is False
-        assert target is None
-        assert size == (40, 30, 20)
-        assert spacing == (0.8, 0.8, 2.0)
+def test_centerline_grid_keeps_a_native_grid_at_the_budget():
+    size, spacing, target, resample = centerline_grid_size(
+        (638, 638, 638), (0.5, 0.5, 0.5))
+    assert resample is False
+    assert target is None
+    assert size == (638, 638, 638)
+    assert spacing == (0.5, 0.5, 0.5)
+    assert int(np.prod(size)) <= 260_000_000

@@ -62,27 +62,27 @@ Each seed is three values:
 2. **Direction point** — a second point further along the vessel, so SeqSeg knows which way to walk
 3. **Radius** — approximate lumen radius at the start
 
-Coordinates and that radius use `-unit` (default `cm`). They are physical coordinates, the same space as the image header.
+Coordinates and that radius use `-unit` (default `mm`). They are physical coordinates, the same space as the image header.
 
 ```json
 [
     {
         "name": "case_001",
         "seeds": [
-            [[-2.07, -2.20, 13.43], [-1.17, -1.34, 12.24], 1.1]
+            [[-20.7, -22.0, 134.3], [-11.7, -13.4, 122.4], 11]
         ]
     }
 ]
 ```
 
-Reading the inner list: start `[-2.07, -2.20, 13.43]`, direction `[-1.17, -1.34, 12.24]`, radius `1.1` cm. Add another three-item list inside `"seeds"` for a second branch (for example the other coronary ostium).
+Reading the inner list: start `[-20.7, -22.0, 134.3]`, direction `[-11.7, -13.4, 122.4]`, radius `11` mm. Add another three-item list inside `"seeds"` for a second branch (for example the other coronary ostium).
 
-Radius guesses that work as a starting point, in the default centimeter unit:
+Radius guesses that work as a starting point, in the default millimeter unit:
 
-- Coronary lumen: `0.2` (2 mm)
-- Aortic root: `1.1` (11 mm)
+- Coronary lumen: `2`
+- Aortic root: `11`
 
-YAML tracking thresholds such as `MIN_RADIUS` and `STOP_RADIUS` stay in millimeters even when `-unit cm`. See [Configuration](configuration.md).
+YAML tracking thresholds such as `MIN_RADIUS` and `STOP_RADIUS` stay in millimeters, including when `-unit` is `cm`. See [Configuration](configuration.md).
 
 Other ways to initialize:
 
@@ -91,7 +91,7 @@ Other ways to initialize:
 
 ### Units
 
-`-unit` (`cm` or `mm`) is the unit of the seed coordinates and the seed radius. It should match the image header. `-scale` multiplies the voxel spacing passed to nnU-Net. Use `-scale 0.1` with `-unit mm` when the image spacing is in millimeters and the model was trained with spacing in centimeters.
+`-unit` (`mm` or `cm`, default `mm`) is the unit of the seed coordinates and the seed radius. It should match the image header. `-scale` multiplies the voxel spacing passed to nnU-Net. Use `-scale 0.1` when the image spacing is in millimeters and the model was trained with spacing in centimeters. Use `-unit cm` for centimeter images, such as SimVascular models.
 
 ## Basic Usage
 
@@ -180,7 +180,7 @@ seqseg run batch -data_dir data/ -start 0 -stop 50  # Process cases 0-49
 
 #### Scale adjustment:
 ```bash
-seqseg run batch -data_dir data/ -unit mm -scale 0.1  # Model trained in cm, data in mm
+seqseg run batch -data_dir data/ -scale 0.1  # Model trained in cm, images in mm
 ```
 
 #### Start from an existing segmentation:
@@ -217,7 +217,7 @@ Add seeds without retracing finished branches. They wait until the open branch e
 
 ```bash
 seqseg run continue --case-dir results/3d_fullres_case001 --extra-steps 100 \
-    --seed 1.2 3.4 5.6 0.4 --seed 2.0 1.0 0.5 0.3
+    --seed 12 34 56 4 --seed 20 10 5 3
 ```
 
 `--seeds-json` accepts a `seeds.json` (the entry named like the case), a single case object, or a bare list of `[old_point, new_point, radius]` triples. If the previous run already finished the tree, extra steps do nothing unless you give new seeds. If it stopped on `-max_n_branches`, pass `--max-n-branches` higher than the saved cap.
@@ -238,7 +238,7 @@ Arguments for `seqseg run batch`:
 | `img_ext` | str | required | Image file extension (`.nii.gz`, `.mha`, `.nrrd`) |
 | `config_name` | str | `global` | Packaged YAML name without `.yaml`. Pair it with `train_dataset` |
 | `outdir` | str | required | Output directory for results. Saved `seqseg paths` value is used when omitted |
-| `unit` | str | `cm` | Image coordinate units (`mm`, `cm`) |
+| `unit` | str | `mm` | Image coordinate units (`mm`, `cm`) |
 | `scale` | float | `1.0` | Multiplies voxel spacing passed to nnU-Net. `0.1` converts mm spacing to cm |
 | `max_n_steps` | int | `1000` | Maximum tracking steps. The tutorial sets this to `10` so the demo finishes quickly |
 | `max_n_steps_per_branch` | int | `100` | Maximum steps per vessel branch |

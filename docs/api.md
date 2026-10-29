@@ -4,7 +4,7 @@
 
 Use this page to call SeqSeg from Python. Command-line use is documented in [Usage](usage.md).
 
-Weights still load from an nnU-Net trainer folder on disk (`…/nnUNetTrainer__nnUNetPlans__3d_fullres`). Seed coordinates and the seed radius use the same unit as `TracingOptions.unit` (default `cm`). Lengths inside a YAML config stay in millimeters; see [Configuration](configuration.md).
+Weights still load from an nnU-Net trainer folder on disk (`…/nnUNetTrainer__nnUNetPlans__3d_fullres`). Seed coordinates and the seed radius use the same unit as `TracingOptions.unit` (default `mm`). Lengths inside a YAML config stay in millimeters; see [Configuration](configuration.md).
 
 `import seqseg` loads these names lazily. Importing from `seqseg.api` is the same surface for tracing.
 
@@ -53,7 +53,7 @@ prob = result.assembly.assembly
 | `write_samples` | `False` | Write intermediate patches |
 | `disk_io` | `True` | Write debug trees. Set `False` to keep results in memory |
 | `simvascular` | `False` | Write a SimVascular project when writing to disk |
-| `unit` | `"cm"` | Unit of seed coordinates and seed radius |
+| `unit` | `"mm"` | Unit of seed coordinates and seed radius |
 | `scale` | `1.0` | Multiplies voxel spacing passed to nnU-Net. `0.1` converts mm spacing to cm |
 | `fold` | `"all"` | nnU-Net fold |
 | `force_cpu` | `False` | Run nnU-Net on CPU |

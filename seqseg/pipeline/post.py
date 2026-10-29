@@ -109,7 +109,7 @@ def run_global_centerline_single(
     case_name: Optional[str] = None,
     merge_method: str = "clean",
     directory_data: Optional[str] = None,
-    unit: str = "cm",
+    unit: str = "mm",
     global_config: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """
@@ -193,7 +193,7 @@ def run_global_centerline_batch(
     out_dir: Optional[str] = None,
     merge_method: str = "clean",
     directory_data: Optional[str] = None,
-    unit: str = "cm",
+    unit: str = "mm",
     global_config: Optional[Mapping[str, Any]] = None,
 ) -> None:
     """Batch variant of :func:`run_global_centerline_single` using filename-derived case ids.
