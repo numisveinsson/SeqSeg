@@ -3535,7 +3535,10 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     component_ratios = []
     component_target_counts = []  # Store actual target counts for each component
     
+    n_steps = len(seeds)
     for i, seed in enumerate(seeds):
+        print(f"Centerline step [{i + 1}/{n_steps}] started", flush=True)
+        step_ok = False
         if verbose:
             print(f"  Centerline source point {i+1}/{len(seeds)}: {seed}")
             
@@ -3605,6 +3608,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
             
             centerlines.append(centerline)
             success_list.append(success)
+            step_ok = bool(success)
             
             # Store component success ratio and counts for detailed reporting
             if target_success_list and len(target_success_list) > 0:
@@ -3648,6 +3652,12 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
             success_list.append(False)
             component_ratios.append(0.0)  # Add 0.0 ratio for failed case
             component_target_counts.append((0, 1))  # Add 0/1 for failed case
+        finally:
+            status = "finished" if step_ok else "failed"
+            print(
+                f"Centerline step [{i + 1}/{n_steps}] {status}",
+                flush=True,
+            )
     
     # Step 3: Combine all centerlines into unified polydata
     if verbose:

@@ -313,8 +313,10 @@ def trace_centerline(
     debug = global_config['DEBUG']
     debug_step = global_config['DEBUG_STEP']
 
-    # Analysis flags: enable centerline retracing and timing analysis
-    retrace_cent = global_config['RETRACE']
+    # Re-queue an early step after a branch finishes. Old checkpoints
+    # still store this under RETRACE.
+    intentional_retrace = global_config.get(
+        'INTENTIONAL_RETRACE', global_config.get('RETRACE', False))
     take_time = global_config['TIME_ANALYSIS']
 
     # Animation settings: create progressive visualization files
@@ -1338,8 +1340,8 @@ def trace_centerline(
                                            * step_seg['radius']
                                            * step_seg['tangent']])
 
-                    # Retrace centerline option: add completed branch for re-processing
-                    if retrace_cent:
+                    # Queue an early step of this branch so it can be walked again.
+                    if intentional_retrace:
                         ind = vessel_tree.branches[branch][1]  # Get second step on this branch
                         step_to_add = vessel_tree.steps[ind]
                         step_to_add['connection'] = [-branch+1, ind]  # Mark as retrace

@@ -54,7 +54,7 @@ MIN_RADIUS: 0.3                   # Minimum vessel radius before stopping (mm)
 
 # Tracing control
 NR_CHANCES: 2                     # Retry attempts for failed steps
-NR_ALLOW_RETRACE_STEPS: 5         # Steps allowed inside existing vessels before stopping
+INTENTIONAL_RETRACE: False        # After a branch finishes, queue its second step again
 PREVENT_RETRACE: True             # Avoid tracing already segmented areas
 ASSEMBLY_EVERY_N: 20              # Combine predictions into the assembly every N steps
 

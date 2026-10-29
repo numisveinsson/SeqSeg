@@ -8,31 +8,36 @@ def create_case_directories(
     write_samples: bool,
     simvascular: bool = False,
 ) -> None:
-    """Create per-case folder tree (classic and plus compatible)."""
+    """Create per-case folder tree (classic and plus compatible).
+
+    ``output_folder`` may or may not end with a separator. Subfolders are
+    joined, so a missing slash does not glue the name onto the parent.
+    """
+    root = os.fspath(output_folder)
     directories = [
-        output_folder,
-        output_folder + "errors",
-        output_folder + "assembly",
+        root,
+        os.path.join(root, "errors"),
+        os.path.join(root, "assembly"),
     ]
     if simvascular:
         directories.extend(
             [
-                output_folder + "simvascular",
-                output_folder + "simvascular/Images",
-                output_folder + "simvascular/Paths",
-                output_folder + "simvascular/Segmentations",
-                output_folder + "simvascular/Models",
+                os.path.join(root, "simvascular"),
+                os.path.join(root, "simvascular", "Images"),
+                os.path.join(root, "simvascular", "Paths"),
+                os.path.join(root, "simvascular", "Segmentations"),
+                os.path.join(root, "simvascular", "Models"),
             ]
         )
     if write_samples:
         directories.extend(
             [
-                output_folder + "volumes",
-                output_folder + "predictions",
-                output_folder + "centerlines",
-                output_folder + "surfaces",
-                output_folder + "points",
-                output_folder + "animation",
+                os.path.join(root, "volumes"),
+                os.path.join(root, "predictions"),
+                os.path.join(root, "centerlines"),
+                os.path.join(root, "surfaces"),
+                os.path.join(root, "points"),
+                os.path.join(root, "animation"),
             ]
         )
     for directory in directories:

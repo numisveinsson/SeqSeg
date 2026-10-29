@@ -17,6 +17,15 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
 
+def case_output_directory(dir_output0, name):
+    """Return ``dir_output0/name/``.
+
+    Callers append relative names onto this string, so the trailing separator
+    is always there. ``dir_output0`` may or may not already end with one.
+    """
+    return os.path.join(os.fspath(dir_output0), name, "")
+
+
 def process_init(test_case, directory_data, dir_output0, img_format, test):
 
     root = normalize_dataset_root(directory_data)
@@ -32,7 +41,7 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
         dir_image, dir_seg, dir_cent, _ = get_directories(
             root, case, img_format, dir_seg
         )
-        dir_output = dir_output0 + test + '_' + case+'/'
+        dir_output = case_output_directory(dir_output0, f"{test}_{case}")
 
     else:
         # Information
@@ -47,7 +56,9 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
         dir_image, dir_seg, dir_cent, _ = get_directories(
             root, case, img_format, dir_seg
         )
-        dir_output = dir_output0 + test + '_'+case+'_'+str(i)+'/'
+        dir_output = case_output_directory(
+            dir_output0, f"{test}_{case}_{i}"
+        )
 
     return dir_output, dir_image, dir_seg, dir_cent, case, i, json_file_present
 
