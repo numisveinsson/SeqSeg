@@ -6,6 +6,7 @@ import SimpleITK as sitk
 from seqseg.modules.centerline import (
     backtracking_gradient,
     calc_centerline_fmm,
+    centerline_grid_size,
     cluster_map,
     masked_world_frame_gradient,
     snap_end_points_to_lumen,
@@ -160,8 +161,46 @@ def test_automatic_targets_reach_a_seed_away_from_the_widest_voxel():
     seed = np.array([10.0, 6.0, 6.0])
 
     _centerline, success, successes = calc_centerline_fmm(
-        image, seed=seed, targets=None, min_res=10,
+        image, seed=seed, targets=None,
         return_success_list=True)
 
     assert success
     assert all(successes)
+
+
+def test_centerline_grid_keeps_a_fine_isotropic_crop():
+    """A 0.5 mm crop with a 1.18 mm radius is already within 10% of the target."""
+    size, spacing, _target, resample = centerline_grid_size(
+        (320, 289, 184), (0.5, 0.5, 0.5), 1.18)
+    assert resample is False
+    assert size == (320, 289, 184)
+    assert spacing == (0.5, 0.5, 0.5)
+
+
+def test_centerline_grid_refines_a_thick_slice_axis():
+    size, spacing, _target, resample = centerline_grid_size(
+        (256, 256, 40), (0.7, 0.7, 3.0), 2.0)
+    assert resample is True
+    assert size == (269, 269, 180)
+    assert int(np.prod(size)) <= 20_000_000
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert spacing[2] < 1.0
+
+
+def test_centerline_grid_coarsens_to_the_voxel_budget():
+    size, spacing, _target, resample = centerline_grid_size(
+        (1000, 1000, 1000), (0.5, 0.5, 0.5), 3.0)
+    assert resample is True
+    assert int(np.prod(size)) <= 20_000_000
+    assert spacing[0] > 1.0
+    assert size[0] < 1000
+
+
+def test_centerline_grid_keeps_the_input_when_radius_is_non_positive():
+    for radius in (0.0, -1.0, float("nan")):
+        size, spacing, target, resample = centerline_grid_size(
+            (40, 30, 20), (0.8, 0.8, 2.0), radius)
+        assert resample is False
+        assert target is None
+        assert size == (40, 30, 20)
+        assert spacing == (0.8, 0.8, 2.0)

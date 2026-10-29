@@ -255,7 +255,6 @@ def initialize_from_seg(segmentation,
     centerline, success_info = calc_multi_component_centerlines(
         segmentation,
         nr_seeds=2,
-        min_res=500,
         out_dir=dir_output,
         write_files=write_samples,
         move_target_if_fail=False,
