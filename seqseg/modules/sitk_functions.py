@@ -403,6 +403,9 @@ def resample_inputs_for_case(
     ``explicit_spacing`` is used as given (SimpleITK order, image-header
     units). When it is omitted, each axis uses the finer of the native
     spacing and the target spacing of each ``(model_folder, scale)`` pair.
+    An empty ``model_specs`` list keeps the native grid: pre-segmented
+    tracing (``SEGMENTATION: True``) never loads nnU-Net, so there is no
+    ``plans.json`` spacing to match.
 
     Returns the image and segmentation paths to trace. Original dataset
     files are not modified.
@@ -419,9 +422,8 @@ def resample_inputs_for_case(
         )
 
     if not model_specs:
-        raise ValueError(
-            "model_specs is required when resample spacing is not set"
-        )
+        print("Keeping native image spacing (no nnU-Net model spacing applies)")
+        return dir_image, dir_seg
 
     reader = read_image(dir_image)
     native = [float(s) for s in reader.GetSpacing()]

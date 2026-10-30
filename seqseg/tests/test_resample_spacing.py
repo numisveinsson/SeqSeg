@@ -241,6 +241,26 @@ def test_resample_inputs_keeps_native_when_image_is_finer(tmp_path):
     assert image_out == str(img_path)
 
 
+def test_resample_inputs_keeps_native_without_model_specs(tmp_path):
+    from seqseg.modules.sitk_functions import resample_inputs_for_case
+
+    img_path = tmp_path / "case.mha"
+    img = sitk.Image(4, 4, 4, sitk.sitkFloat32)
+    img.SetSpacing((0.65, 0.65, 1.0))
+    sitk.WriteImage(img, str(img_path))
+    image_out, seg_out = resample_inputs_for_case(
+        str(img_path),
+        None,
+        str(tmp_path / "out"),
+        "case",
+        ".mha",
+        [],
+    )
+    assert image_out == str(img_path)
+    assert seg_out is None
+    assert not (tmp_path / "out").exists()
+
+
 def test_resample_inputs_explicit_spacing_overrides_model(tmp_path):
     from seqseg.modules.sitk_functions import resample_inputs_for_case
 

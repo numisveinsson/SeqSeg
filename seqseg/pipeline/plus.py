@@ -89,7 +89,11 @@ def run_plus_batch(
             )
         )
 
-        model_specs = [(dir_model_weights_seqseg, seqseg_scale)]
+        # SEGMENTATION skips the local nnU-Net predictor. The global model
+        # is still included when this run predicts the sweep from weights.
+        model_specs = []
+        if not global_config.get("SEGMENTATION"):
+            model_specs.append((dir_model_weights_seqseg, seqseg_scale))
         if dir_model_weights_global:
             model_specs.append((dir_model_weights_global, global_scale))
         dir_image, dir_seg = sf.resample_inputs_for_case(

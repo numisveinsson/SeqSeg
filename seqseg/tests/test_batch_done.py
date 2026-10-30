@@ -220,6 +220,53 @@ def _prepare_dirs(tmp_path, kind, done_text):
     return outdir, data_dir
 
 
+def test_classic_presegmented_does_not_consult_model_plans(tmp_path, monkeypatch):
+    recorded = {}
+
+    def record(dir_image, dir_seg, out_dir, stem, img_ext, model_specs, explicit_spacing=None):
+        recorded["model_specs"] = model_specs
+        recorded["explicit_spacing"] = explicit_spacing
+        return dir_image, dir_seg
+
+    _stub_classic(monkeypatch, [])
+    monkeypatch.setattr(
+        "seqseg.pipeline.classic.sf.resample_inputs_for_case",
+        record,
+    )
+    outdir, data_dir = _prepare_dirs(tmp_path, "classic_seg", None)
+    samples = [{"name": "S-008", "seeds": []}]
+    run_classic_batch(
+        dir_output0=str(outdir),
+        data_dir=str(data_dir),
+        dataset="Dataset010_SEQCOROASOCACT",
+        dir_model_weights="/tmp/nnUNet_results_ci/missing",
+        fold="all",
+        img_format=".nii.gz",
+        scale=1.0,
+        test_name="3d_fullres",
+        pt_centerline=0,
+        num_seeds=1,
+        testing_samples=samples,
+        directory_data=str(data_dir),
+        start=0,
+        stop=1,
+        global_config={"DEBUG": True, "SEGMENTATION": True},
+        unit="mm",
+        max_step_size=3,
+        max_n_branches=1,
+        max_n_steps_per_branch=1,
+        write_samples=False,
+        take_time=False,
+        calc_global_centerline=False,
+        cap_surface_cent=False,
+        assembly_threshold=0.5,
+        resample_spacing=None,
+        start_time_global=0.0,
+    )
+    assert recorded["model_specs"] == []
+    assert recorded["explicit_spacing"] is None
+
+
 @pytest.mark.parametrize("kind", ["classic", "plus"])
 def test_listed_case_skipped_and_success_appends(tmp_path, monkeypatch, capsys, kind):
     samples = [{"name": "3"}, {"name": "S-008"}, {"name": "9"}]

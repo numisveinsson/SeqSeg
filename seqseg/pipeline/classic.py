@@ -86,13 +86,18 @@ def run_classic_batch(
         )
 
         create_case_directories(dir_output, write_samples, simvascular=simvascular)
+        # Pre-segmented tracing never loads nnU-Net, so plans.json is not
+        # required. An explicit resample spacing still applies.
+        model_specs = []
+        if not global_config.get("SEGMENTATION"):
+            model_specs = [(dir_model_weights, scale)]
         dir_image, dir_seg = sf.resample_inputs_for_case(
             dir_image,
             dir_seg,
             dir_output,
             case,
             img_format,
-            [(dir_model_weights, scale)],
+            model_specs,
             explicit_spacing=resample_spacing,
         )
         if simvascular:
