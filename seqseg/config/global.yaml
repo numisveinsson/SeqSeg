@@ -8,7 +8,7 @@ DEBUG_STEP: 63
 ANIMATION: False # to write out animation files
 ANIMATION_STEPS: 3 # write out animation every x steps
 
-RETRACE: False # retrace strategry
+INTENTIONAL_RETRACE: False # queue the second step of a finished branch again
 TIME_ANALYSIS: False # if we want to write out how long each step take
 TREE_ANALYSIS: False
 
@@ -23,7 +23,6 @@ CENTERLINE_MERGE_METHOD: clean # clean (vtkCleanPolyData) or tree
 TYPE_CENT: profileidlist #profileidlist # can also be profileidlist / pointlist
 
 NR_CHANCES: 2
-NR_ALLOW_RETRACE_STEPS: 5
 PREVENT_RETRACE: True
 SORT_NEXT: True
 MERGE_NEXT: False

@@ -47,6 +47,8 @@ class ResumeState:
     inside_branch: int
     simvascular_path_counter: int
     resume_mode: str
+    steps_taken: Optional[int] = None
+    branches_started: Optional[int] = None
     centerlines: list = field(default_factory=list)
     surfaces: list = field(default_factory=list)
     points: list = field(default_factory=list)
@@ -327,6 +329,10 @@ def load_checkpoint(case_dir: str) -> Checkpoint:
         inside_branch=int(manifest["inside_branch"]),
         simvascular_path_counter=int(manifest["simvascular_path_counter"]),
         resume_mode=manifest["resume_mode"],
+        steps_taken=(None if manifest.get("steps_taken") is None
+                     else int(manifest["steps_taken"])),
+        branches_started=(None if manifest.get("branches_started") is None
+                          else int(manifest["branches_started"])),
         **completed,
     )
     return Checkpoint(manifest=manifest, config=config, state=state,

@@ -11,7 +11,7 @@ import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterator, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Union
 
 import numpy as np
 
@@ -363,6 +363,19 @@ def _read_sampler_yaml(path: str) -> dict:
     if not isinstance(data, dict):
         raise ValueError(f"Sampler config {path!r} must parse to a mapping")
     return dict(data)
+
+
+def _patient_level_folds_enabled(sampler_config: Mapping) -> bool:
+    """True unless the sampler YAML sets ``PATIENT_LEVEL_FOLDS`` false.
+
+    A missing key stays on, so older overlays keep the patient holdout.
+    """
+    if "PATIENT_LEVEL_FOLDS" not in sampler_config:
+        return True
+    value = sampler_config["PATIENT_LEVEL_FOLDS"]
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(value)
 
 
 def _cap_from_sampler_config(
@@ -961,6 +974,9 @@ def prepare_training_dataset(
             np=np,
             num_cores=num_cores,
             nnunet_raw=nnunet_raw,
+            patient_level_folds=_patient_level_folds_enabled(
+                _load_sampler_config(config)
+            ),
         )
     if not name:
         raise ValueError(
@@ -979,6 +995,7 @@ def prepare_training_dataset(
         None if isinstance(config, dict) else _resolve_sampler_config_file(str(config))
     )
     sampler_config = _load_sampler_config(config)
+    patient_level_folds = _patient_level_folds_enabled(sampler_config)
     resolved_img_ext = _resolve_img_ext(data_dir, sampler_config, img_ext)
     sampler_config["IMG_EXT"] = resolved_img_ext
     max_samples = _cap_from_sampler_config(sampler_config, max_samples)
@@ -1163,6 +1180,16 @@ def prepare_training_dataset(
 
     preprocessed = False
     if not skip_convert:
+        if patient_level_folds:
+            _install_patient_level_splits(
+                dataset_dirs,
+                resolve_path("nnunet_preprocessed"),
+            )
+        else:
+            print(
+                "PATIENT_LEVEL_FOLDS is false. "
+                "nnU-Net will assign folds by patch."
+            )
         workers = num_cores if np is None else np
         dataset_ids = [dataset_id_from_name(ds_name) for ds_name in dataset_names]
         _run_nnunet_plan_and_preprocess(
@@ -1348,6 +1375,247 @@ def _run_nnunet_cli(cmd: List[str], env: dict, title: str) -> None:
     subprocess.run(cmd, check=True, env=env)
 
 
+_SPLIT_FILENAME = "splits_final.json"
+_SPLIT_SEED = 12345
+_MAX_FOLDS = 5
+_VOLUME_EXTS_LONG_FIRST = (".nii.gz", ".nrrd", ".nii", ".mha", ".mhd")
+
+
+def _volume_stem(filename: str) -> str:
+    """Basename of ``filename`` with a known volume extension removed."""
+    base = os.path.basename(filename)
+    for ext in _VOLUME_EXTS_LONG_FIRST:
+        if base.endswith(ext):
+            return base[: -len(ext)]
+    return os.path.splitext(base)[0]
+
+
+def _patient_id_from_extracted_name(filename: str) -> str:
+    """Patient id from an extracted file.
+
+    Patches are ``{patient}_{index}_{sub}``. Whole volumes are ``{patient}``.
+    Two trailing integer fields are the patch indices; a name without them is
+    the patient id itself.
+    """
+    parts = _volume_stem(filename).split("_")
+    if len(parts) >= 3 and parts[-1].isdigit() and parts[-2].isdigit():
+        return "_".join(parts[:-2])
+    return _volume_stem(filename)
+
+
+def _nnunet_case_id(image_rel: str) -> str:
+    """nnU-Net case id: image name without ``_0000`` and without the extension."""
+    stem = _volume_stem(image_rel)
+    if len(stem) >= 5 and stem[-5] == "_" and stem[-4:].isdigit():
+        return stem[:-5]
+    return stem
+
+
+def _cases_by_patient(mapping_path: str) -> Dict[str, str]:
+    """Map nnU-Net case id to patient id from ``imagesTr`` lines of name_mapping.txt."""
+    cases: Dict[str, str] = {}
+    with open(mapping_path, encoding="utf-8") as handle:
+        for line in handle:
+            text = line.strip()
+            if not text or text.startswith("#") or "->" not in text:
+                continue
+            left, right = (part.strip() for part in text.split("->", 1))
+            if not left.startswith("imagesTr/"):
+                continue
+            cases[_nnunet_case_id(left)] = _patient_id_from_extracted_name(right)
+    return cases
+
+
+def _kfold_id_splits(ids: Sequence[str], n_splits: int) -> List[dict]:
+    """Seeded KFold, matching nnU-Net's ``generate_crossval_split``."""
+    from sklearn.model_selection import KFold
+
+    ordered = [str(item) for item in ids]
+    folds = KFold(n_splits=n_splits, shuffle=True, random_state=_SPLIT_SEED)
+    splits: List[dict] = []
+    for train_idx, val_idx in folds.split(ordered):
+        splits.append(
+            {
+                "train": [ordered[i] for i in train_idx],
+                "val": [ordered[i] for i in val_idx],
+            }
+        )
+    return splits
+
+
+def _patient_case_splits(
+    case_to_patient: Mapping[str, str], patients: Sequence[str]
+) -> List[dict]:
+    """Assign every case of a patient to that patient's fold side."""
+    n_splits = _MAX_FOLDS if len(patients) >= _MAX_FOLDS else len(patients)
+    by_patient: Dict[str, List[str]] = {}
+    for case_id, patient in case_to_patient.items():
+        by_patient.setdefault(patient, []).append(case_id)
+    held_out = _kfold_id_splits(list(patients), n_splits)
+    splits: List[dict] = []
+    for fold in held_out:
+        train_patients = set(fold["train"])
+        val_patients = set(fold["val"])
+        splits.append(
+            {
+                "train": sorted(
+                    case
+                    for patient in train_patients
+                    for case in by_patient.get(patient, [])
+                ),
+                "val": sorted(
+                    case
+                    for patient in val_patients
+                    for case in by_patient.get(patient, [])
+                ),
+            }
+        )
+    return splits
+
+
+def _load_splits(path: str) -> Optional[List[dict]]:
+    """Return fold dicts, or None when ``path`` is not a train/val split file."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, list):
+        return None
+    folds: List[dict] = []
+    for fold in data:
+        if not isinstance(fold, dict) or "train" not in fold or "val" not in fold:
+            return None
+        try:
+            folds.append(
+                {
+                    "train": [str(case) for case in fold["train"]],
+                    "val": [str(case) for case in fold["val"]],
+                }
+            )
+        except TypeError:
+            return None
+    return folds
+
+
+def _splits_match(left: Sequence[dict], right: Sequence[dict]) -> bool:
+    if len(left) != len(right):
+        return False
+    for a, b in zip(left, right):
+        if set(a["train"]) != set(b["train"]) or set(a["val"]) != set(b["val"]):
+            return False
+    return True
+
+
+def _classify_split_file(
+    path: str,
+    patient_splits: Sequence[dict],
+    patch_splits: Optional[Sequence[dict]],
+) -> str:
+    """``missing``, ``patient``, ``patch``, or ``custom``."""
+    if not os.path.isfile(path):
+        return "missing"
+    existing = _load_splits(path)
+    if existing is not None and _splits_match(existing, patient_splits):
+        return "patient"
+    if (
+        existing is not None
+        and patch_splits is not None
+        and _splits_match(existing, patch_splits)
+    ):
+        return "patch"
+    return "custom"
+
+
+def _write_splits(path: str, splits: Sequence[dict]) -> None:
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(list(splits), handle, indent=4)
+        handle.write("\n")
+
+
+def _install_patient_level_splits(
+    dataset_dirs: Sequence[str],
+    preprocessed_root: Optional[str] = None,
+) -> None:
+    """Write patient-grouped ``splits_final.json`` into each raw dataset.
+
+    Folds are a seeded KFold over sorted patient ids (five folds, or one fold
+    per patient when fewer than five patients exist). Every patch from a
+    patient stays on one side of each fold. Datasets that contain the same
+    patients share that sorted list, so fold 0 holds out the same people.
+
+    A single patient cannot be held out, so no file is written. An existing
+    file that is nnU-Net's default patch split is replaced. A file that matches
+    neither that default nor this patient split is left unchanged and raises.
+    """
+    grouped: List[tuple] = []
+    for dataset_dir in dataset_dirs:
+        dataset_dir = os.path.abspath(dataset_dir)
+        if not os.path.isdir(dataset_dir):
+            continue
+        mapping_path = os.path.join(dataset_dir, "name_mapping.txt")
+        if not os.path.isfile(mapping_path):
+            print(
+                f"No name_mapping.txt in {dataset_dir}; "
+                "skipping the patient-level split."
+            )
+            continue
+        case_to_patient = _cases_by_patient(mapping_path)
+        if not case_to_patient:
+            print(
+                f"name_mapping.txt in {dataset_dir} lists no imagesTr cases; "
+                "skipping the patient-level split."
+            )
+            continue
+        patients = sorted(set(case_to_patient.values()))
+        if len(patients) < 2:
+            who = patients[0] if patients else "unknown"
+            print(
+                f"Only one patient ({who}) in {dataset_dir}. "
+                "A held-out fold is impossible, so splits_final.json was not written."
+            )
+            continue
+        patient_splits = _patient_case_splits(case_to_patient, patients)
+        case_ids = sorted(case_to_patient)
+        patch_splits = (
+            _kfold_id_splits(case_ids, _MAX_FOLDS)
+            if len(case_ids) >= _MAX_FOLDS
+            else None
+        )
+        targets = [os.path.join(dataset_dir, _SPLIT_FILENAME)]
+        if preprocessed_root:
+            pre_dir = os.path.join(
+                preprocessed_root, os.path.basename(dataset_dir)
+            )
+            if os.path.isdir(pre_dir):
+                targets.append(os.path.join(pre_dir, _SPLIT_FILENAME))
+        for target in targets:
+            kind = _classify_split_file(target, patient_splits, patch_splits)
+            if kind == "custom":
+                raise RuntimeError(
+                    f"{target} is a custom split. It matches neither a "
+                    "patient-level fold assignment nor nnU-Net's default "
+                    "patch split. Delete that file to adopt patient-level folds."
+                )
+            grouped.append((target, kind, patient_splits, dataset_dir, patients))
+
+    announced: set = set()
+    for target, kind, patient_splits, dataset_dir, patients in grouped:
+        if dataset_dir not in announced:
+            announced.add(dataset_dir)
+            print(
+                f"Patient-level split for {os.path.basename(dataset_dir)}: "
+                f"{len(patients)} patients, {len(patient_splits)} folds."
+            )
+        if kind == "patch":
+            print(
+                f"Replacing patch-level split at {target}. "
+                "Existing fold checkpoints were trained with patches from the "
+                "same patient in both training and validation. Retrain those folds."
+            )
+        _write_splits(target, patient_splits)
+
+
 def _run_nnunet_plan_and_preprocess(
     nnunet_raw: str,
     dataset_ids: Sequence[int],
@@ -1403,6 +1671,7 @@ def _preprocess_existing_dataset(
     np: Optional[int],
     num_cores: int,
     nnunet_raw: Optional[str],
+    patient_level_folds: bool = True,
 ) -> PrepareResult:
     """Plan or preprocess ``configuration`` from an existing raw dataset.
 
@@ -1433,6 +1702,13 @@ def _preprocess_existing_dataset(
     plans_file = (
         os.path.join(pre_matches[0], f"{plans}.json") if pre_matches else ""
     )
+    if patient_level_folds:
+        _install_patient_level_splits([raw_dir], pre_root or None)
+    else:
+        print(
+            "PATIENT_LEVEL_FOLDS is false. "
+            "nnU-Net will assign folds by patch."
+        )
     if plans_file and os.path.isfile(plans_file):
         _run_nnunet_preprocess_only(
             raw_root,

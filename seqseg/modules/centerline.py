@@ -3322,7 +3322,8 @@ def extract_disconnected_body_around_seed(segmentation, seed, verbose=False):
     return component_segmentation
 
 
-def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=False):
+def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=False,
+                                         min_component_voxels=None):
     """
     Create seeds based on disconnected bodies in the segmentation.
     For each disconnected body, pick the point with the highest surface distance value.
@@ -3338,6 +3339,9 @@ def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=F
         Seeds are created from the largest disconnected bodies when fewer than all are requested.
     verbose : bool
         Print detailed information
+    min_component_voxels : int, optional
+        Ignore bodies smaller than this many voxels. When every body is smaller,
+        the largest body is still used.
         
     Returns
     -------
@@ -3383,29 +3387,73 @@ def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=F
     
     # Sort by size (largest first)
     component_info.sort(key=lambda x: x['size'], reverse=True)
-    
+
+    eligible = component_info
+    used_largest_fallback = False
+    if min_component_voxels is not None:
+        min_component_voxels = int(min_component_voxels)
+        if min_component_voxels < 1:
+            raise ValueError("min_component_voxels must be >= 1")
+        eligible = [
+            comp for comp in component_info
+            if comp['size'] >= min_component_voxels
+        ]
+        if not eligible and component_info:
+            eligible = component_info[:1]
+            used_largest_fallback = True
+            print(
+                f"  No connected body has at least {min_component_voxels} voxels; "
+                f"using the largest ({component_info[0]['size']} voxels)"
+            )
+        elif verbose:
+            print(
+                f"  {len(eligible)} of {num_components} bodies have at least "
+                f"{min_component_voxels} voxels"
+            )
+
+    num_eligible = len(eligible)
+
     if verbose:
         print(f"  Component sizes: {[comp['size'] for comp in component_info]}")
     
     # Determine how many seeds to create
     if nr_seeds is None:
-        nr_seeds = num_components
+        nr_seeds = num_eligible
         if verbose:
             print(f"  No source-point count specified, placing one centerline source point per connected body ({nr_seeds})")
     else:
         original_nr_seeds = nr_seeds
-        nr_seeds = min(nr_seeds, num_components)
+        nr_seeds = min(nr_seeds, num_eligible)
         
         if verbose:
-            if original_nr_seeds > num_components:
-                print(f"  Requested {original_nr_seeds} centerline source points, but only {num_components} connected bodies found")
+            if used_largest_fallback:
+                print(
+                    f"  Placing {nr_seeds} centerline source point "
+                    f"in the largest connected body"
+                )
+            elif original_nr_seeds > num_eligible:
+                if min_component_voxels is not None:
+                    print(
+                        f"  Requested {original_nr_seeds} centerline source points, "
+                        f"but only {num_eligible} connected bodies have at least "
+                        f"{min_component_voxels} voxels"
+                    )
+                else:
+                    print(f"  Requested {original_nr_seeds} centerline source points, but only {num_components} connected bodies found")
                 print(f"  Placing {nr_seeds} centerline source points, one per connected body")
             else:
                 print(f"  Placing {nr_seeds} centerline source points, one in each of the largest connected bodies")
         
         # Also provide a warning even when not verbose
-        elif original_nr_seeds > num_components:
-            print(f"Warning: Requested {original_nr_seeds} centerline source points, but only found {num_components} connected bodies. Placing {nr_seeds}.")
+        elif original_nr_seeds > num_eligible and not used_largest_fallback:
+            if min_component_voxels is not None:
+                print(
+                    f"Warning: Requested {original_nr_seeds} centerline source points, "
+                    f"but only {num_eligible} connected bodies have at least "
+                    f"{min_component_voxels} voxels. Placing {nr_seeds}."
+                )
+            else:
+                print(f"Warning: Requested {original_nr_seeds} centerline source points, but only found {num_components} connected bodies. Placing {nr_seeds}.")
     
     # Calculate surface distance map for the entire segmentation
     distance_map = distance_map_from_seg(segmentation)
@@ -3415,7 +3463,7 @@ def create_seeds_from_disconnected_bodies(segmentation, nr_seeds=None, verbose=F
     connected_array = sitk.GetArrayFromImage(connected_components).transpose(2, 1, 0)
     
     seeds = []
-    selected_components = component_info[:nr_seeds]
+    selected_components = eligible[:nr_seeds]
     
     for i, comp in enumerate(selected_components):
         label = comp['label']
@@ -3630,7 +3678,8 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
                                    out_dir=None, write_files=False,
                                    move_target_if_fail=False, relax_factor=1,
                                    verbose=False, return_failed=False,
-                                   post_process_kwargs=None):
+                                   post_process_kwargs=None,
+                                   min_component_voxels=None):
     """
     Calculate centerlines for multi-component segmentations by creating seeds
     from disconnected bodies and computing centerlines for each component.
@@ -3661,6 +3710,9 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
         Defaults to False.
     relax_factor : float, optional
         Factor to relax the tolerance for backtracking convergence. Defaults to 1.
+    min_component_voxels : int, optional
+        Passed to :func:`create_seeds_from_disconnected_bodies`. Bodies smaller
+        than this are not seeded. Defaults to None (no size cutoff).
     verbose : bool, optional
         If True, prints detailed information about the process. Defaults to False.
     return_failed : bool, optional
@@ -3739,7 +3791,8 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
         print("Step 1: Placing one centerline source point in each of the largest connected bodies...")
     
     seeds, component_info = create_seeds_from_disconnected_bodies(
-        segmentation, nr_seeds=nr_seeds, verbose=verbose)
+        segmentation, nr_seeds=nr_seeds, verbose=verbose,
+        min_component_voxels=min_component_voxels)
     
     # Write seeds as polydata file if output directory is specified
     if out_dir and write_files and component_info.get('seeds_polydata') is not None:
@@ -3770,7 +3823,10 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
     component_ratios = []
     component_target_counts = []  # Store actual target counts for each component
     
+    n_steps = len(seeds)
     for i, seed in enumerate(seeds):
+        print(f"Centerline step [{i + 1}/{n_steps}] started", flush=True)
+        step_ok = False
         if verbose:
             print(f"  Centerline source point {i+1}/{len(seeds)}: {seed}")
             
@@ -3840,6 +3896,7 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
             
             centerlines.append(centerline)
             success_list.append(success)
+            step_ok = bool(success)
             
             # Store component success ratio and counts for detailed reporting
             if target_success_list and len(target_success_list) > 0:
@@ -3883,6 +3940,12 @@ def calc_multi_component_centerlines(segmentation, nr_seeds=None,
             success_list.append(False)
             component_ratios.append(0.0)  # Add 0.0 ratio for failed case
             component_target_counts.append((0, 1))  # Add 0/1 for failed case
+        finally:
+            status = "finished" if step_ok else "failed"
+            print(
+                f"Centerline step [{i + 1}/{n_steps}] {status}",
+                flush=True,
+            )
     
     # Step 3: Combine all centerlines into unified polydata
     if verbose:

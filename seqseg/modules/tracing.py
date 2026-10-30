@@ -7,7 +7,7 @@ from typing import Any, Mapping, Optional, Sequence, Union
 import numpy as np
 import SimpleITK as sitk
 
-from .sitk_functions import (import_image, is_point_in_image,
+from .sitk_functions import (import_image,
                              map_to_image, extract_volume, copy_settings,
                              remove_other_vessels, check_seg_border)
 
@@ -29,7 +29,8 @@ from .local_assembly import construct_subvolume
 
 from .tracing_functions import (SkipThisStepError, convert_seg_to_surfs,
                                 get_smoothing_params, orient_caps,
-                                calc_centerline_vmtk, get_next_points)
+                                calc_centerline_vmtk, get_next_points,
+                                centerline_retrace_kind, retrace_stop_action)
 
 from .centerline import calc_centerline_fmm
 
@@ -79,6 +80,27 @@ def _queue_resume_seeds(vessel_tree, resume_mode, i, branch, new_seeds):
         vessel_tree.steps.append(next_step)
     vessel_tree.potential_branches.extend(seeds)
     return branch, True, True
+
+
+def discard_empty_retrace_branch(vessel_tree, branch, branches_started):
+    """Drop a branch whose first step retraces a committed centerline.
+
+    Potentials found elsewhere are kept. Ones that point at this branch are
+    reassigned to the parent, not deleted. The branch is removed from
+    ``branches_started``.
+
+    Returns ``(branch, i, branches_started)`` for the tracing loop.
+    """
+    vessel_tree.restart_branch(branch, drop_child_potentials=False)
+    branches_started = max(0, int(branches_started) - 1)
+    branch -= 1
+    i = vessel_tree.branches[-1][-1] + 1
+    return branch, i, branches_started
+
+
+def drop_failed_branch_step(vessel_tree, branch):
+    """Remove the step that just failed and leave the traced prefix."""
+    del vessel_tree.branches[branch][-1]
 
 
 @dataclass
@@ -291,8 +313,10 @@ def trace_centerline(
     debug = global_config['DEBUG']
     debug_step = global_config['DEBUG_STEP']
 
-    # Analysis flags: enable centerline retracing and timing analysis
-    retrace_cent = global_config['RETRACE']
+    # Re-queue an early step after a branch finishes. Old checkpoints
+    # still store this under RETRACE.
+    intentional_retrace = global_config.get(
+        'INTENTIONAL_RETRACE', global_config.get('RETRACE', False))
     take_time = global_config['TIME_ANALYSIS']
 
     # Animation settings: create progressive visualization files
@@ -300,8 +324,14 @@ def trace_centerline(
     animation_steps = global_config['ANIMATION_STEPS']
 
     # Tracing behavior parameters
-    allowed_steps = global_config['NR_ALLOW_RETRACE_STEPS']     # Steps allowed inside existing vessels
-    prevent_retracing = global_config['PREVENT_RETRACE']        # Avoid tracing already segmented areas
+    prevent_retracing = global_config['PREVENT_RETRACE']        # Avoid walking a committed centerline again
+    retrace_radius_factor = float(global_config.get(
+        'RETRACE_RADIUS_FACTOR', 0.75))
+    retrace_align_deg = float(global_config.get('RETRACE_ALIGN_DEG', 35.0))
+    retrace_tip_ignore = int(global_config.get('RETRACE_TIP_IGNORE_STEPS', 4))
+    retrace_birth_factor = float(global_config.get(
+        'RETRACE_BIRTH_IGNORE_FACTOR', 1.0))
+    retrace_allow_loops = bool(global_config.get('RETRACE_ALLOW_LOOPS', True))
     sort_potentials = global_config['SORT_NEXT']                # Sort potential branches by radius
     merge_potentials = global_config['MERGE_NEXT']              # Merge nearby potential points
 
@@ -418,6 +448,7 @@ def trace_centerline(
     i = 0                                                      # Global step counter (chronological order)
     run_loop = True
     stop_reason = None
+    new_branch = False
 
     if resume_state is not None:
         i = resume_state.i
@@ -435,15 +466,44 @@ def trace_centerline(
             vessel_tree, resume_state.resume_mode, i, branch, new_seeds)
         if new_branch:
             num_steps_direction = 0
-            if len(vessel_tree.branches) > max_n_branches:
-                print(f"Max number of branches reached: {max_n_branches}")
-                run_loop = False
-                stop_reason = 'max_branches'
         elif not run_loop:
             stop_reason = 'exhausted'
 
+    # These counts only increase. Restarting a branch rewinds `i` and
+    # removes that branch from the tree, so the caps cannot use those.
+    steps_taken = i
+    branches_started = len(vessel_tree.branches)
+    if resume_state is not None:
+        if getattr(resume_state, 'steps_taken', None) is not None:
+            steps_taken = resume_state.steps_taken
+        if getattr(resume_state, 'branches_started', None) is not None:
+            branches_started = resume_state.branches_started
+            if new_branch:
+                branches_started += 1
+    if new_branch and branches_started > max_n_branches:
+        print(f"Max number of branches reached: {max_n_branches} "
+              f"({branches_started} started)")
+        run_loop = False
+        stop_reason = 'max_branches'
+
+    def _centerline_kind(point, tangent, connector_step=None, allow_loops=None):
+        if allow_loops is None:
+            allow_loops = retrace_allow_loops
+        return centerline_retrace_kind(
+            vessel_tree,
+            point,
+            tangent,
+            branch=branch,
+            connector_step=connector_step,
+            radius_factor=retrace_radius_factor,
+            align_deg=retrace_align_deg,
+            tip_ignore_steps=retrace_tip_ignore,
+            birth_ignore_factor=retrace_birth_factor,
+            allow_loops=allow_loops,
+        )
+
     # Main tracing loop: continue while there are potential branches to explore
-    while run_loop and vessel_tree.potential_branches and i < max_step_size:
+    while run_loop and vessel_tree.potential_branches and steps_taken < max_step_size:
 
         # Progress reporting: print step number and timestamp
         print(f"\n*** Step number {i} ***")
@@ -475,36 +535,34 @@ def trace_centerline(
                         "Too many steps in current branch, stop here"
                     )
 
-            # Retrace prevention: avoid tracing areas that are already segmented
+            # Retrace prevention compares this step with committed centerlines.
+            # The assembly is the output segmentation, not the visited set.
+            # A loop that left a centerline and came back is kept.
+            centerline_kind = None
             if prevent_retracing:
-                # If we've been inside existing vessels for too many consecutive steps
-                if inside_branch == allowed_steps:
-                    step_seg['is_inside'] = True
-                    inside_branch = 0
-                    # Record this point as being inside existing segmentation
-                    list_inside_pts.append(
-                        points2polydata([step_seg['point'].tolist()]))
-                    if allow_writes and write_samples:
-                        polydata_point = points2polydata(
-                                         [step_seg['point'].tolist()])
-                        pfn = (output_folder +
-                               'points/inside_point_'+case+'_'+str(i)+'.vtp')
-                        write_geo(pfn, polydata_point)
-
-                    # Stop tracing this branch to avoid redundant work
-                    raise SkipThisStepError(
-                        "Inside already segmented vessel, stop here"
-                    )
-
-                # Check if current point is inside existing global assembly
-                elif is_point_in_image(assembly_segs.assembly,
-                                       step_seg['point']
-                                       # + step_seg['radius']
-                                       # * step_seg['tangent']
-                                       ):
-                    inside_branch += 1                          # Increment counter for consecutive inside steps
-                else:
-                    inside_branch = 0                           # Reset counter if outside existing vessels
+                centerline_kind = _centerline_kind(
+                    step_seg['point'], step_seg['tangent'])
+            if centerline_kind == "retrace":
+                step_seg['is_retrace'] = True
+                step_seg['chances'] = number_chances
+                list_inside_pts.append(
+                    points2polydata([step_seg['point'].tolist()]))
+                if allow_writes and write_samples:
+                    polydata_point = points2polydata(
+                                     [step_seg['point'].tolist()])
+                    pfn = (output_folder +
+                           'points/inside_point_'+case+'_'+str(i)+'.vtp')
+                    write_geo(pfn, polydata_point)
+                raise SkipThisStepError(
+                    "Retracing a committed centerline, stop here"
+                )
+            if centerline_kind == "loop":
+                step_seg['is_loop'] = True
+                step_seg['chances'] = number_chances
+                print("Closing a loop, keeping this branch")
+                raise SkipThisStepError(
+                    "Closing a loop, keeping this branch"
+                )
 
             # Create VTK point data for current step location
             polydata_point = points2polydata([step_seg['point'].tolist()])
@@ -903,6 +961,7 @@ def trace_centerline(
             if point_tree.size != 0:
 
                 i += 1
+                steps_taken += 1
                 num_steps_direction += 1
                 # Create next tracing step from best candidate point
                 next_step = create_step_dict(step_seg['point'],
@@ -943,6 +1002,16 @@ def trace_centerline(
                             dict['radius'] = (dict['radius']
                                               * forceful_sidebranch_magnify)
 
+                        # A new arm has not traveled anywhere yet, so a hit
+                        # here is a duplicate. Loop closure is decided later,
+                        # on the branch that actually leaves and comes back.
+                        if (prevent_retracing and _centerline_kind(
+                                dict['point'], dict['tangent'],
+                                connector_step=i - 1, allow_loops=False)
+                                == "retrace"):
+                            print("Skipping bifurcation that retraces "
+                                  "a committed centerline")
+                            continue
                         vessel_tree.potential_branches.append(dict)
                     
                     # Visualization: save potential branch points for debugging
@@ -985,9 +1054,13 @@ def trace_centerline(
                 print("Didnt work for first surface")
                 # break
 
-            # Retry logic: allow multiple attempts for failed steps
+            # Retry logic: allow multiple attempts for failed steps.
+            # A centerline retrace is final: another chance would walk the
+            # same committed path.
             if (vessel_tree.steps[i]['chances'] < number_chances
-               and not step_seg['is_inside']):
+               and not step_seg['is_inside']
+               and not step_seg.get('is_retrace')
+               and not step_seg.get('is_loop')):
                 print("Giving chance for surface: " + str(i))
                 if take_time:
                     print('Radius is ', step_seg['radius'])
@@ -1017,29 +1090,49 @@ def trace_centerline(
                 if len(vessel_tree.branches) <= 1 and step_seg['is_inside']:
                     print("\n\nWARNING: First branch is inside, so stopping\n\n")
 
-                # Branch restart conditions: inside vessel or short branch
-                if i != 0 and len(vessel_tree.branches) > 1 and ((step_seg['is_inside'] and global_config['RESTART_BRANCH'])
-                   or len(vessel_tree.branches[branch]) <= 2):
-                    # Switch to next available branch and reset step counter
-                    # Remove current branch from allowed steps to prevent infinite loops
-
-                    if len(vessel_tree.branches[branch]) <= 2:
-                        print("Branch length is 1 or 0, so restarting")
-                    elif (step_seg['is_inside']
-                          and global_config['RESTART_BRANCH']):
-                        print('Branch inside, restarting branch')
-
-                    # If this branch is inside, then restart branch
-                    # if len(vessel_tree.branches[branch]) <= allowed_steps+2:
-                    vessel_tree.restart_branch(branch)
-                    branch -= 1
-                    # If not the whole branch is inside
-                    # then remove allowed_steps
-                    # else:
-                    #     print('Part inside, removing last n steps')
-                    #     vessel_tree.remove_previous_n(branch,
-                    #                                   n=allowed_steps-1)
-                    i = vessel_tree.branches[-1][-1] + 1
+                # A loop that came back keeps the branch. A retrace that
+                # already traced a step keeps that prefix. An empty retrace
+                # is discarded and not counted. Segmentation failures still
+                # restart a one-step branch or an inside branch.
+                retrace_action = None
+                if step_seg.get('is_loop'):
+                    retrace_action = retrace_stop_action(
+                        vessel_tree.branches[branch], kind="loop")
+                elif step_seg.get('is_retrace'):
+                    retrace_action = retrace_stop_action(
+                        vessel_tree.branches[branch])
+                short_or_inside = (
+                    (step_seg['is_inside'] and global_config['RESTART_BRANCH'])
+                    or len(vessel_tree.branches[branch]) <= 2
+                )
+                restart_this = (
+                    retrace_action != "keep_prefix"
+                    and i != 0
+                    and len(vessel_tree.branches) > 1
+                    and (retrace_action == "discard_empty" or short_or_inside)
+                )
+                if restart_this:
+                    if retrace_action == "discard_empty":
+                        print("Retrace on first step, discarding branch")
+                        branch, i, branches_started = (
+                            discard_empty_retrace_branch(
+                                vessel_tree, branch, branches_started)
+                        )
+                    else:
+                        if len(vessel_tree.branches[branch]) <= 2:
+                            print("Branch length is 1 or 0, so restarting")
+                        elif (step_seg['is_inside']
+                              and global_config['RESTART_BRANCH']):
+                            print('Branch inside, restarting branch')
+                        drop_children = bool(
+                            step_seg['is_inside']
+                            and global_config['RESTART_BRANCH']
+                        )
+                        vessel_tree.restart_branch(
+                            branch, drop_child_potentials=drop_children
+                        )
+                        branch -= 1
+                        i = vessel_tree.branches[-1][-1] + 1
                     print(f"i is now {i}")
 
                 # Standard branch completion: collect results and clean up
@@ -1048,8 +1141,9 @@ def trace_centerline(
                     if debug:
                         print("Debugging")
 
-                    # Remove failed step from current branch
-                    del vessel_tree.branches[branch][-1]
+                    # Remove failed step from current branch. A retrace keeps
+                    # the steps traced before the match, and their children.
+                    drop_failed_branch_step(vessel_tree, branch)
                     
                     # Collect all valid results from completed branch steps
                     (list_surf_branch, list_cent_branch,
@@ -1246,8 +1340,8 @@ def trace_centerline(
                                            * step_seg['radius']
                                            * step_seg['tangent']])
 
-                    # Retrace centerline option: add completed branch for re-processing
-                    if retrace_cent:
+                    # Queue an early step of this branch so it can be walked again.
+                    if intentional_retrace:
                         ind = vessel_tree.branches[branch][1]  # Get second step on this branch
                         step_to_add = vessel_tree.steps[ind]
                         step_to_add['connection'] = [-branch+1, ind]  # Mark as retrace
@@ -1284,6 +1378,7 @@ def trace_centerline(
                             break  # No more branches to process
 
                 branch += 1
+                branches_started += 1
                 vessel_tree.add_branch(next_step['connection'][1], i)
                 vessel_tree.steps[i] = next_step
                 num_steps_direction = 0
@@ -1292,25 +1387,30 @@ def trace_centerline(
                 for print_branch in vessel_tree.branches:
                     print(print_branch)
                 print("Number of steps are: ", len(vessel_tree.steps))
+                print("Steps taken: ", steps_taken)
+                print("Branches started: ", branches_started)
                 print("Connections of branches are: ",
                       vessel_tree.bifurcations)
                 print("Number of potentials left are: ",
                       len(vessel_tree.potential_branches))
 
-                # Check if end prematurely
-                if len(vessel_tree.branches) > max_n_branches:
-                    print(f"Max number of branches reached: {max_n_branches}")
+                # Check if end prematurely. Discarded branches stay in this count.
+                if branches_started > max_n_branches:
+                    print(f"Max number of branches reached: {max_n_branches} "
+                          f"({branches_started} started)")
                     stop_reason = 'max_branches'
                     break
 
     if stop_reason is None:
-        if i >= max_step_size and i < len(vessel_tree.steps):
+        if steps_taken >= max_step_size:
             stop_reason = 'max_steps'
         else:
             stop_reason = 'exhausted'
     loop_state = {
         'i': i,
         'branch': branch,
+        'steps_taken': steps_taken,
+        'branches_started': branches_started,
         'num_steps_direction': num_steps_direction,
         'inside_branch': inside_branch,
         'simvascular_path_counter': simvascular_path_counter,
@@ -1377,6 +1477,6 @@ def trace_centerline(
             list_inside_pts,     # Points that were detected inside vessels
             assembly_segs,       # Global segmentation assembly object
             vessel_tree,         # Complete tree structure with all steps
-            i,                   # Final step counter
+            steps_taken,         # Steps started, including ones later discarded
             stop_reason,         # 'max_steps', 'max_branches', or 'exhausted'
             loop_state)          # Counters needed to continue this run

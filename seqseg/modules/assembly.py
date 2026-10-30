@@ -426,19 +426,33 @@ class VesselTree:
 
         return prefix_ids + tracing_ids
 
-    def restart_branch(self, branch):
+    def restart_branch(self, branch, drop_child_potentials=False):
         "Function to restart a branch from beginning"
 
-        # change potential branches that originated in the branch
-        for pot_branch in self.potential_branches:
-            if pot_branch['connection'][0] == branch:
-                # change the connection to first step in branch
-                first_step = self.branches[branch][0]
-                # find which branch the first step is in
-                for j, br in enumerate(self.branches):
-                    if first_step in br:
-                        pot_branch['connection'] = [j, first_step]
-                        break
+        if drop_child_potentials:
+            # This branch is being thrown away. Potentials found along it
+            # would keep the queue growing after the branch is deleted.
+            kept = []
+            dropped = 0
+            for pot_branch in self.potential_branches:
+                connection = pot_branch.get('connection') or [None]
+                if connection[0] == branch:
+                    dropped += 1
+                    continue
+                kept.append(pot_branch)
+            self.potential_branches = kept
+            print(f"Dropped {dropped} potentials from discarded branch {branch}")
+        else:
+            # change potential branches that originated in the branch
+            for pot_branch in self.potential_branches:
+                if pot_branch['connection'][0] == branch:
+                    # change the connection to first step in branch
+                    first_step = self.branches[branch][0]
+                    # find which branch the first step is in
+                    for j, br in enumerate(self.branches):
+                        if first_step in br:
+                            pot_branch['connection'] = [j, first_step]
+                            break
 
         # if len(self.branches[branch]) > 1:
         start = self.branches[branch][1]

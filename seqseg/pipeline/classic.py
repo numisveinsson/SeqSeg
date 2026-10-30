@@ -21,6 +21,12 @@ from seqseg.modules.simvascular import (
 )
 from seqseg.modules.tracing import trace_centerline_from_context, TracingContext
 from seqseg.pipeline.directories import create_case_directories
+from seqseg.pipeline.done import (
+    case_name_from_sample,
+    mark_case_done,
+    read_done_cases,
+    skip_if_done,
+)
 
 
 def run_classic_batch(
@@ -61,11 +67,17 @@ def run_classic_batch(
     if cent_max_spacing is not None and float(cent_max_spacing) <= 0:
         raise ValueError("CENT_MAX_SPACING must be > 0 (mm)")
 
+    done = read_done_cases(dir_output0)
     for i, test_case in enumerate(testing_samples[start:stop]):
+        case_name = case_name_from_sample(test_case)
+        if skip_if_done(done, case_name):
+            continue
+
         print(
             f"\nProcessing test case {i + start + 1} of {len(testing_samples)}: "
             f"{test_case}"
         )
+        case_started = time.perf_counter()
 
         dir_output, dir_image, dir_seg, dir_cent, case, idx, json_file_present = (
             init.process_init(
@@ -74,15 +86,20 @@ def run_classic_batch(
         )
 
         create_case_directories(dir_output, write_samples, simvascular=simvascular)
-        if resample_spacing is not None:
-            dir_image, dir_seg = sf.maybe_resample_volume_paths(
-                dir_image,
-                dir_seg,
-                resample_spacing,
-                dir_output,
-                case,
-                img_format,
-            )
+        # Pre-segmented tracing never loads nnU-Net, so plans.json is not
+        # required. An explicit resample spacing still applies.
+        model_specs = []
+        if not global_config.get("SEGMENTATION"):
+            model_specs = [(dir_model_weights, scale)]
+        dir_image, dir_seg = sf.resample_inputs_for_case(
+            dir_image,
+            dir_seg,
+            dir_output,
+            case,
+            img_format,
+            model_specs,
+            explicit_spacing=resample_spacing,
+        )
         if simvascular:
             vf.write_image_as_vti(
                 dir_image,
@@ -189,6 +206,12 @@ def run_classic_batch(
             assembly_threshold=assembly_threshold,
             simvascular=simvascular,
             start_time_global=start_time_global,
+        )
+        mark_case_done(
+            dir_output0,
+            done,
+            case_name,
+            seconds=time.perf_counter() - case_started,
         )
 
         if not global_config["DEBUG"]:

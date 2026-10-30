@@ -16,6 +16,20 @@ from seqseg.modules.centerline import calc_multi_component_centerlines
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
+# Largest disconnected bodies in the global mask used to place tracing seeds.
+# Bodies under 100 voxels are speckle on the sweep masks and are left out.
+MAX_INIT_COMPONENTS = 5
+MIN_INIT_COMPONENT_VOXELS = 100
+
+
+def case_output_directory(dir_output0, name):
+    """Return ``dir_output0/name/``.
+
+    Callers append relative names onto this string, so the trailing separator
+    is always there. ``dir_output0`` may or may not already end with one.
+    """
+    return os.path.join(os.fspath(dir_output0), name, "")
+
 
 def process_init(test_case, directory_data, dir_output0, img_format, test):
 
@@ -32,7 +46,7 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
         dir_image, dir_seg, dir_cent, _ = get_directories(
             root, case, img_format, dir_seg
         )
-        dir_output = dir_output0 + test + '_' + case+'/'
+        dir_output = case_output_directory(dir_output0, f"{test}_{case}")
 
     else:
         # Information
@@ -47,7 +61,9 @@ def process_init(test_case, directory_data, dir_output0, img_format, test):
         dir_image, dir_seg, dir_cent, _ = get_directories(
             root, case, img_format, dir_seg
         )
-        dir_output = dir_output0 + test + '_'+case+'_'+str(i)+'/'
+        dir_output = case_output_directory(
+            dir_output0, f"{test}_{case}_{i}"
+        )
 
     return dir_output, dir_image, dir_seg, dir_cent, case, i, json_file_present
 
@@ -255,10 +271,12 @@ def initialize_from_seg(segmentation,
     potential_branches = []
     extracted_centerline = None
 
-    # Use multi-component centerline extraction over the two largest bodies.
+    # Trace the largest disconnected bodies, up to five, skipping speckle.
     centerline, success_info = calc_multi_component_centerlines(
         segmentation,
-        nr_seeds=2,
+        nr_seeds=MAX_INIT_COMPONENTS,
+        min_component_voxels=MIN_INIT_COMPONENT_VOXELS,
+        min_res=500,
         out_dir=dir_output,
         write_files=write_samples,
         move_target_if_fail=False,

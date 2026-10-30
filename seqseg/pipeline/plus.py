@@ -23,6 +23,12 @@ from seqseg.modules.simvascular import (
 from seqseg.modules.sweep import run_global_segmentation
 from seqseg.modules.tracing import TracingContext, trace_centerline_from_context
 from seqseg.pipeline.directories import create_case_directories
+from seqseg.pipeline.done import (
+    case_name_from_sample,
+    mark_case_done,
+    read_done_cases,
+    skip_if_done,
+)
 
 
 def run_plus_batch(
@@ -68,8 +74,14 @@ def run_plus_batch(
     if cent_max_spacing is not None and float(cent_max_spacing) <= 0:
         raise ValueError("CENT_MAX_SPACING must be > 0 (mm)")
 
+    done = read_done_cases(dir_output0)
     for test_case in testing_samples[start:stop]:
+        case_name = case_name_from_sample(test_case)
+        if skip_if_done(done, case_name):
+            continue
+
         print(f"\n{test_case}\n")
+        case_started = time.perf_counter()
 
         dir_output, dir_image, dir_seg, dir_cent, case, idx, json_file_present = (
             init.process_init(
@@ -77,16 +89,22 @@ def run_plus_batch(
             )
         )
 
-        if resample_spacing is not None:
-            os.makedirs(dir_output, exist_ok=True)
-            dir_image, dir_seg = sf.maybe_resample_volume_paths(
-                dir_image,
-                dir_seg,
-                resample_spacing,
-                dir_output,
-                case,
-                img_format,
-            )
+        # SEGMENTATION skips the local nnU-Net predictor. The global model
+        # is still included when this run predicts the sweep from weights.
+        model_specs = []
+        if not global_config.get("SEGMENTATION"):
+            model_specs.append((dir_model_weights_seqseg, seqseg_scale))
+        if dir_model_weights_global:
+            model_specs.append((dir_model_weights_global, global_scale))
+        dir_image, dir_seg = sf.resample_inputs_for_case(
+            dir_image,
+            dir_seg,
+            dir_output,
+            case,
+            img_format,
+            model_specs,
+            explicit_spacing=resample_spacing,
+        )
 
         if global_seg_dir:
             ref_image_for_seg = sitk.ReadImage(dir_image)
@@ -96,19 +114,42 @@ def run_plus_batch(
             pred_sweep, prob_pred_sweep = sf.load_global_segmentation(
                 binary_path, probability_path, ref_image_for_seg
             )
+            write_probability = probability_path is not None
         else:
-            pred_sweep, prob_pred_sweep = run_global_segmentation(
-                dir_image=dir_image,
-                model_folder=dir_model_weights_global,
-                fold=global_fold,
-                scale=global_scale,
-                force_cpu=force_cpu,
+            existing_sweep = sf.resolve_existing_sweep_seg(
+                dir_output, case, dir_output0
             )
-        sitk.WriteImage(pred_sweep, dir_output0 + "/" + case + "_sweep_seg.mha")
+            if existing_sweep:
+                binary_path, probability_path = existing_sweep
+                print(
+                    "Existing global segmentation found; "
+                    f"skipping prediction:\n  {binary_path}"
+                )
+                ref_image_for_seg = sitk.ReadImage(dir_image)
+                pred_sweep, prob_pred_sweep = sf.load_global_segmentation(
+                    binary_path, probability_path, ref_image_for_seg
+                )
+                write_probability = probability_path is not None
+            else:
+                pred_sweep, prob_pred_sweep = run_global_segmentation(
+                    dir_image=dir_image,
+                    model_folder=dir_model_weights_global,
+                    fold=global_fold,
+                    scale=global_scale,
+                    force_cpu=force_cpu,
+                )
+                write_probability = True
+        create_case_directories(dir_output, write_samples, simvascular=simvascular)
+        sitk.WriteImage(pred_sweep, dir_output + case + "_sweep_seg.mha")
+        if write_probability:
+            sitk.WriteImage(
+                prob_pred_sweep,
+                dir_output + case + "_sweep_probability.mha",
+            )
         sweep_surface = vf.evaluate_surface(pred_sweep, 1)
         vf.write_vtk_polydata(
             sweep_surface,
-            dir_output0 + "/" + case + "_sweep_surface_nonsmooth.vtp",
+            dir_output + case + "_sweep_surface_nonsmooth.vtp",
         )
         sweep_surface_smooth = vf.taubin_smooth_polydata(
             sweep_surface, it=75, mu1=0.5, mu2=0.51
@@ -116,10 +157,8 @@ def run_plus_batch(
         sweep_surface_smooth = vf.compute_polydata_normals(sweep_surface_smooth)
         vf.write_vtk_polydata(
             sweep_surface_smooth,
-            dir_output0 + "/" + case + "_sweep_surface.vtp",
+            dir_output + case + "_sweep_surface.vtp",
         )
-
-        create_case_directories(dir_output, write_samples, simvascular=simvascular)
         if simvascular:
             vf.write_image_as_vti(
                 dir_image,
@@ -136,7 +175,7 @@ def run_plus_batch(
         if sweep_centerline is not None:
             vf.write_vtk_polydata(
                 sweep_centerline,
-                dir_output0 + "/" + case + "_sweep_centerline.vtp",
+                dir_output + case + "_sweep_centerline.vtp",
             )
         else:
             print("Sweep centerline extraction failed in initialization")
@@ -233,6 +272,12 @@ def run_plus_batch(
             assembly_threshold=assembly_threshold,
             simvascular=simvascular,
             start_time_global=start_time_global,
+        )
+        mark_case_done(
+            dir_output0,
+            done,
+            case_name,
+            seconds=time.perf_counter() - case_started,
         )
 
         if not global_config.get("DEBUG", False):

@@ -11,6 +11,10 @@
 
 DATASET_NAME: 'other'
 
+# Keep every patch from one patient on the same side of each nnU-Net fold.
+# Set false to let nnU-Net split individual patches into folds.
+PATIENT_LEVEL_FOLDS: True
+
 EXTRACT_VOLUMES: True
 WRITE_SAMPLES: True
 WRITE_IMG: True

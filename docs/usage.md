@@ -93,6 +93,8 @@ Other ways to initialize:
 
 `-unit` (`mm` or `cm`, default `mm`) is the unit of the seed coordinates and the seed radius. It should match the image header. `-scale` multiplies the voxel spacing passed to nnU-Net. Use `-scale 0.1` when the image spacing is in millimeters and the model was trained with spacing in centimeters. Use `-unit cm` for centimeter images, such as SimVascular models.
 
+By default the input is resampled so each axis is the finer of the image spacing and the model spacing in `plans.json` (converted with `-scale`). An axis already finer than the model stays at the image spacing. `-resample_spacing` overrides that: one value is isotropic spacing, or three values are `sx sy sz`, in image-header units. `seqseg run plus batch` uses the finer spacing across the global and SeqSeg models. The same default applies to `seqseg run single` (`--resample-spacing`).
+
 ## Basic Usage
 
 `seqseg run batch` on an aorta MR case:
@@ -116,7 +118,7 @@ Other common commands:
 | -------- | ------- |
 | `seqseg run single` | One volume + seeds (stages under `<outdir>/_seqseg_single_staging/`) |
 | `seqseg run global` | Whole-volume nnU-Net prediction from a trainer folder and an image or image folder |
-| `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg. `-global_seg_dir` supplies those masks instead of predicting them |
+| `seqseg run plus batch` | Global nnU-Net sweep, then SeqSeg. Reuses `{case}_sweep_seg.mha` when that file is already present. `-global_seg_dir` supplies masks instead of predicting them |
 | `seqseg run continue` | Continue a case from `{case_dir}/checkpoint` for more steps, optionally with new seeds |
 | `seqseg paths init` / `set` / `show` | Save default nnU-Net / data / out dirs (`~/.seqseg/paths.yaml`) |
 | `seqseg train prepare` | Extract patches or whole volumes, create an nnU-Net dataset, and preprocess |
@@ -189,6 +191,16 @@ seqseg run batch -data_dir data/ -start_seg /path/to/initial_seg.mha
 ```
 Tracing is unchanged; the SeqSeg result is merged (union) into the initial mask.
 
+#### Finished cases
+
+`seqseg run batch` and `seqseg run plus batch` append each finished case to `outdir/done.txt`. The line is the case name, a tab, and how long that case took in seconds (`S-008	842.105 s`). A later run of either command skips names already in that file. A case that stops before it finishes is left off the list, so the next run tries it again. Delete that line, or the file, to run a case again. Older files that list only the case name still skip those cases.
+
+#### Reusing a global segmentation plus already wrote
+
+`seqseg run plus batch` checks for `{case}_sweep_seg.mha` before the global model runs. It looks in the case folder first, then in the output directory (where older runs wrote that file). When the mask is there, plus loads it and skips the global prediction. `{case}_sweep_probability.mha` beside the mask is the tracing prior when that file exists; otherwise the binary mask is the prior. A new prediction writes both files into the case folder. Delete `{case}_sweep_seg.mha` to predict again.
+
+`-global_seg_dir` still takes precedence: plus reads that folder and does not look for a sweep mask.
+
 #### SeqSeg Plus from an existing global segmentation:
 ```bash
 seqseg run plus batch \
@@ -240,6 +252,7 @@ Arguments for `seqseg run batch`:
 | `outdir` | str | required | Output directory for results. Saved `seqseg paths` value is used when omitted |
 | `unit` | str | `mm` | Image coordinate units (`mm`, `cm`) |
 | `scale` | float | `1.0` | Multiplies voxel spacing passed to nnU-Net. `0.1` converts mm spacing to cm |
+| `resample_spacing` | float(s) | finer of image and model | Override input spacing (one isotropic value, or `sx sy sz`). Omit to resample each axis to the finer of the native spacing and the model spacing |
 | `max_n_steps` | int | `1000` | Maximum tracking steps. The tutorial sets this to `10` so the demo finishes quickly |
 | `max_n_steps_per_branch` | int | `100` | Maximum steps per vessel branch |
 | `max_n_branches` | int | `100` | Maximum number of branches to follow |
