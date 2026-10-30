@@ -12,6 +12,7 @@ from seqseg.modules.sitk_functions import (
     merge_binary_with_start,
     merge_probability_with_start,
     resample_to_reference,
+    resolve_existing_sweep_seg,
     resolve_global_seg_files,
 )
 
@@ -104,6 +105,36 @@ def test_merge_probability_with_start_takes_maximum():
 
 def _write(img, path):
     sitk.WriteImage(img, str(path))
+
+
+def test_resolve_existing_sweep_seg_case_folder_with_probability(tmp_path):
+    case_dir = tmp_path / "3d_fullres_case"
+    case_dir.mkdir()
+    binary = case_dir / "case_sweep_seg.mha"
+    probability = case_dir / "case_sweep_probability.mha"
+    binary.write_bytes(b"seg")
+    probability.write_bytes(b"prob")
+    (tmp_path / "case_sweep_seg.mha").write_bytes(b"legacy")
+
+    found = resolve_existing_sweep_seg(case_dir, "case", tmp_path)
+    assert found == (str(binary), str(probability))
+
+
+def test_resolve_existing_sweep_seg_binary_only_and_legacy_dir(tmp_path):
+    binary = tmp_path / "case_sweep_seg.mha"
+    binary.write_bytes(b"seg")
+    case_dir = tmp_path / "3d_fullres_case"
+    case_dir.mkdir()
+
+    found = resolve_existing_sweep_seg(case_dir, "case", tmp_path)
+    assert found == (str(binary), None)
+
+
+def test_resolve_existing_sweep_seg_missing(tmp_path):
+    case_dir = tmp_path / "3d_fullres_case"
+    case_dir.mkdir()
+    (tmp_path / "case_segmentation_12_steps.mha").write_bytes(b"final")
+    assert resolve_existing_sweep_seg(case_dir, "case", tmp_path) is None
 
 
 def test_resolve_global_seg_files_prefers_segmentation_and_probability(tmp_path):

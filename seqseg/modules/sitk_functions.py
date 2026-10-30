@@ -579,6 +579,36 @@ def resample_to_reference(image, reference, is_label=True):
     )
 
 
+def resolve_existing_sweep_seg(case_dir, case, legacy_dir=None):
+    """Find a global sweep mask a previous plus run already wrote.
+
+    ``{case}_sweep_seg.mha`` is checked in ``case_dir`` first, then in
+    ``legacy_dir`` (older runs wrote it next to the case folders).
+    ``{case}_sweep_probability.mha`` beside that mask is included when
+    the file is present.
+
+    Returns ``(binary_path, probability_path)`` or ``None``.
+    ``probability_path`` may be ``None``.
+    """
+    binary_name = f"{case}_sweep_seg.mha"
+    probability_name = f"{case}_sweep_probability.mha"
+    roots = []
+    for directory in (case_dir, legacy_dir):
+        if not directory:
+            continue
+        root = os.path.abspath(os.path.expanduser(str(directory)))
+        if root not in roots:
+            roots.append(root)
+    for root in roots:
+        binary = os.path.join(root, binary_name)
+        if os.path.isfile(binary):
+            probability = os.path.join(root, probability_name)
+            if not os.path.isfile(probability):
+                probability = None
+            return binary, probability
+    return None
+
+
 def resolve_global_seg_files(seg_dir, case, img_ext):
     """Find the global mask for one case.
 

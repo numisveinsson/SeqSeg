@@ -77,6 +77,7 @@ def run_classic_batch(
             f"\nProcessing test case {i + start + 1} of {len(testing_samples)}: "
             f"{test_case}"
         )
+        case_started = time.perf_counter()
 
         dir_output, dir_image, dir_seg, dir_cent, case, idx, json_file_present = (
             init.process_init(
@@ -201,7 +202,12 @@ def run_classic_batch(
             simvascular=simvascular,
             start_time_global=start_time_global,
         )
-        mark_case_done(dir_output0, done, case_name)
+        mark_case_done(
+            dir_output0,
+            done,
+            case_name,
+            seconds=time.perf_counter() - case_started,
+        )
 
         if not global_config["DEBUG"]:
             sys.stdout.close()

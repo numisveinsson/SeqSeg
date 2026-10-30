@@ -16,6 +16,11 @@ from seqseg.modules.centerline import calc_multi_component_centerlines
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
 
+# Largest disconnected bodies in the global mask used to place tracing seeds.
+# Bodies under 100 voxels are speckle on the sweep masks and are left out.
+MAX_INIT_COMPONENTS = 5
+MIN_INIT_COMPONENT_VOXELS = 100
+
 
 def case_output_directory(dir_output0, name):
     """Return ``dir_output0/name/``.
@@ -262,10 +267,11 @@ def initialize_from_seg(segmentation,
     potential_branches = []
     extracted_centerline = None
 
-    # Use multi-component centerline extraction over the two largest bodies.
+    # Trace the largest disconnected bodies, up to five, skipping speckle.
     centerline, success_info = calc_multi_component_centerlines(
         segmentation,
-        nr_seeds=2,
+        nr_seeds=MAX_INIT_COMPONENTS,
+        min_component_voxels=MIN_INIT_COMPONENT_VOXELS,
         min_res=500,
         out_dir=dir_output,
         write_files=write_samples,
