@@ -239,7 +239,8 @@ def initialize_from_seg(segmentation,
                         dir_output,
                         num_seeds=3,
                         write_samples=False,
-                        return_centerline=False):
+                        return_centerline=False,
+                        verbose=False):
     """
     Initialize the potential branches and initial seeds for the
     segmentation process, based on the segmentation
@@ -254,6 +255,9 @@ def initialize_from_seg(segmentation,
         Number of seeds
     write_samples : bool
         Write samples
+    verbose : bool
+        Print the multi-component centerline trace. The component, branch,
+        seeds-per-branch, and failed-branch summary is printed either way.
 
     Returns
     -------
@@ -277,16 +281,22 @@ def initialize_from_seg(segmentation,
         write_files=write_samples,
         move_target_if_fail=False,
         relax_factor=1,
-        verbose=True,
+        verbose=verbose,
         return_failed=False,
     )
+    n_components = len(success_info.get('seeds_used', []))
+    n_positions = max(1, num_seeds)
+    n_branches = 0
+    n_failed = 0
+    for successful_targets, total_targets in success_info.get(
+            'component_target_counts', []):
+        n_failed += max(0, total_targets - successful_targets)
     success = bool(success_info.get('overall_success', False))
     if success and centerline.GetNumberOfPoints() > 0:
         extracted_centerline = centerline
         write_geo(dir_output + 'centerline.vtp', centerline)
         # num_seeds controls how many equally spaced seed pairs are placed
         # per branch; use all branches available in the centerline.
-        n_positions = max(1, num_seeds)
         for position_idx in range(n_positions):
             (old_seeds, old_radiuss,
              component_initial_seeds, initial_radiuss) = get_equally_spaced_radius_seeds(
@@ -295,6 +305,8 @@ def initialize_from_seg(segmentation,
                 position_idx=position_idx,
                 num_branches=None
                 )
+            if position_idx == 0:
+                n_branches = len(component_initial_seeds)
             if len(component_initial_seeds) == 0:
                 continue
             potential_branches += create_pots(
@@ -305,7 +317,16 @@ def initialize_from_seg(segmentation,
                 initial_radiuss
             )
             initial_seeds.extend(component_initial_seeds)
-    else:
+    print(f"Extracting centerlines for {n_components} connected components")
+    branch_line = (
+        f"Extracted {n_branches} branches for seed placement, "
+        f"{n_positions} seeds per branch"
+    )
+    if n_failed:
+        failed_word = "branch" if n_failed == 1 else "branches"
+        branch_line += f", {n_failed} {failed_word} failed"
+    print(branch_line)
+    if not (success and centerline.GetNumberOfPoints() > 0):
         print("Centerline calculation failed! - No seeds found!")
 
     if return_centerline:

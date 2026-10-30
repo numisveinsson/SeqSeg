@@ -118,7 +118,7 @@ class TracingLimits:
     max_n_branches: int = 100
     max_n_steps_per_branch: int = 100
     write_samples: bool = False
-    unit: str = "cm"
+    unit: str = "mm"
     scale: float = 1.0
 
 

@@ -1006,19 +1006,19 @@ def calc_centerline_global(predicted_vessels, initial_seeds,
             Centerline merge method for post-processing. Supported values are
             ``'clean'`` (default) and ``'tree'``.
     """
-    if nr_seeds is None:
-        print(
-            "Calculating global centerline; "
-            "identifying one seed per disconnected body"
-        )
-    else:
-        print(f"Calculating global centerline with {len(initial_seeds)} initial seeds")
+    if verbose:
+        if nr_seeds is None:
+            print(
+                "Calculating global centerline; "
+                "identifying one seed per disconnected body"
+            )
+        else:
+            print(f"Calculating global centerline with {len(initial_seeds)} initial seeds")
     # Use multi-component centerline extraction so disconnected bodies are
     # handled in one unified workflow.
     centerline_poly, success_info = calc_multi_component_centerlines(
         predicted_vessels,
         nr_seeds=nr_seeds,
-        min_res=500,
         out_dir=None,
         write_files=False,
         move_target_if_fail=False,

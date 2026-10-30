@@ -34,7 +34,7 @@ Other YAML files in that folder (`global_default`, `global_debug`, `global_test`
 
 ## Units inside the YAML
 
-Seed coordinates and the seed radius follow `-unit` (default centimeters). Lengths in the YAML stay in **millimeters**, including when `-unit cm`:
+Seed coordinates and the seed radius follow `-unit` (default millimeters). Lengths in the YAML stay in **millimeters**, including when `-unit` is `cm`:
 
 - `MIN_RADIUS`, `ADD_RADIUS`, `STOP_RADIUS`
 - `CENT_MAX_SPACING`

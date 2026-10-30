@@ -261,7 +261,7 @@ def resample_path_like_simvascular(
     return spline_points
 
 
-def reslice_size_for_unit(unit: str = "cm") -> str:
+def reslice_size_for_unit(unit: str = "mm") -> str:
     """SimVascular XML ``reslice_size`` for the project's physical units.
 
     SimVascular expects ``5`` when coordinates are in centimeters and ``50``
@@ -279,7 +279,7 @@ _MM_CONTOUR_POINT_2D = 3.0
 _MM_CONTOUR_POINT_3D = 5.0
 
 
-def _physical_unit_scale(unit: str = "cm") -> float:
+def _physical_unit_scale(unit: str = "mm") -> float:
     """Scale factor from mm-native display sizes to project ``unit``."""
     if str(unit).strip().lower() == "mm":
         return 1.0
@@ -294,7 +294,7 @@ def _format_sv_display_size(value: float) -> str:
     return f"{v:g}"
 
 
-def path_point_display_sizes_for_unit(unit: str = "cm") -> tuple:
+def path_point_display_sizes_for_unit(unit: str = "mm") -> tuple:
     """
     SimVascular path XML ``point_2D_display_size`` and ``point_size`` (3D).
 
@@ -307,7 +307,7 @@ def path_point_display_sizes_for_unit(unit: str = "cm") -> tuple:
     )
 
 
-def contour_point_display_sizes_for_unit(unit: str = "cm") -> tuple:
+def contour_point_display_sizes_for_unit(unit: str = "mm") -> tuple:
     """
     SimVascular contour group XML ``point_2D_display_size`` and ``point_size`` (3D).
 
@@ -523,7 +523,7 @@ def create_pth(
     calculation_number=100,
     spacing=0.0,
     further_subdivision_number=10,
-    unit="cm",
+    unit="mm",
 ):
     """Create a SimVascular-style .pth XML file given a list of (x,y,z) points.
 

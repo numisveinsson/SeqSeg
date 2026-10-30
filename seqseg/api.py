@@ -122,7 +122,7 @@ class TracingOptions:
     write_samples: bool = False
     disk_io: bool = True
     simvascular: bool = False
-    unit: str = "cm"
+    unit: str = "mm"
     scale: float = 1.0
     fold: str = "all"
     force_cpu: bool = False

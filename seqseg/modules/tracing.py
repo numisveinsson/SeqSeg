@@ -117,7 +117,7 @@ class TracingContext:
     max_n_branches: int
     max_n_steps_per_branch: int
     global_config: Mapping[str, Any]
-    unit: str = "cm"
+    unit: str = "mm"
     scale: float = 1.0
     seg_file: Optional[Union[str, sitk.Image]] = None
     start_seg: Any = None
@@ -215,7 +215,7 @@ def trace_centerline(
     max_n_branches,
     max_n_steps_per_branch,
     global_config,
-    unit='cm',
+    unit='mm',
     scale=1,
     seg_file=None,
     start_seg=None,
@@ -266,7 +266,7 @@ def trace_centerline(
     global_config : dict
         Configuration parameters
     unit : str, optional
-        Image units ('cm' or 'mm'), default 'cm'
+        Image units ('mm' or 'cm'), default 'mm'
     scale : float, optional
         Scaling factor for image data, default 1
     seg_file : str or sitk.Image, optional
@@ -803,7 +803,7 @@ def trace_centerline(
                  success) = calc_centerline_fmm(predicted_vessel,
                                                 seed,
                                                 targets,
-                                                min_res=40,
+                                                global_grid=False,
                                                 post_process_kwargs={
                                                     'merge_method': global_config.get(
                                                         'CENTERLINE_MERGE_METHOD',

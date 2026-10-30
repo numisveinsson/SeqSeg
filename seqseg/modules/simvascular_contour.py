@@ -38,6 +38,7 @@ from .simvascular import (
     _perpendicular_normal_unit,
     compute_tangents,
     contour_point_display_sizes_for_unit,
+    reslice_size_for_unit,
     indent,
     resample_path_like_simvascular,
 )
@@ -669,12 +670,12 @@ def write_ctgr(
     contours_xyz: Sequence[Optional[np.ndarray]],
     output_path: str,
     *,
-    reslice_size: str = "5",
+    reslice_size: Optional[str] = None,
     lofting_attribs: Optional[Dict[str, str]] = None,
     contour_method: str = "LevelSet",
     n_control_points: int = DEFAULT_SPLINE_POLYGON_N_CONTROL,
     subdivision_spacing: Optional[float] = None,
-    unit: str = "cm",
+    unit: str = "mm",
 ) -> str:
     """
     Write a SimVascular ``.ctgr`` contour group XML.
@@ -690,6 +691,8 @@ def write_ctgr(
     """
     if len(path_points) != len(contours_xyz):
         raise ValueError("path_points and contours_xyz must have the same length")
+    if reslice_size is None:
+        reslice_size = reslice_size_for_unit(unit)
 
     loft = dict(_DEFAULT_LOFTING_ATTRIBS)
     if lofting_attribs:
@@ -712,7 +715,10 @@ def write_ctgr(
     ET.SubElement(ts, "lofting_parameters", loft)
 
     if subdivision_spacing is None or float(subdivision_spacing) <= 0.0:
-        subdivision_spacing = 0.078125
+        # ~0.8 mm between contour samples; centimeter projects use one tenth.
+        subdivision_spacing = (
+            0.78125 if str(unit).strip().lower() == "mm" else 0.078125
+        )
     subdiv_str = _fmt_coord(float(subdivision_spacing))
     n_spline = max(4, int(n_control_points))
     n_xml_ctrl = n_spline + SIMVASCULAR_SPLINE_RESERVED_CONTROLS
@@ -862,7 +868,7 @@ def write_ctgr_for_pth(
     contour_method: str = "LevelSet",
     component_selection: str = "closest_to_path",
     n_control_points: int = DEFAULT_SPLINE_POLYGON_N_CONTROL,
-    unit: str = "cm",
+    unit: str = "mm",
 ) -> str:
     """
     Parse ``pth_path``, extract contours from ``sitk_volume``, write ``.ctgr``.

@@ -6,8 +6,10 @@ import SimpleITK as sitk
 from seqseg.modules.centerline import (
     backtracking_gradient,
     calc_centerline_fmm,
+    centerline_grid_size,
     cluster_map,
     masked_world_frame_gradient,
+    resample_local_centerline,
     snap_end_points_to_lumen,
     world_frame_gradient,
 )
@@ -61,6 +63,32 @@ def test_snap_end_point_stays_on_the_local_cross_section():
     speck[2, 2, 2] = 0.2
     assert snap_end_points_to_lumen(
         [np.array([2, 2, 2])], speck, (1.0, 1.0, 1.0)) == []
+
+
+def test_masked_gradient_of_a_clipped_field_is_float32():
+    shape = (12, 10, 8)
+    xs = np.arange(shape[0], dtype=np.float64)[:, None, None]
+    arrival = np.clip(np.broadcast_to(xs, shape).copy(), -1.0e6, 1.0e6)
+    inside = np.zeros(shape, dtype=bool)
+    inside[1:-1, 1:-1, 1:-1] = True
+    inward = np.where(inside, 1.0, -1.0)
+    spacing = (0.5, 0.5, 0.5)
+    grad = masked_world_frame_gradient(
+        arrival, inside, inward, spacing, _IDENTITY)
+    assert grad.dtype == np.float32
+    # df/d(index) = 1 and spacing is 0.5 mm, so the lumen gradient is 2 per mm.
+    np.testing.assert_allclose(grad[0, 2:-2, 2:-2, 2:-2], 2.0, atol=1e-5)
+    np.testing.assert_allclose(grad[1, 2:-2, 2:-2, 2:-2], 0.0, atol=1e-5)
+    np.testing.assert_allclose(grad[2, 2:-2, 2:-2, 2:-2], 0.0, atol=1e-5)
+
+    plain = world_frame_gradient(inward, spacing, _IDENTITY)
+    outside = (0, 4, 4)
+    assert not inside[outside]
+    sample = plain[:, outside[0], outside[1], outside[2]]
+    norm = np.linalg.norm(sample)
+    expected = -2.0 * sample / (norm if norm >= 1e-12 else 1.0)
+    np.testing.assert_allclose(
+        grad[:, outside[0], outside[1], outside[2]], expected, atol=1e-5)
 
 
 def test_masked_gradient_follows_a_thin_tube_at_the_wall():
@@ -160,8 +188,81 @@ def test_automatic_targets_reach_a_seed_away_from_the_widest_voxel():
     seed = np.array([10.0, 6.0, 6.0])
 
     _centerline, success, successes = calc_centerline_fmm(
-        image, seed=seed, targets=None, min_res=10,
+        image, seed=seed, targets=None,
         return_success_list=True)
 
     assert success
     assert all(successes)
+
+
+def test_local_centerline_grid_stops_at_40_on_every_axis():
+    image = _image_from_xyz(
+        np.zeros((24, 24, 24), dtype=np.uint8), spacing=(0.4, 0.4, 0.4))
+    out, resampled = resample_local_centerline(image)
+    assert resampled is True
+    assert out.GetSize() == (40, 40, 40)
+    assert int(np.prod(out.GetSize())) < 100_000
+
+    short_xy = _image_from_xyz(
+        np.zeros((24, 24, 48), dtype=np.uint8), spacing=(0.4, 0.4, 0.4))
+    lifted, resampled = resample_local_centerline(short_xy)
+    assert resampled is True
+    assert lifted.GetSize() == (40, 40, 80)
+    assert min(lifted.GetSize()) >= 40
+
+    already = _image_from_xyz(
+        np.zeros((40, 48, 56), dtype=np.uint8), spacing=(0.4, 0.4, 0.4))
+    kept, resampled = resample_local_centerline(already)
+    assert resampled is False
+    assert kept.GetSize() == (40, 48, 56)
+
+
+def test_centerline_grid_refines_the_s008_crop_to_150_million():
+    size, spacing, _target, resample = centerline_grid_size(
+        (325, 294, 252), (0.39453125, 0.39453125, 0.4))
+    assert resample is True
+    assert size == (595, 538, 468)
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert abs(spacing[0] - 0.215) < 0.01
+    assert int(np.prod(size)) <= 150_000_000
+    assert size[0] > 325 and size[2] > 252
+
+
+def test_centerline_grid_refines_a_half_millimeter_crop_to_150_million():
+    size, spacing, _target, resample = centerline_grid_size(
+        (320, 289, 184), (0.5, 0.5, 0.5))
+    assert resample is True
+    assert size == (661, 597, 380)
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert abs(spacing[0] - 0.242) < 0.01
+    assert int(np.prod(size)) <= 150_000_000
+
+
+def test_centerline_grid_refines_a_thick_slice_axis():
+    size, spacing, _target, resample = centerline_grid_size(
+        (256, 256, 40), (0.7, 0.7, 3.0))
+    assert resample is True
+    assert size == (607, 607, 407)
+    assert int(np.prod(size)) <= 150_000_000
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert spacing[2] < 0.7
+
+
+def test_centerline_grid_caps_a_billion_voxels_at_150_million():
+    size, spacing, _target, resample = centerline_grid_size(
+        (1000, 1000, 1000), (0.5, 0.5, 0.5))
+    assert resample is True
+    assert size == (531, 531, 531)
+    assert spacing[0] == spacing[1] == spacing[2]
+    assert abs(spacing[0] - 0.941) < 0.01
+    assert int(np.prod(size)) <= 150_000_000
+
+
+def test_centerline_grid_keeps_a_native_grid_at_the_budget():
+    size, spacing, target, resample = centerline_grid_size(
+        (531, 531, 531), (0.5, 0.5, 0.5))
+    assert resample is False
+    assert target is None
+    assert size == (531, 531, 531)
+    assert spacing == (0.5, 0.5, 0.5)
+    assert int(np.prod(size)) <= 150_000_000
