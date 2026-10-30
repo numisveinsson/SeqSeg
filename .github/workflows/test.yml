@@ -24,10 +24,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install CPU PyTorch
+        if: runner.os == 'Linux'
+        run: |
+          python -m pip install --upgrade pip
+          # The default Linux torch wheel depends on cuda-toolkit and nvidia-*-cu13.
+          # These jobs only check the CLI, so the CPU wheels are enough.
+          python -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install .
+          python -m pip install --no-cache-dir --upgrade-strategy only-if-needed .
 
       - name: Run CLI test
         run: |
@@ -49,10 +57,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install CPU PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          # The default Linux torch wheel depends on cuda-toolkit and nvidia-*-cu13.
+          # The test suite does not need a GPU.
+          python -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
       - name: Install package and pytest
         run: |
           python -m pip install --upgrade pip
-          pip install '.[dev]'
+          python -m pip install --no-cache-dir --upgrade-strategy only-if-needed '.[dev]'
 
       - name: Run pytest
         run: pytest -q
