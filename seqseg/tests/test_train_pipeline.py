@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+import seqseg
 from seqseg.pipeline.train import (
     TrainDependencyError,
     _STAGING_DIR_NAME,
@@ -262,7 +263,9 @@ _REQUIRED_SAMPLER_KEYS = (
 def test_bundled_sampler_configs_resolve_inside_seqseg(name, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     resolved = Path(_resolve_sampler_config_file(name))
-    bundled = Path(__file__).resolve().parents[1] / "config" / "sampler"
+    # Follow the imported package. A non-editable install resolves configs
+    # from site-packages, while this test file stays in the checkout.
+    bundled = Path(seqseg.__file__).resolve().parent / "config" / "sampler"
     assert resolved.parent == bundled
 
 
