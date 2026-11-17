@@ -265,6 +265,9 @@ def finish_classic_case(
     assembly = assembly_obj.assembly
     if start_seg is not None:
         assembly = sf.merge_probability_with_start(assembly, start_seg)
+    # Take the logit before any upsampling: the logit of an upsampled
+    # probability has the same zero crossing as the probability itself.
+    level_set = sf.probability_to_level_set(assembly, assembly_threshold)
     n_udpates = None
     if write_samples:
         n_udpates = assembly_obj.get_n_updates_image()
@@ -301,6 +304,10 @@ def finish_classic_case(
                 )
                 assembly = sf.resample_to_spacing(
                     assembly, target_spacing, is_label=False
+                )
+                level_set = sf.resample_to_spacing(
+                    level_set, target_spacing, is_label=False,
+                    default_value=-1.0,
                 )
                 if write_samples:
                     n_udpates = sf.resample_to_spacing(
@@ -348,7 +355,10 @@ def finish_classic_case(
         + ".mha",
     )
 
-    assembly_surface = vf.evaluate_surface(assembly_binary, 1)
+    level_set = sf.keep_level_set_components(
+        level_set, assembly_binary, initial_seeds
+    )
+    assembly_surface = vf.evaluate_surface(level_set, 0)
 
     vf.write_vtk_polydata(
         assembly_surface,
@@ -356,9 +366,8 @@ def finish_classic_case(
         + str(n_steps_taken) + "_steps" + ".vtp",
     )
 
-    surface_smooth = vf.taubin_smooth_polydata(
-        assembly_surface, it=75, mu1=0.5, mu2=0.51
-    )
+    # Windowed sinc: cotangent Taubin diverges on marching-cubes slivers.
+    surface_smooth = vf.smooth_surface(assembly_surface, 10)
     surface_smooth = vf.compute_polydata_normals(surface_smooth)
     vf.write_vtk_polydata(
         surface_smooth,
