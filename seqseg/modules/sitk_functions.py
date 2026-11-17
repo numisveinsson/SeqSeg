@@ -134,7 +134,8 @@ def fit_spacing_to_max_voxels(
 
 
 def resample_to_spacing(image, new_spacing, is_label=False,
-                        max_voxels=DEFAULT_MAX_RESAMPLE_VOXELS):
+                        max_voxels=DEFAULT_MAX_RESAMPLE_VOXELS,
+                        default_value=0):
     """
     Resample a SITK image to a target spacing while preserving physical extent.
 
@@ -144,6 +145,7 @@ def resample_to_spacing(image, new_spacing, is_label=False,
         is_label (bool): Use nearest-neighbor interpolation for labels.
         max_voxels (int | None): If set, raise ``ValueError`` when the
             output grid would exceed this many voxels instead of allocating.
+        default_value (float): Value for samples outside the input image.
     """
     orig_size = np.array(image.GetSize(), dtype=np.int64)
     orig_spacing = np.array(image.GetSpacing(), dtype=np.float64)
@@ -166,7 +168,7 @@ def resample_to_spacing(image, new_spacing, is_label=False,
     resample.SetOutputOrigin(image.GetOrigin())
     resample.SetOutputDirection(image.GetDirection())
     resample.SetTransform(sitk.Transform())
-    resample.SetDefaultPixelValue(0)
+    resample.SetDefaultPixelValue(default_value)
     if is_label:
         resample.SetInterpolator(sitk.sitkNearestNeighbor)
     else:
@@ -768,6 +770,47 @@ def merge_probability_with_start(prob, start_prob):
     )
     merged.CopyInformation(prob)
     return merged
+
+
+def probability_to_level_set(prob, threshold=0.5, eps=1e-4):
+    """
+    Logit of a probability image, shifted so that zero is ``threshold``.
+
+    Across a vessel wall the probability is a steep sigmoid, which linear
+    interpolation resolves poorly. Its logit is close to linear in distance
+    to the wall, so contouring the logit at zero places the surface between
+    voxel centers instead of on them. Positive values are inside the vessel.
+
+    Args:
+        prob (sitk.Image): Foreground probability in [0, 1].
+        threshold (float): Probability that maps to zero.
+        eps (float): Probabilities are clipped to [eps, 1 - eps].
+    Returns:
+        sitk.Image: float32 level set on the grid of ``prob``.
+    """
+    p = np.clip(sitk.GetArrayFromImage(prob).astype(np.float64), eps, 1 - eps)
+    t = float(np.clip(threshold, eps, 1 - eps))
+    logit = np.log(p / (1 - p)) - np.log(t / (1 - t))
+    level_set = sitk.GetImageFromArray(logit.astype(np.float32))
+    level_set.CopyInformation(prob)
+    return level_set
+
+
+def keep_level_set_components(level_set, binary, seeds):
+    """
+    Push parts of ``level_set`` outside the kept vessel below zero.
+
+    The kept vessel is the seed-connected component of ``level_set >= 0``
+    plus ``binary``. Voxels that are already negative are left unchanged, so
+    the zero crossing of the kept vessel does not move.
+    """
+    inside = level_set >= 0
+    kept = sitk.Or(
+        sitk.Cast(keep_component_seeds(inside, seeds), sitk.sitkUInt8),
+        sitk.Cast(binary, sitk.sitkUInt8),
+    )
+    unchanged = sitk.Or(kept, sitk.Not(inside))
+    return sitk.Mask(level_set, unchanged, outsideValue=-1.0)
 
 
 def write_image(image, outputImageFileName):
